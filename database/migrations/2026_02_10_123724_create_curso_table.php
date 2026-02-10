@@ -11,6 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (Schema::hasTable('curso')) {
+            return;
+        }
+
         Schema::create('curso', function (Blueprint $table) {
             $table->id();
             $table->unsignedInteger('ordem')->default(0);

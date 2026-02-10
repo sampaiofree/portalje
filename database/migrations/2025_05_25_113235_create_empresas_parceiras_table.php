@@ -9,19 +9,23 @@ return new class extends Migration
     /**
      * Run the migrations.
      */
-    public function up()
-{
-    Schema::create('empresas_parceiras', function (Blueprint $table) {
-        $table->id();
-        $table->string('nome_empresa');
-        $table->string('nome_responsavel');
-        $table->string('telefone_contato');
-        $table->string('cidade');
-        $table->string('estado', 2);
-        $table->text('informacoes_vagas')->nullable();
-        $table->timestamps();
-    });
-}
+    public function up(): void
+    {
+        if (Schema::hasTable('empresas_parceiras')) {
+            return;
+        }
+
+        Schema::create('empresas_parceiras', function (Blueprint $table) {
+            $table->id();
+            $table->string('nome_empresa');
+            $table->string('nome_responsavel');
+            $table->string('telefone_contato');
+            $table->string('cidade');
+            $table->string('estado', 2);
+            $table->text('informacoes_vagas')->nullable();
+            $table->timestamps();
+        });
+    }
 
 
     /**

@@ -11,6 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (Schema::hasTable('combos')) {
+            return;
+        }
+
         Schema::create('combos', function (Blueprint $table) {
             $table->id();
             $table->string('titulo')->nullable();
@@ -32,4 +36,3 @@ return new class extends Migration
         Schema::dropIfExists('combos');
     }
 };
-

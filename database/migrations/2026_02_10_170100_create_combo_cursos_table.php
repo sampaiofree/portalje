@@ -11,6 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (Schema::hasTable('combo_cursos')) {
+            return;
+        }
+
         Schema::create('combo_cursos', function (Blueprint $table) {
             $table->id();
             $table->foreignId('id_combo')->constrained('combos')->cascadeOnDelete();
@@ -29,4 +33,3 @@ return new class extends Migration
         Schema::dropIfExists('combo_cursos');
     }
 };
-
