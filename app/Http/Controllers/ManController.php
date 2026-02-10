@@ -52,34 +52,6 @@ class ManController extends Controller
         
     }
 
-    public function many(){
-        $manychat = new ManyChatService('2250527:c0257f693d4b13e84e7d1c7340253ed2'); 
-            $dados_many = [
-                'cliente_nome' => 'Bruno',
-                'cliente_telefone' => '5562995772922',
-                'phone' => '5562995772922',
-                'whatsapp_phone' => '5562995772922',
-                'gpt_reposta' => "Olá",
-                'gpt_thread_id' => '',
-                'cliente_telefone_id' => '12347345'
-
-            ];
-        $reposta = $manychat->many($dados_many);
-
-        print_r($reposta);
-
-    }
-
-    public function openAI(){
-        $assistant_id = "asst_s8wED8lm88lyfLpY3JxDQvf0";
-        $api_key = "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";
-
-        $openAIService = new OpenAIService($api_key);
-
-        $thread_id = $openAIService->create_thread();
-        $run_id = $this->rodar_assistente($assistant_id, $thread_id);
-        
-    }
 
     public function gerarImagem(){
         $assistant_id = "asst_s8wED8lm88lyfLpY3JxDQvf0";
