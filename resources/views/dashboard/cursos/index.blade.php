@@ -13,7 +13,8 @@
                 showSuccessMessage: false,
                 successMessage: '',
                 showTutorial: false
-            }">
+            }"
+            @show-success.window="showSuccessMessage = true; successMessage = $event.detail; setTimeout(() => showSuccessMessage = false, 3000)">
                 <!-- Card de Cabeçalho com o campo de busca -->
                 <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-6">
                     <div class="p-6 text-gray-900">
@@ -92,6 +93,9 @@
 
                                         resourcesExpanded: false,
 
+                                        hasCodigoRef: {{ $curso->codigo_ref ? 'true' : 'false' }},
+                                        codigoRefId: {{ $curso->codigo_ref_id ? (int) $curso->codigo_ref_id : 'null' }},
+                                        codigoRef: @js($curso->codigo_ref),
                                         mostrarCurso: {{ $curso->mostrar_curso ? 'true' : 'false' }},
 
                                         // Estado para o Gerador da Página de Vendas
@@ -108,7 +112,7 @@
 
                                         // URLs Base
                                         baseUrl: 'https://{{ Auth::user()->dominio_externo ?? Auth::user()->dominio }}/{{$curso->url}}',
-                                        baseCheckoutUrl: '{{ $curso->link_checkout_completo }}',
+                                        baseCheckoutUrl: @js($curso->link_checkout_completo),
 
                                         // Função para copiar com feedback melhorado
                                        copyLink(text, type) {
@@ -136,28 +140,34 @@
                                         },
 
                                         get finalCheckoutUrl() {
+                                            if (!this.baseCheckoutUrl) return '';
                                             let url = this.baseCheckoutUrl;
                                             url += this.checkoutBoleto === 'com' ? '&hideBillet=0' : '&hideBillet=1';
                                             if (this.checkoutCupom) url += '&offDiscount=' + this.checkoutCupom;
                                             return url;
                                         }
                                     }"
-                                    @show-success.window="showSuccessMessage = true; successMessage = $event.detail; setTimeout(() => showSuccessMessage = false, 3000)"
+                                    @ref-saved.window="
+                                        if (Number($event.detail.cursoId) === {{ $curso->id }}) {
+                                            hasCodigoRef = true;
+                                            if ($event.detail.codigoRefId) codigoRefId = $event.detail.codigoRefId;
+                                            if (typeof $event.detail.codigoRef !== 'undefined') codigoRef = $event.detail.codigoRef;
+                                            if (typeof $event.detail.mostrarCurso !== 'undefined') mostrarCurso = !!$event.detail.mostrarCurso;
+                                            if (typeof $event.detail.baseCheckoutUrl !== 'undefined') baseCheckoutUrl = $event.detail.baseCheckoutUrl || '';
+                                        }
+                                    "
                                     class="bg-white shadow-sm rounded-lg border hover:shadow-md transition-shadow duration-200 flex flex-col h-full"
                                 >
                                     <!-- Cabeçalho do Card -->
                                     <div class="p-6 flex-grow">
                                         <div class="flex justify-between items-start mb-3">
                                             <h5 class="font-bold text-gray-900 text-lg leading-tight">{{ $curso->titulo }} ({{ $curso->codigo_id_hotmart }})</h5>
-                                            @if($curso->codigo_ref)
-                                                <span class="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
-                                                    Configurado
-                                                </span>
-                                            @else
-                                                <span class="bg-yellow-100 text-yellow-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
-                                                    Pendente
-                                                </span>
-                                            @endif
+                                            <span x-show="hasCodigoRef" class="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
+                                                Configurado
+                                            </span>
+                                            <span x-show="!hasCodigoRef" class="bg-yellow-100 text-yellow-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
+                                                Pendente
+                                            </span>
                                         </div>
                                         <div class="flex items-center mb-4">
                                             <i class="ri-price-tag-3-line text-blue-600 mr-2"></i>
@@ -173,6 +183,7 @@
                                             id='form_{{$curso->id}}' 
                                             method="POST" 
                                             action="{{route('cadastrar_codigo_ref')}}" 
+                                            @submit.prevent
                                             class="space-y-4 ref-form"
                                         >
                                             @csrf
@@ -191,7 +202,7 @@
                                                     />
                                                     <x-primary-button type="submit" class="rounded-l-none px-4 whitespace-nowrap">
                                                         <i class="ri-save-line mr-1"></i>
-                                                        {{ $curso->codigo_ref ? 'Atualizar' : 'Salvar' }}
+                                                        <span x-text="hasCodigoRef ? 'Atualizar' : 'Salvar'"></span>
                                                     </x-primary-button>
                                                 </div>
                                             </div>
@@ -208,7 +219,7 @@
                                                             class="sr-only peer"
                                                             value="1"
                                                             :checked="mostrarCurso"
-                                                            @change="mostrarCurso = !mostrarCurso; $nextTick(() => $el.form.dispatchEvent(new Event('submit', { bubbles: true })))"
+                                                            @change="mostrarCurso = $event.target.checked; $nextTick(() => $el.form.requestSubmit())"
                                                         >
                                                         <div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                                                         <span x-text="mostrarCurso ? 'Sim' : 'Não'" class="ml-3 text-sm font-medium text-gray-900"></span>
@@ -219,7 +230,7 @@
                                             <!-- Inputs Ocultos (CORRIGIDOS) -->
                                             <div id="ref-form-feedback-{{$curso->id}}" class="mt-2 text-sm"></div>
                                             <input type="hidden" name="curso_id" value="{{$curso->id}}">
-                                            <input type="hidden" name="id" value="{{$curso->codigo_ref_id}}">
+                                            <input type="hidden" name="id" :value="codigoRefId ?? ''">
                                             
                                             {{-- ADICIONADO: Input oculto para o título, necessário para a mensagem de sucesso --}}
                                             <input type="hidden" name="titulo" value="{{$curso->titulo}}">
@@ -231,8 +242,7 @@
                                     </div>
                                     
                                     <!-- GERADOR DE LINKS DINÂMICOS -->
-                                    @if($curso->codigo_ref)
-                                    <div class="border-t border-gray-200 bg-gray-50">
+                                    <div x-show="hasCodigoRef" x-transition class="border-t border-gray-200 bg-gray-50">
                                         <!-- Botão para Expandir/Colapsar -->
                                         <button 
                                             @click="expanded = !expanded"
@@ -342,14 +352,12 @@
 
                                         </div>
                                     </div>
-                                    @else
-                                    <div class="border-t border-gray-200 bg-yellow-50 p-4">
+                                    <div x-show="!hasCodigoRef" x-transition class="border-t border-gray-200 bg-yellow-50 p-4">
                                         <div class="flex items-center text-yellow-800">
                                             <i class="ri-information-line mr-2"></i>
                                             <span class="text-sm">Configure um código REF primeiro para gerar links personalizados</span>
                                         </div>
                                     </div>
-                                    @endif
                                     <!-- Bloco de Links Rápidos e Recursos -->
                                     <!-- NOVO: Acordeão de Recursos e Links Rápidos -->
                                     <div class="border-t border-gray-200 bg-gray-50">
@@ -383,13 +391,13 @@
                                             </a>
 
                                             <!-- Link para Área de Membros (se o código REF estiver configurado) -->
-                                            @if($curso->codigo_ref)
-                                                <a target="_blanck" href="{{ $curso->link_area_membros }}" target="_blank" class="flex items-center text-sm text-indigo-600 hover:underline">
+
+                                                <a x-show="hasCodigoRef" target="_blanck" href="{{ $curso->link_area_membros }}" target="_blank" class="flex items-center text-sm text-indigo-600 hover:underline">
                                                     <i class="ri-shield-user-line w-5 mr-2"></i>
                                                     <span>Acessar Área de Membros</span>
                                                     <i class="ri-external-link-line ml-1 text-gray-400"></i>
                                                 </a>
-                                            @endif
+
 
                                             @if($curso->video_dentro_do_curso)
                                                         <a target="_blanck" href="https://www.youtube.com/watch?v={{$curso->video_dentro_do_curso}}" class="flex items-center text-sm text-indigo-600 hover:underline">
@@ -457,20 +465,50 @@
                         },
                         body: formData
                     })
-                    .then(response => {
-                        if (!response.ok) { // Verifica se a resposta HTTP foi um erro (ex: 422, 500)
-                           return response.json().then(err => { throw err; });
+                    .then(async response => {
+                        const contentType = response.headers.get('content-type') || '';
+                        const isJson = contentType.includes('application/json');
+                        const payload = isJson
+                            ? await response.json()
+                            : { message: 'Erro inesperado no servidor.' };
+
+                        if (!response.ok) {
+                            throw payload;
                         }
-                        return response.json();
+
+                        return payload;
                     })
                     .then(data => {
                         if (data.success) {
+                            if (typeof data.codigo_ref_id !== 'undefined') {
+                                const idInput = form.querySelector('input[name="id"]');
+                                if (idInput) {
+                                    idInput.value = data.codigo_ref_id ?? '';
+                                }
+                            }
+
+                            window.dispatchEvent(new CustomEvent('ref-saved', {
+                                detail: {
+                                    cursoId: Number(cursoId),
+                                    codigoRefId: data.codigo_ref_id ?? null,
+                                    codigoRef: data.codigo_ref ?? formData.get('codigo_ref'),
+                                    mostrarCurso: typeof data.mostrar_curso === 'boolean'
+                                        ? data.mostrar_curso
+                                        : formData.get('mostrar_curso') === '1',
+                                    baseCheckoutUrl: data.base_checkout_url ?? ''
+                                }
+                            }));
+
+                            feedbackDiv.innerHTML = '';
+                            const successParagraph = document.createElement('p');
+                            successParagraph.className = 'text-green-600';
+                            successParagraph.textContent = data.success;
+                            feedbackDiv.appendChild(successParagraph);
                             window.dispatchEvent(new CustomEvent('show-success', { detail: data.success }));
-                            setTimeout(() => location.reload(), 1500); 
                         }
                     })
                     .catch(errorData => {
-                        if (errorData.errors) {
+                        if (errorData && errorData.errors) {
                             // Erros de validação
                             let errorHtml = '<ul class="text-red-600 list-disc list-inside">';
                             Object.values(errorData.errors).forEach(error => {
@@ -481,7 +519,14 @@
                         } else {
                             // Outros erros
                             console.error('Erro:', errorData);
-                            feedbackDiv.innerHTML = '<p class="text-red-600">Ocorreu um erro inesperado. Tente novamente.</p>';
+                            const errorMessage = (errorData && errorData.message)
+                                ? errorData.message
+                                : 'Ocorreu um erro inesperado. Tente novamente.';
+                            feedbackDiv.innerHTML = '';
+                            const paragraph = document.createElement('p');
+                            paragraph.className = 'text-red-600';
+                            paragraph.textContent = errorMessage;
+                            feedbackDiv.appendChild(paragraph);
                         }
                     });
                 });

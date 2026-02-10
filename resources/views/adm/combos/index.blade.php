@@ -1,45 +1,50 @@
-@extends('adm.html_base')
+<x-app-layout>
+    <x-slot name="header">
+        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
+            {{ __('Lista de Combos') }}
+        </h2>
+    </x-slot>
 
-@section('content')
-<div class="container">
-    <h1>Lista de Combos</h1>
-    <div class="accordion" id="accordionCombos">
-        @foreach($combos as $combo)
-        <div class="accordion-item">
-            <h2 class="accordion-header" id="heading{{ $combo->id }}">
-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ $combo->id }}" aria-expanded="false" aria-controls="collapse{{ $combo->id }}">
-                    {{ $combo->titulo }} - {{ $combo->headline }}
-                </button>
-            </h2>
-            <div id="collapse{{ $combo->id }}" class="accordion-collapse collapse" aria-labelledby="heading{{ $combo->id }}" data-bs-parent="#accordionCombos">
-                <div class="accordion-body">
-                    <p><strong>ID:</strong> {{ $combo->id }}</p>
-                    <p><strong>URL:</strong> {{ $combo->url }}</p>
-                    
-                    <h5>Cursos inclusos:</h5>
-                    @if($combo->cursos->isNotEmpty())
-                        <ul>
-                            @foreach($combo->cursos as $curso)
-                                <li class="my-1">
-                                    {{ $curso->titulo }}
-                                    <form action="{{ route('combo.curso.excluir', [$combo->id, $curso->id]) }}" method="POST" style="display:inline;">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="btn btn-danger btn-sm">Excluir</button>
-                                    </form>
-                                </li>
-                            @endforeach
-                        </ul>
-                    @else
-                        <p>Nenhum curso adicionado.</p>
-                    @endif
-                    
-                    <a href="{{ route('combo.editar_form', $combo->id) }}" class="btn btn-primary btn-sm">Editar</a>
-                    <a href="{{ route('combo.cursos.form', $combo->id) }}" class="btn btn-secondary btn-sm">Adicionar Cursos</a>
+    <div class="py-12">
+        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+                <div class="p-6 text-gray-900 space-y-4">
+                    @foreach($combos as $combo)
+                        <details class="border rounded-lg p-4">
+                            <summary class="cursor-pointer font-semibold">
+                                {{ $combo->titulo }} - {{ $combo->headline }}
+                            </summary>
+                            <div class="mt-3 text-sm space-y-2">
+                                <p><strong>ID:</strong> {{ $combo->id }}</p>
+                                <p><strong>URL:</strong> {{ $combo->url }}</p>
+                                <div>
+                                    <p class="font-semibold">Cursos inclusos:</p>
+                                    @if($combo->cursos->isNotEmpty())
+                                        <ul class="list-disc list-inside space-y-1">
+                                            @foreach($combo->cursos as $curso)
+                                                <li>
+                                                    {{ $curso->titulo }}
+                                                    <form action="{{ route('combo.curso.excluir', [$combo->id, $curso->id]) }}" method="POST" class="inline-block ml-2">
+                                                        @csrf
+                                                        @method('DELETE')
+                                                        <button type="submit" class="text-red-600 hover:text-red-800 text-sm">Excluir</button>
+                                                    </form>
+                                                </li>
+                                            @endforeach
+                                        </ul>
+                                    @else
+                                        <p>Nenhum curso adicionado.</p>
+                                    @endif
+                                </div>
+                                <div class="flex gap-3 pt-2">
+                                    <a href="{{ route('combo.editar_form', $combo->id) }}" class="text-indigo-600 hover:text-indigo-800">Editar</a>
+                                    <a href="{{ route('combo.cursos.form', $combo->id) }}" class="text-indigo-600 hover:text-indigo-800">Adicionar Cursos</a>
+                                </div>
+                            </div>
+                        </details>
+                    @endforeach
                 </div>
             </div>
         </div>
-        @endforeach
     </div>
-</div>
-@endsection
+</x-app-layout>

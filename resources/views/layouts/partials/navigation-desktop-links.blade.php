@@ -67,6 +67,7 @@
             </x-slot>
             <x-slot name="content">
                 <x-dropdown-link :href="route('dashboard_adm')">Dashboard ADM</x-dropdown-link>
+                <x-dropdown-link :href="route('adm_portal_informacoes')">Informações do Portal</x-dropdown-link>
                 <x-dropdown-link :href="route('cursos.novo')">Novo Curso</x-dropdown-link>
                 <x-dropdown-link :href="route('adm_cursos_lista')">Lista de Cursos</x-dropdown-link>
                 <x-dropdown-link :href="route('aulas_gratuitas_index')">Aulas Gratuitas</x-dropdown-link>

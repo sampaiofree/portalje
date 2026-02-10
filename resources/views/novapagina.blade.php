@@ -1026,7 +1026,7 @@
                     </p>
                     
                     <!-- Ketsu - Conclusão -->
-                    <a href="https://wa.me/{{$curso->whatsapp_atendimento}}?text=Quero tirar minhas dúvidas sobre o curso {{$curso->titulo}}" target="_blank" class="btn-cta fw-bold btn-inscricao">
+                    <a href="https://wa.me/{{$curso->whatsapp_atendimento}}?text=Olá, meu nome é {nome} e quero tirar minhas dúvidas sobre o curso {{$curso->titulo}}" target="_blank" class="btn-cta fw-bold btn-inscricao">
                         <i class="bi bi-whatsapp"></i> Fale com a gente no WhatsApp
                     </a>
                     <p class="mt-1 fw-bold" style="font-size: small">Clique no botão para conversar diretamente com a gente!</p>
@@ -1236,6 +1236,7 @@
                     <input id="input_lead_user_id" type="hidden" name="user_id" value="{{$curso->user_id ?? 13}}">
                     <input id="input_lead_curso_id" type="hidden" name="curso_id" value="{{$curso->id}}">
                     <input id="input_lead_origem" type="hidden" name="origem" value="{{$curso->origem ?? 'whatsapp'}}">
+                    <input id="input_lead_whatsapp_atendimento_id" type="hidden" name="whatsapp_atendimento_id" value="{{$curso->whatsapp_atendimento_id ?? ''}}">
 
                     <div class="mb-3">    
                         <input minlength="13" id="input_lead_telefone" type="tel" name="buyer_checkout_phone" class="form-control input_telefone" placeholder="Digite apenas números" title="Digite seu número de telefone aqui" style="height: 50px;font-size: large;" required>
@@ -1783,6 +1784,7 @@
                 var input_lead_user_id = $('#input_lead_user_id').val();
                 var input_lead_curso_id = $('#input_lead_curso_id').val();                
                 var input_lead_origem = $('#input_lead_origem').val();
+                var input_lead_whatsapp_atendimento_id = $('#input_lead_whatsapp_atendimento_id').val();
                 var input_lead_telefone = $('#input_lead_telefone').val();
                 var telefoneApenasNumeros = input_lead_telefone.replace(/\D/g, '');
 
@@ -1808,6 +1810,7 @@
                         nome: input_lead_nome,
                         curso_id: input_lead_curso_id,
                         user_id: input_lead_user_id,
+                        whatsapp_atendimento_id: input_lead_whatsapp_atendimento_id,
                         origem: input_lead_origem,
                         telefone: telefoneApenasNumeros,
                         origem: input_lead_origem,

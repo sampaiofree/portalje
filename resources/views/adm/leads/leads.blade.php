@@ -1,6 +1,8 @@
-@extends('adm.html_base')
+<x-app-layout>
+    <x-slot name="header">
+        <h2 class="font-semibold text-xl text-gray-800 leading-tight">{{ __('Leads - Administração') }}</h2>
+    </x-slot>
 
-@section('content')
 
     <div class="row">
         <div class="col-12">
@@ -19,7 +21,7 @@
                         <button type="button" class="btn btn-primary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false"> {{$btn_status}} <span class="caret"></span> </button>
                         <div class="dropdown-menu">
                             <a class="dropdown-item" href="{{ route('hotmart_leads', array_merge(request()->query(), ['purchase_status' => 'WAITING_PAYMENT'])) }}">Aguardando Pagamento PIX e BOLETO</a>
-                            <a class="dropdown-item" href="{{ route('hotmart_leads', array_merge(request()->query(), ['purchase_status' => 'CANCELLED'])) }}">Cartão Recusado</a>
+                            <a class="dropdown-item" href="{{ route('hotmart_leads', array_merge(request()->query(), ['purchase_status' => 'CANCELLED'])) }}">CartÃ£o Recusado</a>
                             <a class="dropdown-item" href="{{ route('hotmart_leads', array_merge(request()->query(), ['purchase_status' => 'EXPIRED'])) }}">Pagamentos Expirados</a>
                             <a class="dropdown-item" href="{{ route('hotmart_leads', array_merge(request()->query(), ['purchase_status' => 'APPROVED'])) }}">Vendas</a>
                             <a class="dropdown-item" href="{{ route('hotmart_leads', array_merge(request()->query(), ['purchase_status' => ''])) }}">Mostrar TODOS</a>
@@ -30,11 +32,11 @@
                         <button type="button" class="btn btn-info dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false"> {{$btn_atendimento}} <span class="caret"></span> </button>
                         <div class="dropdown-menu">
                             <a class="dropdown-item" href="{{ route('hotmart_leads', array_merge(request()->query(), ['atendimento' => 'aguardando'])) }}">Aguardando Atendimento</a>
-                            <a class="dropdown-item" href="{{ route('hotmart_leads', array_merge(request()->query(), ['atendimento' => '1'])) }}">1º Atendimento</a>
-                            <a class="dropdown-item" href="{{ route('hotmart_leads', array_merge(request()->query(), ['atendimento' => '2'])) }}">2º Atendimento</a>
-                            <a class="dropdown-item" href="{{ route('hotmart_leads', array_merge(request()->query(), ['atendimento' => '3'])) }}">3º Atendimento</a>
-                            <a class="dropdown-item" href="{{ route('hotmart_leads', array_merge(request()->query(), ['atendimento' => '4'])) }}">4º Atendimento</a>
-                            <a class="dropdown-item" href="{{ route('hotmart_leads', array_merge(request()->query(), ['atendimento' => '5'])) }}">5º Atendimento</a>
+                            <a class="dropdown-item" href="{{ route('hotmart_leads', array_merge(request()->query(), ['atendimento' => '1'])) }}">1Âº Atendimento</a>
+                            <a class="dropdown-item" href="{{ route('hotmart_leads', array_merge(request()->query(), ['atendimento' => '2'])) }}">2Âº Atendimento</a>
+                            <a class="dropdown-item" href="{{ route('hotmart_leads', array_merge(request()->query(), ['atendimento' => '3'])) }}">3Âº Atendimento</a>
+                            <a class="dropdown-item" href="{{ route('hotmart_leads', array_merge(request()->query(), ['atendimento' => '4'])) }}">4Âº Atendimento</a>
+                            <a class="dropdown-item" href="{{ route('hotmart_leads', array_merge(request()->query(), ['atendimento' => '5'])) }}">5Âº Atendimento</a>
                             <a class="dropdown-item" href="{{ route('hotmart_leads', array_merge(request()->query(), ['atendimento' => 'arquivado'])) }}">Arquivados</a>
                             <a class="dropdown-item" href="{{ route('hotmart_leads', array_merge(request()->query(), ['atendimento' => ''])) }}">Mostrar todos</a>
                         </div>
@@ -48,7 +50,7 @@
                     </div>
                     <div class="me-2 mt-1" style="width: 230px">
                         <div class="input-group flex-nowrap">
-                            <span class="input-group-text bg-secondary text-white" id="basic-addon2">Até o dia: </span>
+                            <span class="input-group-text bg-secondary text-white" id="basic-addon2">AtÃ© o dia: </span>
                             {{-- <input type="text" class="form-control" placeholder="Username" aria-label="Username"> --}}
                             <input class="form-control border-secondary" id="date_fim" type="date" name="date_fim" style="width: 150px"  aria-describedby="basic-addon2" value="{{ $btn_fim }}">
                         </div>
@@ -66,11 +68,11 @@
                             @csrf
                             <div class="d-flex">
                                 <select class="form-select form-control border-info" name="select_atendimento" id="select_atendimento" style="width: 120px">
-                                    <option value="1">1º Atend.</option>
-                                    <option value="2">2º Atend.</option>
-                                    <option value="3">3º Atend.</option>
-                                    <option value="4">4º Atend.</option>
-                                    <option value="5">5º Atend.</option>
+                                    <option value="1">1Âº Atend.</option>
+                                    <option value="2">2Âº Atend.</option>
+                                    <option value="3">3Âº Atend.</option>
+                                    <option value="4">4Âº Atend.</option>
+                                    <option value="5">5Âº Atend.</option>
                                     <option value="arquivado">Arquivar</option>
                                 </select>
                                 <button type="submit" class="btn btn-info" style="width: 160px">Alterar atendimento</button>
@@ -82,7 +84,7 @@
                 </div>
             </div>
             <div id="alert-container-topo"></div>
-        <!-- Paginação do Laravel -->
+        <!-- PaginaÃ§Ã£o do Laravel -->
             <div class="d-flex justify-content-center">
                 {{ $hotmart_leads->links('pagination::bootstrap-4') }}
             </div>
@@ -119,7 +121,7 @@
                         <td class="hidden">{{$hotmart_lead['id']}}</td>
                         <td class="td_check">
                             <input type="checkbox" class="me-2 form-check-input check_item" id="check_{{$hotmart_lead['id']}}">
-                            {{$hotmart_lead['atendimento']}}@if($hotmart_lead['atendimento'] AND $hotmart_lead['atendimento']!='arquivado') º Atend. @elseif(!$hotmart_lead['atendimento']) Aguardando @endif
+                            {{$hotmart_lead['atendimento']}}@if($hotmart_lead['atendimento'] AND $hotmart_lead['atendimento']!='arquivado') Âº Atend. @elseif(!$hotmart_lead['atendimento']) Aguardando @endif
                         </td>
                         @php
                             $nome = explode(" ", $hotmart_lead['buyer_name']);
@@ -158,7 +160,7 @@
                     @endforeach
                 </tbody>
             </table>
-            <!-- Paginação do Laravel -->
+            <!-- PaginaÃ§Ã£o do Laravel -->
             <div class="d-flex justify-content-center">
                 {{ $hotmart_leads->links('pagination::bootstrap-4') }}
             </div>
@@ -169,22 +171,22 @@
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h4 class="modal-title d-inline">Enviar mensagem pelo Zap Automático</h4>
+                    <h4 class="modal-title d-inline">Enviar mensagem pelo Zap AutomÃ¡tico</h4>
                     
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-hidden="true"></button>
                 </div>
                 <div class="modal-body">
-                    <p>Certifique-se que seu WhatsApp está conectado. Veja no Menu > Ferramentas > Zap Automático</p>
+                    <p>Certifique-se que seu WhatsApp estÃ¡ conectado. Veja no Menu > Ferramentas > Zap AutomÃ¡tico</p>
                     <h5>Use <span class="bg-secondary text-white rounded-3" style="font-size: padding: 0.5%;">{nome}</span> para se referir ao nome do lead e <span class="bg-secondary text-white rounded-3" style="font-size: padding: 0.5%;">{curso}</span> para se referir ao nome do curso.</p>
                     <form id="form_envio_mensagem" enctype="multipart/form-data">
                         @csrf
                         <div id="alert-container"></div>
                         <div class="mb-3">
-                            <label for="texto_padrao" class="form-label">Texto com até 500 caracteres</label>
+                            <label for="texto_padrao" class="form-label">Texto com atÃ© 500 caracteres</label>
                             <textarea name="texto_padrao" class="form-control" id="texto_padrao" rows="5"></textarea>
                         </div>
                         <div class="mb-1">
-                            <label for="imagem" class="form-label">Imagem de até 750kb</label>
+                            <label for="imagem" class="form-label">Imagem de atÃ© 750kb</label>
                             <input type="file" id="imagem" name="imagem" class="form-control">
                         </div>
                         <div class="mb-3">
@@ -192,7 +194,7 @@
                             <textarea name="imagem_legenda" class="form-control" id="imagem_legenda" rows="5"></textarea>
                         </div>
                         <div class="mb-3">
-                            <label for="audio" class="form-label">Áudio - Mp3 de até 750kb</label>
+                            <label for="audio" class="form-label">Ãudio - Mp3 de atÃ© 750kb</label>
                             <input type="file" id="audio" name="audio" class="form-control">
                         </div>
                         <input type="hidden" id="selectedRowsData" name="selectedRowsData"> <!--PEGAR OS DADOS DAS LINHAS // ID, NOME , TELEFONE E CURSO-->
@@ -217,9 +219,8 @@
     </div>
                                                 
 
-@endsection
-
-@section('head')
+@push('head')
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
 
     <link href="{{asset('Hyper_v5.4/Admin/dist/saas/assets/vendor/datatables.net-bs5/css/dataTables.bootstrap5.min.css')}}" rel="stylesheet" type="text/css" />
     <link href="{{asset('Hyper_v5.4/Admin/dist/saas/assets/vendor/datatables.net-responsive-bs5/css/responsive.bootstrap5.min.css')}}" rel="stylesheet" type="text/css" />
@@ -232,10 +233,12 @@
         /* .sorting{max-width: 200px;} */
     </style>
   
-@endsection
+@endpush
 
-@section('scripts')
-    
+@push('scripts')
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
     <script src="{{asset('Hyper_v5.4/Admin/dist/saas/assets/vendor/datatables.net/js/jquery.dataTables.min.js')}}"></script>
     <script src="{{asset('Hyper_v5.4/Admin/dist/saas/assets/vendor/datatables.net-bs5/js/dataTables.bootstrap5.min.js')}}"></script>
     <script src="{{asset('Hyper_v5.4/Admin/dist/saas/assets/vendor/datatables.net-responsive/js/dataTables.responsive.min.js')}}"></script>
@@ -250,7 +253,7 @@
                 //order: [[2, 'asc']],
                 order: false,
                 columnDefs: [
-                    { orderable: false, targets: 0 } // Desativa a ordenação na coluna 0
+                    { orderable: false, targets: 0 } // Desativa a ordenaÃ§Ã£o na coluna 0
                 ]
             } );
 
@@ -268,7 +271,7 @@
                 });
             });
 
-            //ESCOLHER A DATA INÍCIO
+            //ESCOLHER A DATA INÃCIO
             document.getElementById('example-date').addEventListener('change', function() {
                 let selectedDate = this.value;
 
@@ -278,17 +281,17 @@
                 // Obter a query string atual
                 let queryParams = new URLSearchParams(window.location.search);
 
-                // Atualizar ou adicionar o parâmetro created_at com a data selecionada
+                // Atualizar ou adicionar o parÃ¢metro created_at com a data selecionada
                 queryParams.set('created_at', selectedDate);
 
-                // Construir a nova URL com os parâmetros atualizados
+                // Construir a nova URL com os parÃ¢metros atualizados
                 let newUrl = `${baseUrl}?${queryParams.toString()}`;
 
                 // Redirecionar para a nova URL
                 window.location.href = newUrl;
             });
 
-            //ESCOLHER A DATA INÍCIO
+            //ESCOLHER A DATA INÃCIO
             document.getElementById('date_fim').addEventListener('change', function() {
                 let selectedDate = this.value;
 
@@ -298,10 +301,10 @@
                 // Obter a query string atual
                 let queryParams = new URLSearchParams(window.location.search);
 
-                // Atualizar ou adicionar o parâmetro created_at com a data selecionada
+                // Atualizar ou adicionar o parÃ¢metro created_at com a data selecionada
                 queryParams.set('date_fim', selectedDate);
 
-                // Construir a nova URL com os parâmetros atualizados
+                // Construir a nova URL com os parÃ¢metros atualizados
                 let newUrl = `${baseUrl}?${queryParams.toString()}`;
 
                 // Redirecionar para a nova URL
@@ -334,7 +337,7 @@
                                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                             </div>
                         `;
-                        // Insere o alerta no contêiner de alertas
+                        // Insere o alerta no contÃªiner de alertas
                         $('#alert-container-topo').html(alertHtml);
                         return false;
                 }else{
@@ -356,7 +359,7 @@
 
             $(document).ready(function() {
                 $('#form_atendimento').on('submit', function(e) {
-                    e.preventDefault(); // Evita o envio padrão do formulário
+                    e.preventDefault(); // Evita o envio padrÃ£o do formulÃ¡rio
 
                     var formData = new FormData(this);
 
@@ -368,7 +371,7 @@
 
                     formData.append('selectedRowsData', JSON.stringify(selectedData));
 
-                    // Para depuração, exibe o conteúdo do FormData
+                    // Para depuraÃ§Ã£o, exibe o conteÃºdo do FormData
                     for (var pair of formData.entries()) {
                         console.log(pair[0]+ ': ' + pair[1]);
                     }
@@ -378,7 +381,7 @@
                         type: 'POST',
                         data: formData,
                         processData: false, // Evita que o jQuery processe os dados
-                        contentType: false, // Evita que o jQuery defina o cabeçalho Content-Type
+                        contentType: false, // Evita que o jQuery defina o cabeÃ§alho Content-Type
                         success: function(response) {
                             console.log('Resposta do servidor:', response);
                             window.location.reload();
@@ -387,7 +390,7 @@
                             console.error('Erro ao enviar dados: ', error);
                             console.error('Status: ', status);
                             console.error('Resposta do servidor: ', xhr.responseText);
-                            // Aqui você pode manipular o erro, exibir uma mensagem de erro, etc.
+                            // Aqui vocÃª pode manipular o erro, exibir uma mensagem de erro, etc.
                         }
                     });
                 });
@@ -396,97 +399,97 @@
 
             $(document).ready(function() {
                 $('#form_envio_mensagem').on('submit', function(e) {
-                    e.preventDefault(); // Evita o envio padrão do formulário
+                    e.preventDefault(); // Evita o envio padrÃ£o do formulÃ¡rio
 
                     var imageInput = document.getElementById('imagem');
                     var file = imageInput.files[0];
                     var maxSize = 750 * 1024; // 750 KB em bytes
 
                     if (file && file.size > maxSize) {
-                        e.preventDefault(); // Evita o envio do formulário
+                        e.preventDefault(); // Evita o envio do formulÃ¡rio
 
                         // Cria o alerta Bootstrap
                         var alertHtml = `
                             <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                                A imagem é muito grande. O tamanho máximo permitido é 750 KB.
+                                A imagem Ã© muito grande. O tamanho mÃ¡ximo permitido Ã© 750 KB.
                                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                             </div>
                         `;
-                        // Insere o alerta no contêiner de alertas
+                        // Insere o alerta no contÃªiner de alertas
                         $('#alert-container').html(alertHtml);
 
-                        return false; // Impede o envio do formulário
+                        return false; // Impede o envio do formulÃ¡rio
                     }
 
-                    // Verifica o tipo e tamanho do arquivo de áudio
+                    // Verifica o tipo e tamanho do arquivo de Ã¡udio
                     var audioInput = document.getElementById('audio');
                     var audio = audioInput.files[0];
                     var maxSizeaudio = 750 * 1024; // 750 KB em bytes
 
                     if (audio) {
-                        // Verifica se o tipo de arquivo é mp3
+                        // Verifica se o tipo de arquivo Ã© mp3
                         if (audio.type !== 'audio/mp3' && audio.type !== 'audio/mpeg') {
-                            e.preventDefault(); // Evita o envio do formulário
+                            e.preventDefault(); // Evita o envio do formulÃ¡rio
 
                             // Cria o alerta Bootstrap
                             var alertHtml = `
                                 <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                                    O arquivo de áudio deve ser do tipo MP3.
+                                    O arquivo de Ã¡udio deve ser do tipo MP3.
                                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                                 </div>
                             `;
                             $('#alert-container').html(alertHtml);
-                            return false; // Impede o envio do formulário
+                            return false; // Impede o envio do formulÃ¡rio
                         }
 
                         if (audio.size > maxSizeaudio) {
-                            e.preventDefault(); // Evita o envio do formulário
+                            e.preventDefault(); // Evita o envio do formulÃ¡rio
 
                             // Cria o alerta Bootstrap
                             var alertHtml = `
                                 <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                                    O áudio é muito grande. O tamanho máximo permitido é 750 KB.
+                                    O Ã¡udio Ã© muito grande. O tamanho mÃ¡ximo permitido Ã© 750 KB.
                                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                                 </div>
                             `;
                             $('#alert-container').html(alertHtml);
-                            return false; // Impede o envio do formulário
+                            return false; // Impede o envio do formulÃ¡rio
                         }
                     }
 
 
-                    var textoPadrao = $('#texto_padrao').val(); //NÃO PERMITIR MAIS DE 500 CARACTERES NO TEXTO
+                    var textoPadrao = $('#texto_padrao').val(); //NÃƒO PERMITIR MAIS DE 500 CARACTERES NO TEXTO
                     if (textoPadrao.length > 500) {
-                        e.preventDefault(); // Impede o envio do formulário
+                        e.preventDefault(); // Impede o envio do formulÃ¡rio
 
                         // Cria o alerta Bootstrap
                         var alertHtml = `
                             <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                                O texto não pode ultrapassar 500 caracteres. Atualmente você está com ${textoPadrao.length} caracteres.
+                                O texto nÃ£o pode ultrapassar 500 caracteres. Atualmente vocÃª estÃ¡ com ${textoPadrao.length} caracteres.
                                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                             </div>
                         `;
-                        // Insere o alerta no contêiner de alertas
+                        // Insere o alerta no contÃªiner de alertas
                         $('#alert-container').html(alertHtml);
 
-                        return false; // Impede o envio do formulário
+                        return false; // Impede o envio do formulÃ¡rio
                     }
 
-                    var imagemLegenda = $('#imagem_legenda').val(); //NÃO PERMITIR MAIS DE 500 CARACTERES NO TEXTO
+                    var imagemLegenda = $('#imagem_legenda').val(); //NÃƒO PERMITIR MAIS DE 500 CARACTERES NO TEXTO
                     if (imagemLegenda.length > 500) {
-                        e.preventDefault(); // Impede o envio do formulário
+                        e.preventDefault(); // Impede o envio do formulÃ¡rio
 
                         // Cria o alerta Bootstrap
                         var alertHtml = `
                             <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                                O texto da legenda da imagem não pode ultrapassar 500 caracteres. Atualmente você está com ${imagemLegenda.length} caracteres.
+                                O texto da legenda da imagem nÃ£o pode ultrapassar 500 caracteres. Atualmente vocÃª estÃ¡ com ${imagemLegenda.length} caracteres.
                                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                             </div>
                         `;
-                        // Insere o alerta no contêiner de alertas
+                        // Insere o alerta no contÃªiner de alertas
                         $('#alert-container').html(alertHtml);
 
-                        return false; // Impede o envio do formulário
+                        return false; // Impede o envio do formulÃ¡rio
                     }
 
                     // Cria um objeto FormData
@@ -503,7 +506,7 @@
                                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                             </div>
                         `;
-                        // Insere o alerta no contêiner de alertas
+                        // Insere o alerta no contÃªiner de alertas
                         $('#alert-container-topo').html(alertHtml);
                         $('#modal_whatsapp').modal('hide');
 
@@ -513,14 +516,14 @@
                         type: 'POST',
                         data: formData,
                         processData: false, // Evita que o jQuery processe os dados
-                        contentType: false, // Evita que o jQuery defina o cabeçalho Content-Type
+                        contentType: false, // Evita que o jQuery defina o cabeÃ§alho Content-Type
                         success: function(response) {
                             console.log('Resposta do servidor:', response);
-                            // Aqui você pode manipular a resposta, exibir uma mensagem de sucesso, etc.
+                            // Aqui vocÃª pode manipular a resposta, exibir uma mensagem de sucesso, etc.
                         },
                         error: function(xhr, status, error) {
                             console.error('Erro ao enviar dados:', error);
-                            // Aqui você pode manipular o erro, exibir uma mensagem de erro, etc.
+                            // Aqui vocÃª pode manipular o erro, exibir uma mensagem de erro, etc.
                         }
                     });
                 });
@@ -530,4 +533,5 @@
 
 
     </script>
-@endsection
+@endpush
+</x-app-layout>

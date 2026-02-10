@@ -33,7 +33,9 @@ class AdminController extends Controller
             $tot_dominio += $afiliado['total_with_dominio'];
         }
 
-        $aproveitamento = number_format(($tot_dominio/$tot_cadastros)*100, 2, ",", "");
+        $aproveitamento = $tot_cadastros > 0
+            ? number_format(($tot_dominio / $tot_cadastros) * 100, 2, ",", "")
+            : "0,00";
 
         $afiliados = [
             "tot_cadastros" =>  $tot_cadastros,
@@ -60,7 +62,13 @@ class AdminController extends Controller
 
     public function create()
     {
-        $curso = Curso::create();
+        $timestamp = now()->format('YmdHis');
+        $tempUrl = 'curso-temp-' . $timestamp . '-' . substr((string) microtime(true), -6);
+
+        $curso = Curso::create([
+            'titulo' => 'Novo curso',
+            'url' => $tempUrl,
+        ]);
 
         // Obtém o ID do registro recém-criado
         $newCursoId = $curso->id;
@@ -127,7 +135,10 @@ class AdminController extends Controller
                 
             }
 
-            if(!$curso['url']){
+            if(
+                !$curso['url'] ||
+                str_starts_with($curso['url'], 'curso-temp-')
+            ){
                 $dados['url'] = $this->createSlug($dados['titulo']);
                 if(!$dados['url']){return redirect()->back()->with('error', 'Curso com mesmo nome já cadastrado');}
             }
@@ -215,3 +226,6 @@ class AdminController extends Controller
     }
   
 }
+
+
+

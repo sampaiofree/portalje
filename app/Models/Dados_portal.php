@@ -15,6 +15,9 @@ class Dados_portal extends Model
     protected $fillable = [
         'telefone_suporte_alunos',
         'telefone_suporte_afiliados',
+        'whatsapp_atendimento_tempo',
+        'formulario_whatsapp',
+        'formulario_pre_checkout',
         'endereco',
         'cnpj',
     ];

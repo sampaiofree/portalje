@@ -66,7 +66,14 @@ class CursoController extends Controller
 
        
         
-      $codigo_ref = Codigo_ref::firstOrNew(['id' => $request->input('id')]);
+      if ($request->filled('id')) {
+          $codigo_ref = Codigo_ref::firstOrNew(['id' => $request->input('id')]);
+      } else {
+          $codigo_ref = Codigo_ref::firstOrNew([
+              'user_id' => $request->input('user_id'),
+              'curso_id' => $request->input('curso_id'),
+          ]);
+      }
 
       if ($codigo_ref->exists) {
           // Registro já existe
@@ -83,10 +90,30 @@ class CursoController extends Controller
               'user_id' => $request->input('user_id'),
               'curso_id' => $request->input('curso_id'),
               'codigo_ref' => $request->input('codigo_ref'),
-              'mostrar_curso' =>  true,
+              'mostrar_curso' =>  $request->input('mostrar_curso') ?? 0,
           ]);
           $codigo_ref->save();
           $registroExistente = false;
+      }
+
+      if ($request->expectsJson()) {
+          $message = $registroExistente
+              ? "Codigo REF do curso ".$request->input('titulo')." editado com sucesso!"
+              : "Codigo REF do curso ".$request->input('titulo')." cadastrado com sucesso!";
+
+          $curso = Curso::find($codigo_ref->curso_id);
+          $baseCheckoutUrl = $curso && $curso->codigo_afiliado_plano_completo
+              ? "https://go.hotmart.com/{$codigo_ref->codigo_ref}?ap={$curso->codigo_afiliado_plano_completo}"
+              : ($curso->link_checkout_completo ?? null);
+
+          return response()->json([
+              'success' => $message,
+              'codigo_ref_id' => $codigo_ref->id,
+              'codigo_ref' => $codigo_ref->codigo_ref,
+              'mostrar_curso' => (bool) $codigo_ref->mostrar_curso,
+              'curso_id' => (int) $codigo_ref->curso_id,
+              'base_checkout_url' => $baseCheckoutUrl,
+          ]);
       }
 
       if ($registroExistente) {

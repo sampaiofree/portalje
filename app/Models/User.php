@@ -9,13 +9,16 @@ use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Models\Codigo_ref;
 use App\Models\Leads;
 use App\Models\PurchaseEvent;
+use App\Models\WhatsappAtendimento;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
     use HasFactory, Notifiable;
 
-    // Constantes para os papéis do usuário
+    // Constantes para os papÃ©is do usuÃ¡rio
     const NIVEL_ACESSO_ADMIN = 'admin';
     const NIVEL_ACESSO_USER = 'user';
 
@@ -75,7 +78,7 @@ class User extends Authenticatable implements MustVerifyEmail
                     ->where('user_id', $this->id)
                     ->first();
 
-        // Verifica se o código contém apenas números ou "/"
+        // Verifica se o cÃ³digo contÃ©m apenas nÃºmeros ou "/"
         if ($codigo_ref && (is_numeric($codigo_ref->codigo_ref) || str_contains($codigo_ref->codigo_ref, '/'))) {
             return false;
         }
@@ -87,6 +90,11 @@ class User extends Authenticatable implements MustVerifyEmail
     public function leads()
     {
         return $this->hasMany(Leads::class);
+    }
+
+    public function whatsappAtendimentos(): HasMany
+    {
+        return $this->hasMany(WhatsappAtendimento::class, 'user_id', 'id');
     }
     
     public function purchaseEvents() //PEGAR OS LEADS DO AFILIADO
@@ -122,11 +130,18 @@ class User extends Authenticatable implements MustVerifyEmail
         $startDate = $now->copy()->subMonths(4)->startOfMonth();
         $endDate = $now->endOfMonth();
 
+        $driver = DB::connection()->getDriverName();
+        $yearExpression = $driver === 'sqlite'
+            ? "CAST(strftime('%Y', created_at) AS INTEGER)"
+            : "YEAR(created_at)";
+        $monthExpression = $driver === 'sqlite'
+            ? "CAST(strftime('%m', created_at) AS INTEGER)"
+            : "MONTH(created_at)";
+
         return static::whereBetween('created_at', [$startDate, $endDate])
-            // Seleciona o ano, o mês, a quantidade total e a quantidade com 'dominio' e 'dominio_externo' não nulos
-            ->selectRaw('YEAR(created_at) as year, MONTH(created_at) as month, COUNT(*) as total, 
-                        COUNT(CASE WHEN dominio IS NOT NULL OR dominio_externo IS NOT NULL THEN 1 END) as total_with_dominio')
-            ->groupBy('year', 'month')
+            ->selectRaw("$yearExpression as year, $monthExpression as month, COUNT(*) as total, 
+                        COUNT(CASE WHEN dominio IS NOT NULL OR dominio_externo IS NOT NULL THEN 1 END) as total_with_dominio")
+            ->groupByRaw("$yearExpression, $monthExpression")
             ->orderBy('year')
             ->orderBy('month')
             ->get()
@@ -134,8 +149,8 @@ class User extends Authenticatable implements MustVerifyEmail
                 return [
                     'year' => $row->year,
                     'month' => $row->month,
-                    'total' => $row->total,  // Total de cadastros
-                    'total_with_dominio' => $row->total_with_dominio,  // Total de cadastros com dominio e dominio_externo não nulos
+                    'total' => $row->total,
+                    'total_with_dominio' => $row->total_with_dominio,
                 ];
             })
             ->toArray();

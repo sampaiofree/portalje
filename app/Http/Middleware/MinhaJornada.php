@@ -6,9 +6,11 @@ use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
 use App\Models\User;
 use App\Models\Codigo_ref;
 use App\Models\PurchaseEvent;
+use Throwable;
 
 class MinhaJornada
 {
@@ -20,6 +22,12 @@ class MinhaJornada
     public function handle(Request $request, Closure $next): Response
     {
         if (Auth::check()) {
+            if (!$this->requiredTablesAvailable()) {
+                $this->shareDefaultDashboardData();
+                return $next($request);
+            }
+
+            try {
             // Obtém o usuário autenticado
             $id=Auth::user()->id;
             //if($id==13){$id=43011;} //PATRICIA 43011
@@ -251,7 +259,32 @@ class MinhaJornada
            view()->share('aguardadndo', $aguardadndo);
            view()->share('canceladas', $canceladas);
            view()->share('dashboard', $array);
+            } catch (Throwable $e) {
+                report($e);
+                $this->shareDefaultDashboardData();
+            }
         }
         return $next($request);
+    }
+
+    private function requiredTablesAvailable(): bool
+    {
+        return Schema::hasTable('users')
+            && Schema::hasTable('codigo_ref')
+            && Schema::hasTable('purchase_events');
+    }
+
+    private function shareDefaultDashboardData(): void
+    {
+        view()->share('minha_jornada', []);
+        view()->share('quantidade_vendas', 0);
+        view()->share('total_sum', 0);
+        view()->share('vencidos', ['n' => 0, 'soma' => 0]);
+        view()->share('aguardadndo', ['n' => 0, 'soma' => 0]);
+        view()->share('canceladas', ['n' => 0, 'soma' => 0]);
+        view()->share('dashboard', [
+            'totalLeads' => 0,
+            'conversao_vendas' => null,
+        ]);
     }
 }

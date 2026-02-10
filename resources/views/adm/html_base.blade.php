@@ -607,6 +607,12 @@ $dominioseco = str_replace('.portalje.org', '', Auth::user()->dominio);
                     </a>
                 </li>
                 <li class="side-nav-item">
+                    <a href="{{ route('adm_portal_informacoes') }}" class="side-nav-link">
+                        <i class="ri-settings-3-line"></i>
+                        <span> Informações do Portal </span>
+                    </a>
+                </li>
+                <li class="side-nav-item">
                     <a data-bs-toggle="collapse" href="#sidebarPages" aria-expanded="true" aria-controls="sidebarPages" class="side-nav-link">
                         <i class="ri-slideshow-3-line  "></i>
                         <span> Cursos </span>

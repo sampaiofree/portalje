@@ -539,6 +539,7 @@
                                     <input id="input_lead_curso_id" type="hidden" name="curso_id">
                                     <input id="input_lead_user_id" type="hidden" name="user_id">
                                     <input id="input_lead_origem" type="hidden" name="origem">
+                                    <input id="input_lead_whatsapp_atendimento_id" type="hidden" name="whatsapp_atendimento_id">
                                 </div>
                                 <div class="my-3">
                                     <label >Digite seu WhatsApp com DDD</label>
@@ -660,17 +661,20 @@
           var curso_id = button.getAttribute('data-curso');
           var user_id = button.getAttribute('data-user');
           var origem = button.getAttribute('data-origem');
+          var whatsapp_atendimento_id = button.getAttribute('data-whatsapp-atendimento-id');
 
           // Update the modal's content.
           var input_lead_link = modal_lead.querySelector('#input_lead_link');
           var input_lead_curso_id = modal_lead.querySelector('#input_lead_curso_id');
           var input_lead_user_id = modal_lead.querySelector('#input_lead_user_id');
           var input_lead_origem = modal_lead.querySelector('#input_lead_origem');
+          var input_lead_whatsapp_atendimento_id = modal_lead.querySelector('#input_lead_whatsapp_atendimento_id');
 
           input_lead_link.value = link;
           input_lead_curso_id.value = curso_id;
           input_lead_user_id.value = user_id;
           input_lead_origem.value = origem;
+          input_lead_whatsapp_atendimento_id.value = whatsapp_atendimento_id;
 
     });
 
@@ -683,16 +687,17 @@
             fbq('track', 'Lead');
             @endif
 
-            var input_lead_nome = $('#input_lead_nome').val();
-            var input_lead_link = $('#input_lead_link').val();
-            var input_lead_curso_id = $('#input_lead_curso_id').val();
-            var input_lead_user_id = $('#input_lead_user_id').val();
-            var input_lead_origem = $('#input_lead_origem').val();
-            var input_lead_telefone = $('#input_lead_telefone').val();
-            var telefoneApenasNumeros = input_lead_telefone.replace(/\D/g, '');
+            var input_lead_nome = $("#input_lead_nome").val();
+            var input_lead_link = $("#input_lead_link").val();
+            var input_lead_curso_id = $("#input_lead_curso_id").val();
+            var input_lead_user_id = $("#input_lead_user_id").val();
+            var input_lead_origem = $("#input_lead_origem").val();
+            var input_lead_whatsapp_atendimento_id = $("#input_lead_whatsapp_atendimento_id").val();
+            var input_lead_telefone = $("#input_lead_telefone").val();
+            var telefoneApenasNumeros = input_lead_telefone.replace(/\D/g, "");
 
             if (telefoneApenasNumeros.length < 10) {
-                alert('O telefone deve conter no mínimo 10 dígitos.');
+                alert("O telefone deve conter no minimo 10 digitos.");
                 return;
             }
 
@@ -700,28 +705,33 @@
             var telefone = telefoneApenasNumeros.substring(2);
 
             input_lead_link = input_lead_link.replace("{nome}", input_lead_nome); //COLOCAR O NOME DA PESSOA NA MENSAGEM
-            window.location.href = input_lead_link+"&name="+input_lead_nome+"&phoneac="+ddd+"&phonenumber="+telefone;
-            
-            $.ajax({
-                url: $(this).attr('action'),
-                method: $(this).attr('method'),
-                data: {
-                    _token: $('input[name="_token"]').val(),  // Certifique-se de incluir o CSRF token se necessário
-                    nome: input_lead_nome,
-                    curso_id: input_lead_curso_id,
-                    user_id: input_lead_user_id,
-                    origem: input_lead_origem,
-                    telefone: telefoneApenasNumeros,
-                    origem: input_lead_origem
-                },
-                success: function(response) {
-                    console.log(response);
-                },
-                error: function(xhr, status, error) {
-                    var errors = xhr.responseJSON.errors;
-                    console.log(errors);
-                }
-            });
+            var redirectUrl = input_lead_link + "&name=" + encodeURIComponent(input_lead_nome) + "&phoneac=" + ddd + "&phonenumber=" + telefone;
+            var formElement = document.getElementById("modal_form_lead");
+            var payload = new FormData(formElement);
+            payload.set("nome", input_lead_nome);
+            payload.set("curso_id", input_lead_curso_id);
+            payload.set("user_id", input_lead_user_id);
+            payload.set("origem", input_lead_origem);
+            payload.set("telefone", telefoneApenasNumeros);
+            payload.set("whatsapp_atendimento_id", input_lead_whatsapp_atendimento_id || "");
+
+            var requestSent = false;
+            if (navigator.sendBeacon) {
+                requestSent = navigator.sendBeacon(formElement.action, payload);
+            }
+
+            if (!requestSent) {
+                fetch(formElement.action, {
+                    method: "POST",
+                    body: payload,
+                    keepalive: true,
+                    credentials: "same-origin"
+                }).catch(function(error) {
+                    console.log(error);
+                });
+            }
+
+            window.location.href = redirectUrl;
         });
     });
 

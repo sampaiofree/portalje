@@ -21,6 +21,7 @@ use App\Http\Controllers\ShortenedUrlController;
 use App\Http\Controllers\ViajandinhoController;
 use App\Http\Controllers\OpenAIController;
 use App\Http\Controllers\FormacaoEmpresarialController;
+use App\Http\Controllers\DadosPortalController;
 use App\Exports\TabelaExport;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Http\Controllers\Auth\LoginController;
@@ -154,6 +155,7 @@ Route::middleware(['auth', 'verified', 'minha_jornada'])->group(function () {
         Route::post('/leads/alterar_atendimento', [LeadsController::class, 'alterar_atendimento'])->name('alterar_atendimento'); //LEADS ALTERAR ATENDIMENTO
         Route::post('/dominio', [UserController::class, 'update_dominio'])->name('alterar_dominio'); //MENU > MINHA ESTRUTURA > MEU SITE || SUBMETENDO O FORMULÁRIO
         Route::post('/whatsapp_atendimento', [UserController::class, 'update_whatsapp_atendimento'])->name('alterar_whatsapp_atendimento'); //MENU > MINHA ESTRUTURA > WHATSAPP DE ATENDIMENTO || SUBMETENDO O FORMULÁRIO      
+        Route::delete('/whatsapp_atendimento/{id}', [UserController::class, 'destroy_whatsapp_atendimento'])->name('excluir_whatsapp_atendimento');
         Route::post('/afiliados_cadastrar_curso', [CursoController::class, 'afiliados_cadastrar_curso_ref'])->name('cadastrar_codigo_ref'); //MENU > MINHA ESTRUTURA > CURSOS || ENVIO DO FORMULÁRIO
         Route::post('/configurar_site', [UserController::class, 'afiliado_configurar_site'])->name('afiliado_configurar_site_post'); //MENU > MINHA ESTRUTURA > CONFIGURAÇÕES DO SITE || SUBMETENDO O FORMULÁRIO
         Route::post('/testar_pixel', [Meta_apiController::class, 'testar_pixel'])->name('afiliado_testar_pixel'); //MENU > MINHA ESTRUTURA > CONFIGURAÇÕES DO SITE || TESTAR PIXEL DO META FACEBOOK
@@ -247,6 +249,9 @@ Route::prefix('administrador')->group(function () {
     Route::get('curso_novo', [AdminController::class, 'create'])->name('cursos.novo');
 
     Route::get('leads/hotmart', [AdminController::class, 'leads_hotmart'])->name('leads.hotmart');
+
+    Route::get('/portal-informacoes', [DadosPortalController::class, 'index'])->name('adm_portal_informacoes');
+    Route::post('/portal-informacoes', [DadosPortalController::class, 'update'])->name('adm_portal_informacoes_update');
 });
 
 /*PIXEL DO FACEBOOK META ADS */

@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Models\Curso;
 use App\Models\PurchaseEvent;
 use App\Models\Codigo_ref;
+use App\Models\WhatsappAtendimento;
 use App\Services\ManyChatService;
 
 
@@ -43,16 +44,29 @@ class LeadsController extends Controller
             Log::info('User ID recebido.', ['user_id' => $request->input('user_id')]);
 
             $user = User::find($request->input('user_id')) ?? null;
-            Log::info('Usuário buscado.', ['user' => $user]);
+            Log::info('Usuario buscado.', ['user' => $user]);
 
-            $ref = Codigo_ref::where('user_id', $user->id)
-                ->where('curso_id', $request->input('curso_id'))
-                ->first() ?? null;
-            Log::info('Código de referência buscado.', ['ref' => $ref]);
+            if ($user) {
+                $ref = Codigo_ref::where('user_id', $user->id)
+                    ->where('curso_id', $request->input('curso_id'))
+                    ->first() ?? null;
+                Log::info('Codigo de referencia buscado.', ['ref' => $ref]);
+            } else {
+                $ref = null;
+            }
 
         } else {
             Log::warning('Nenhum user_id recebido.');
             $user = false;
+            $ref = null;
+        }
+
+        $whatsappAtendimentoId = (int) $request->input('whatsapp_atendimento_id', 0);
+        if ($user && $whatsappAtendimentoId > 0) {
+            WhatsappAtendimento::where('id', $whatsappAtendimentoId)
+                ->where('user_id', $user->id)
+                ->where('is_active', true)
+                ->update(['last_lead_at' => now()]);
         }
 
         $telefone = preg_replace('/\D/', '', $request->input('telefone')) ?? null;

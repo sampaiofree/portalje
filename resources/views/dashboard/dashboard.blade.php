@@ -16,6 +16,11 @@
                 <p class="mt-2 text-lg text-gray-600 text-gray-400">Sua jornada para o sucesso como afiliado começa agora. Siga os passos abaixo.</p>
             </div>
 
+            @php
+                $whatsappAtendimentos = $whatsappAtendimentos ?? collect();
+                $temWhatsappAtendimento = $whatsappAtendimentos->isNotEmpty();
+            @endphp
+
             <!-- BOX DE ALERTA PRINCIPAL -->
             @if(!Auth::user()->dominio && !Auth::user()->dominio_externo)
                 <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 text-center rounded-md" role="alert">
@@ -26,12 +31,12 @@
                         <i class="ri-global-line mr-2"></i>Configurar Meu Site Agora
                     </x-danger-button>
                 </div>
-            @elseif(!Auth::user()->whatsapp_atendimento)
+            @elseif(!$temWhatsappAtendimento)
                 <div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 p-4 text-center rounded-md" role="alert">
                     <h4 class="font-bold text-lg flex items-center justify-center"><i class="ri-whatsapp-line mr-2"></i>Quase lá!</h4>
                     <p>Seu site está no ar, mas você precisa cadastrar seu WhatsApp de atendimento para não perder vendas.</p>
                     <hr class="my-3 border-yellow-300">
-                    <x-primary-button x-data @click.prevent="$dispatch('open-modal', 'whatsapp-form-modal')"  class="bg-yellow-500 hover:bg-yellow-600 focus:bg-yellow-600 active:bg-yellow-700">
+                    <x-primary-button type="button" onclick="openWhatsappModal()" class="bg-yellow-500 hover:bg-yellow-600 focus:bg-yellow-600 active:bg-yellow-700">
                         <i class="ri-edit-2-line mr-2"></i>Cadastrar Meu WhatsApp
                     </x-primary-button>
                 </div>
@@ -70,10 +75,38 @@
                                 </div>
                             </div>
                             
-                            @if (Auth::user()->whatsapp_atendimento)
-                                <p class="mt-3 text-sm text-gray-700 bg-green-50 p-2 rounded-md w-full">
-                                    Cadastrado: <span class="font-medium">{{ Auth::user()->whatsapp_atendimento }}</span>
-                                </p>
+                            @if ($temWhatsappAtendimento)
+                                <div class="mt-3 w-full space-y-2">
+                                    @foreach ($whatsappAtendimentos as $item)
+                                        <div class="w-full rounded-md border p-3">
+                                            <div class="flex items-start justify-between gap-3">
+                                                <div class="break-all">
+                                                    <p class="font-medium text-gray-800">{{ $item->whatsapp }}</p>
+                                                    <p class="text-xs {{ $item->is_active ? 'text-green-700' : 'text-gray-500' }}">
+                                                        {{ $item->is_active ? 'Ativo' : 'Inativo' }}
+                                                    </p>
+                                                </div>
+                                                <div class="flex items-center gap-2">
+                                                    <button
+                                                        type="button"
+                                                        class="px-3 py-2 text-xs font-semibold text-indigo-700 bg-indigo-50 rounded-md hover:bg-indigo-100"
+                                                        onclick="openWhatsappModal({ id: {{ $item->id }}, whatsapp: '{{ $item->whatsapp }}', isActive: {{ $item->is_active ? 1 : 0 }} })"
+                                                    >
+                                                        Editar
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        class="px-3 py-2 text-xs font-semibold text-red-700 bg-red-50 rounded-md hover:bg-red-100"
+                                                        data-delete-whatsapp
+                                                        data-delete-url="{{ route('excluir_whatsapp_atendimento', $item->id) }}"
+                                                    >
+                                                        Excluir
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
                             @else
                                 <p class="mt-3 text-sm text-yellow-800 bg-yellow-50 p-2 rounded-md w-full">
                                     <i class="ri-error-warning-line mr-1"></i>
@@ -81,9 +114,8 @@
                                 </p>
                             @endif
 
-                            {{-- ESTE BOTÃO IRÁ ABRIR O MODAL --}}
-                            <x-secondary-button x-data @click.prevent="$dispatch('open-modal', 'whatsapp-form-modal')" class="mt-4">
-                                {{ Auth::user()->whatsapp_atendimento ? 'Alterar WhatsApp' : 'Cadastrar WhatsApp' }}
+                            <x-secondary-button type="button" onclick="openWhatsappModal()" class="mt-4">
+                                {{ $temWhatsappAtendimento ? 'Adicionar WhatsApp' : 'Cadastrar WhatsApp' }}
                             </x-secondary-button>
                         </div>
 
@@ -256,36 +288,34 @@
         <form id="form_whatsapp_atendimento" method="post" action="{{ route('alterar_whatsapp_atendimento') }}" class="p-6 ajax-form">
 
             @csrf
+            <input type="hidden" name="whatsapp_id" id="whatsapp_id" value="">
 
-            <h2 class="text-lg font-medium text-gray-900">
-                Atualizar WhatsApp de Atendimento
+            <h2 class="text-lg font-medium text-gray-900" id="whatsapp-modal-title">
+                Cadastrar WhatsApp de Atendimento
             </h2>
             <p class="mt-1 text-sm text-gray-600">
                 Digite o número completo, incluindo o código do país (Ex: 55) e o DDD, sem espaços ou símbolos.
             </p>
 
             <div class="mt-6">
-                <x-input-label for="whatsapp_atendimento" value="Número do WhatsApp" />
+                <x-input-label for="whatsapp" value="Número do WhatsApp" />
                 <x-text-input
-                    id="whatsapp_atendimento"
-                    name="whatsapp_atendimento"
-                    type="number"
+                    id="whatsapp"
+                    name="whatsapp"
+                    type="text"
                     class="mt-1 block w-full py-3 px-4"
                     placeholder="5562999998888"
-                    :value="old('whatsapp_atendimento', Auth::user()->whatsapp_atendimento)"
+                    inputmode="numeric"
+                    pattern="[0-9]{12,14}"
                     required
                 />
             </div>
             
             <div class="mt-4">
-                <x-input-label for="whatsapp_atendimento_tempo" value="Quando mostrar o botão de WhatsApp no seu site?" />
-                <select name="whatsapp_atendimento_tempo" id="whatsapp_atendimento_tempo" class="py-3 px-4 mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm">
-                    @php $currentTime = Auth::user()->whatsapp_atendimento_tempo; @endphp
-                    <option value="0" @selected($currentTime == 0)>Imediatamente</option>
-                    <option value="60" @selected($currentTime == 60)>Após 1 minuto</option>
-                    <option value="120" @selected($currentTime == 120)>Após 2 minutos</option>
-                    <option value="180" @selected($currentTime == 180)>Após 3 minutos</option>
-                    <option value="300" @selected($currentTime == 300)>Após 5 minutos</option>
+                <x-input-label for="is_active" value="Status" />
+                <select name="is_active" id="is_active" class="py-3 px-4 mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm" required>
+                    <option value="1">Ativo</option>
+                    <option value="0">Inativo</option>
                 </select>
             </div>
 
@@ -297,7 +327,7 @@
                     {{ __('Cancelar') }}
                 </x-secondary-button>
 
-                <x-primary-button class="ms-3">
+                <x-primary-button class="ms-3" id="whatsapp-modal-submit">
                     {{ __('Salvar WhatsApp') }}
                 </x-primary-button>
             </div>
@@ -306,8 +336,24 @@
 
     <!-- Modal do Formulário de Domínio -->
     <x-modal name="dominio-form-modal" :show="$errors->any()" focusable>
+        @php
+            $baseDomain = parse_url(config('app.url'), PHP_URL_HOST) ?: request()->getHost();
+            $baseDomain = preg_replace('/^www\./', '', strtolower($baseDomain));
+
+            $currentSubdomain = '';
+            $userDomain = strtolower((string) (Auth::user()->dominio ?? ''));
+            if ($userDomain !== '') {
+                $baseSuffix = '.' . $baseDomain;
+                if (str_ends_with($userDomain, $baseSuffix)) {
+                    $currentSubdomain = substr($userDomain, 0, -strlen($baseSuffix));
+                } else {
+                    $currentSubdomain = explode('.', $userDomain)[0] ?? '';
+                }
+                $currentSubdomain = preg_replace('/[^a-z0-9]/', '', $currentSubdomain);
+            }
+        @endphp
         <form 
-            x-data="{ subdominio: '{{ str_replace('.portalje.org', '', Auth::user()->dominio) }}' }"
+            x-data="{ subdominio: @js($currentSubdomain), dominioBase: @js($baseDomain) }"
             method="post" 
             action="{{ route('alterar_dominio') }}" 
             class="p-6 ajax-form"
@@ -332,7 +378,7 @@
             </div>
 
             <div class="mt-2 text-sm text-gray-600">
-                Seu site será: <strong class="font-semibold text-indigo-600" x-text="subdominio ? subdominio + '.portalje.org' : ''"></strong>
+                Seu site será: <strong class="font-semibold text-indigo-600" x-text="subdominio ? subdominio + '.' + dominioBase : ''"></strong>
             </div>
             
             <div class="modal_feedback mt-4 text-sm"></div>
@@ -348,6 +394,69 @@
         </form>
     </x-modal>
 <script>
+    function openWhatsappModal(payload = null) {
+        const form = document.getElementById('form_whatsapp_atendimento');
+        if (!form) return;
+
+        const idInput = document.getElementById('whatsapp_id');
+        const whatsappInput = document.getElementById('whatsapp');
+        const isActiveSelect = document.getElementById('is_active');
+        const feedbackDiv = form.querySelector('.modal_feedback');
+        const title = document.getElementById('whatsapp-modal-title');
+        const submitButton = document.getElementById('whatsapp-modal-submit');
+
+        if (idInput) idInput.value = payload?.id ? String(payload.id) : '';
+        if (whatsappInput) whatsappInput.value = payload?.whatsapp ? String(payload.whatsapp).replace(/[^0-9]/g, '') : '';
+        if (isActiveSelect) isActiveSelect.value = payload?.isActive === 0 ? '0' : '1';
+        if (feedbackDiv) feedbackDiv.innerHTML = '';
+
+        if (title) {
+            title.textContent = payload?.id ? 'Editar WhatsApp de Atendimento' : 'Cadastrar WhatsApp de Atendimento';
+        }
+        if (submitButton) {
+            submitButton.textContent = payload?.id ? 'Salvar Alterações' : 'Salvar WhatsApp';
+        }
+
+        window.dispatchEvent(new CustomEvent('open-modal', { detail: 'whatsapp-form-modal' }));
+    }
+
+    function bindWhatsappDeleteButtons() {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        document.querySelectorAll('[data-delete-whatsapp]').forEach(button => {
+            if (button.dataset.bound === '1') return;
+            button.dataset.bound = '1';
+
+            button.addEventListener('click', function () {
+                const deleteUrl = this.dataset.deleteUrl;
+                if (!deleteUrl) return;
+
+                if (!confirm('Deseja excluir este WhatsApp?')) return;
+
+                this.disabled = true;
+                fetch(deleteUrl, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json',
+                    },
+                })
+                .then(response => {
+                    if (!response.ok) return response.json().then(err => { throw err; });
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.success) {
+                        location.reload();
+                    }
+                })
+                .catch(() => {
+                    this.disabled = false;
+                    alert('Não foi possível excluir o WhatsApp.');
+                });
+            });
+        });
+    }
+
     function bindAjaxForms() {
         const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
         document.querySelectorAll('.ajax-form').forEach(form => {
@@ -374,7 +483,7 @@
                 .then(data => {
                     if (data.success) {
                         if (feedbackDiv) feedbackDiv.innerHTML = '<p class="text-green-600">Salvo com sucesso!</p>';
-                        setTimeout(() => location.reload(), 1500);
+                        setTimeout(() => location.reload(), 800);
                     }
                 })
                 .catch(errorData => {
@@ -382,8 +491,14 @@
                         let errorHtml = '<ul class="text-red-600 list-disc list-inside">';
                         
                         // CORREÇÃO: Verifica os possíveis erros de ambos os formulários
+                        if (errorData.errors.whatsapp) {
+                            errorHtml += `<li>${errorData.errors.whatsapp[0]}</li>`;
+                        }
                         if (errorData.errors.whatsapp_atendimento) {
                             errorHtml += `<li>${errorData.errors.whatsapp_atendimento[0]}</li>`;
+                        }
+                        if (errorData.errors.is_active) {
+                            errorHtml += `<li>${errorData.errors.is_active[0]}</li>`;
                         }
                         if (errorData.errors.dominio) {
                             errorHtml += `<li>${errorData.errors.dominio[0]}</li>`;
@@ -399,6 +514,20 @@
         });
     }
 
-    document.addEventListener('DOMContentLoaded', bindAjaxForms);
+    function bindWhatsappInputMask() {
+        const whatsappInput = document.getElementById('whatsapp');
+        if (!whatsappInput || whatsappInput.dataset.bound === '1') return;
+        whatsappInput.dataset.bound = '1';
+
+        whatsappInput.addEventListener('input', function () {
+            this.value = this.value.replace(/[^0-9]/g, '');
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        bindAjaxForms();
+        bindWhatsappDeleteButtons();
+        bindWhatsappInputMask();
+    });
 </script>
 </x-app-layout>

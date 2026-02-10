@@ -5,11 +5,12 @@ use Illuminate\Http\Request;
 use Carbon\Carbon;
 
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Foundation\Auth\User;
+use App\Models\User;
 
 use App\Http\Controllers\Home_e_cursosController;
 
 use App\Models\PurchaseEvent;
+use App\Models\WhatsappAtendimento;
 
 class UserController extends Controller 
 {
@@ -36,8 +37,24 @@ class UserController extends Controller
         $user = Auth::user();
         $cursos = new Home_e_cursosController();
         $cursos = $cursos->listar_cursos($request, $user); 
+
+        // Migração suave do campo legado em users para a nova tabela
+        if (!empty($user->whatsapp_atendimento) && !$user->whatsappAtendimentos()->exists()) {
+            $whatsappLegacy = preg_replace('/\D/', '', (string) $user->whatsapp_atendimento);
+            if ($whatsappLegacy !== '') {
+                $user->whatsappAtendimentos()->create([
+                    'whatsapp' => $whatsappLegacy,
+                    'is_active' => true,
+                ]);
+            }
+        }
+
+        $whatsappAtendimentos = $user->whatsappAtendimentos()
+            ->orderByDesc('is_active')
+            ->orderByDesc('updated_at')
+            ->get();
         
-        return view('dashboard.dashboard', compact('cursos'));
+        return view('dashboard.dashboard', compact('cursos', 'whatsappAtendimentos'));
         //return view('adm.dashboard', compact('cursos'));
     }
 
@@ -102,16 +119,30 @@ class UserController extends Controller
 
     public function update_dominio(Request $request)
     {
-        // Processamento do campo 'dominio'
-        $dominio = $request->input('dominio');
-        $dominio = preg_replace('/[^a-z0-9]/', '', strtolower($dominio));
-        $dominio = str_replace(".portalje.org", "", $dominio);
-        $dominio = $dominio . ".portalje.org";
-
-        // Validação dos dados do formulário
+        // Validação inicial do formulário
         $request->validate([
-            'dominio' => 'required|unique:users,dominio,' . Auth::id(),
+            'dominio' => 'required|string|max:255',
         ]);
+
+        $baseDomain = parse_url(config('app.url'), PHP_URL_HOST) ?: $request->getHost();
+        $baseDomain = preg_replace('/^www\./', '', strtolower($baseDomain));
+
+        // Aceita apenas o subdomínio e monta o domínio final com base no APP_URL
+        $subdominio = strtolower(trim((string) $request->input('dominio')));
+        $subdominio = preg_replace('/^https?:\/\//', '', $subdominio);
+        $subdominio = preg_replace('/^www\./', '', $subdominio);
+
+        $sufixoBase = '.' . $baseDomain;
+        if (str_ends_with($subdominio, $sufixoBase)) {
+            $subdominio = substr($subdominio, 0, -strlen($sufixoBase));
+        }
+
+        $subdominio = preg_replace('/[^a-z0-9]/', '', $subdominio);
+        if (empty($subdominio)) {
+            return response()->json(['errors' => ['dominio' => ['Informe um nome de site válido.']]], 422);
+        }
+
+        $dominio = $subdominio . '.' . $baseDomain;
 
         // Verificação manual se o domínio já existe para outro usuário
         $existingUser = User::where('dominio', $dominio)->where('id', '!=', Auth::id())->first();
@@ -130,23 +161,82 @@ class UserController extends Controller
 
     public function update_whatsapp_atendimento(Request $request)
     {
-       // Validação dos dados do formulário
-        $request->validate([
-            'whatsapp_atendimento' => [
+        $validated = $request->validate([
+            'whatsapp_id' => 'nullable|integer',
+            'whatsapp' => [
                 'required',
                 'regex:/^[0-9]{12,14}$/',
             ],
-            'whatsapp_atendimento_tempo' => 'required',
+            'is_active' => 'required|boolean',
         ]);
 
-        // Atualizar os dados do usuário
         $user = Auth::user();
-        $user->whatsapp_atendimento = $request->input('whatsapp_atendimento');
-        $user->whatsapp_atendimento_tempo = $request->input('whatsapp_atendimento_tempo');
-        $user->save();
+        $whatsappId = (int) ($validated['whatsapp_id'] ?? 0);
+        $registro = null;
 
-        // Retornar resposta JSON
-        return response()->json(['success' => 'WhatsApp alterado com sucesso!']);
+        if ($whatsappId > 0) {
+            $registro = WhatsappAtendimento::where('id', $whatsappId)
+                ->where('user_id', $user->id)
+                ->first();
+
+            if (!$registro) {
+                return response()->json(['errors' => ['whatsapp' => ['Registro de WhatsApp não encontrado.']]], 422);
+            }
+        }
+
+        $whatsapp = preg_replace('/\D/', '', (string) $validated['whatsapp']);
+
+        $duplicateQuery = WhatsappAtendimento::where('user_id', $user->id)
+            ->where('whatsapp', $whatsapp);
+        if ($registro) {
+            $duplicateQuery->where('id', '!=', $registro->id);
+        }
+
+        if ($duplicateQuery->exists()) {
+            return response()->json(['errors' => ['whatsapp' => ['Este WhatsApp já está cadastrado.']]], 422);
+        }
+
+        if (!$registro) {
+            $registro = new WhatsappAtendimento();
+            $registro->user_id = $user->id;
+        }
+
+        $registro->whatsapp = $whatsapp;
+        $registro->is_active = (bool) $validated['is_active'];
+        $registro->save();
+
+        $this->syncWhatsappAtendimentoLegado($user);
+
+        return response()->json(['success' => 'WhatsApp salvo com sucesso!']);
+    }
+
+    public function destroy_whatsapp_atendimento(int $id)
+    {
+        $user = Auth::user();
+        $registro = WhatsappAtendimento::where('id', $id)
+            ->where('user_id', $user->id)
+            ->first();
+
+        if (!$registro) {
+            return response()->json(['errors' => ['whatsapp' => ['Registro de WhatsApp não encontrado.']]], 404);
+        }
+
+        $registro->delete();
+
+        $this->syncWhatsappAtendimentoLegado($user);
+
+        return response()->json(['success' => 'WhatsApp excluído com sucesso!']);
+    }
+
+    private function syncWhatsappAtendimentoLegado(User $user): void
+    {
+        $principal = $user->whatsappAtendimentos()
+            ->where('is_active', true)
+            ->orderByDesc('updated_at')
+            ->first();
+
+        $user->whatsapp_atendimento = $principal ? (string) $principal->whatsapp : null;
+        $user->save();
     }
 
     public function afiliado_configurar_site(Request $request)

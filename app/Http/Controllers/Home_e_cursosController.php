@@ -10,9 +10,11 @@ use App\Http\Controllers\Meta_apiController;
 use App\Models\Curso;
 use App\Models\User;
 use App\Models\Dados_portal;
+use Illuminate\Support\Facades\Schema;
 
 use DOMDocument;
 use DOMXPath;
+use Throwable;
 
 class Home_e_cursosController extends Controller
 {
@@ -21,13 +23,40 @@ class Home_e_cursosController extends Controller
 
     public function __construct()
     {
-        $this->dados_portal = Dados_portal::first();
+        $this->dados_portal = $this->carregarDadosPortal();
+    }
+
+    private function carregarDadosPortal(): array
+    {
+        $defaults = [
+            'telefone_suporte_alunos' => '5511982671533',
+            'whatsapp_atendimento_tempo' => 'Seg a Sex 08:00-18:00',
+            'formulario_pre_checkout' => true,
+            'formulario_whatsapp' => true,
+        ];
+
+        try {
+            if (!Schema::hasTable('portal_informacoes')) {
+                return $defaults;
+            }
+
+            $dados = Dados_portal::first();
+
+            if (!$dados) {
+                return $defaults;
+            }
+
+            return array_merge($defaults, $dados->toArray());
+        } catch (Throwable $e) {
+            return $defaults;
+        }
     }
 
     //PÁGINA CURSO INDIVIDUAL
     public function curso_individual(Request $request, $curso = null, $desconto = null) {
             
         if (!$curso) {return redirect()->away('https://portalje.org');}  
+        if (!Schema::hasTable('curso')) {return redirect()->route('nova_home');}
             
         /**PEGAR TODOS OS PARAMETROS PARA COLOCAR NO LINK DO CHECKOUT**/
         $queryParams = request()->query();
@@ -151,7 +180,11 @@ class Home_e_cursosController extends Controller
         $dados = $this->dadosusuario($request->getHost(), $curso, $ref);
         if (!$dados) {return redirect()->away('https://portalje.org');}   
         $curso->whatsapp_atendimento = $dados['whatsapp_atendimento'];
-        if((strlen(request()->get('t')) > 10)){$curso->whatsapp_atendimento=request()->get('t');}
+        $curso->whatsapp_atendimento_id = $dados['whatsapp_atendimento_id'] ?? null;
+        if((strlen(request()->get('t')) > 10)){
+            $curso->whatsapp_atendimento=request()->get('t');
+            $curso->whatsapp_atendimento_id=null;
+        }
         //if($curso->whatsapp_atendimento=='5511982671533'){$curso->whatsapp_atendimento='5511962501386';}
         $curso->whatsapp_atendimento_tempo = $dados['whatsapp_atendimento_tempo'];
         $curso->link_checkout_completo = $dados['link_checkout_completo'].$desconto.$query.$src;
@@ -201,14 +234,24 @@ class Home_e_cursosController extends Controller
     //DADOS DO USUARIO - AFILIADO OU PRODUTOR
     private function dadosusuario($dominio, $curso = null, $ref = null){
         //VERIFICAR SE É UM SOBDOMINIO OU DOMINIO COMPRADO
-        if($dominio!='portalje.org' AND $dominio!='dns.portalje.org' AND $dominio!='jemp.me' AND $dominio!='jovemempreendedor.org' AND $dominio!='dns.jovemempreendedor.org'){
+        if(
+            Schema::hasTable('users') AND
+            $dominio!='portalje.org' AND
+            $dominio!='dns.portalje.org' AND
+            $dominio!='jemp.me' AND
+            $dominio!='jovemempreendedor.org' AND
+            $dominio!='dns.jovemempreendedor.org'
+        ){
 
             $verificar = User::where('dominio', $dominio)->orWhere('dominio_externo', $dominio)->first();
             if($verificar){
+                $whatsappSelecionado = $this->selecionarWhatsappAtendimento($verificar);
+                $whatsappAtendimento = $whatsappSelecionado['whatsapp'] ?? $verificar->whatsapp_atendimento;
 
                 //DADOS DO AFILIADO
                 $dados = [
-                    'whatsapp_atendimento' => $verificar->whatsapp_atendimento,
+                    'whatsapp_atendimento' => $whatsappAtendimento,
+                    'whatsapp_atendimento_id' => $whatsappSelecionado['id'] ?? null,
                     'whatsapp_atendimento_tempo' => $verificar->whatsapp_atendimento_tempo,
                     'meta_pixel_id' => $verificar->meta_pixel_id,
                     'formulario_pre_checkout' => $verificar->formulario_pre_checkout,
@@ -230,19 +273,36 @@ class Home_e_cursosController extends Controller
 
         }
 
-        if($ref){
+        if($ref && Schema::hasTable('codigo_ref') && Schema::hasTable('users')){
           $ref = Codigo_ref::where('codigo_ref', $ref)->join('users', 'users.id', '=', 'codigo_ref.user_id')->select('codigo_ref.*','users.*', )->first();
         }
 
-        $dados_portal = Dados_portal::first();
+        $refUserId = is_object($ref) ? ($ref->id ?? null) : (is_array($ref) ? ($ref['id'] ?? null) : null);
+        $refWhatsapp = is_object($ref) ? ($ref->whatsapp_atendimento ?? null) : (is_array($ref) ? ($ref['whatsapp_atendimento'] ?? null) : null);
+        $refWhatsappTempo = is_object($ref) ? ($ref->whatsapp_atendimento_tempo ?? null) : (is_array($ref) ? ($ref['whatsapp_atendimento_tempo'] ?? null) : null);
+        $refMetaPixel = is_object($ref) ? ($ref->meta_pixel_id ?? null) : (is_array($ref) ? ($ref['meta_pixel_id'] ?? null) : null);
+        $refFormularioPreCheckout = is_object($ref) ? ($ref->formulario_pre_checkout ?? null) : (is_array($ref) ? ($ref['formulario_pre_checkout'] ?? null) : null);
+        $refFormularioWhatsapp = is_object($ref) ? ($ref->formulario_whatsapp ?? null) : (is_array($ref) ? ($ref['formulario_whatsapp'] ?? null) : null);
+        $refCodigo = is_object($ref) ? ($ref->codigo_ref ?? null) : (is_array($ref) ? ($ref['codigo_ref'] ?? null) : null);
+
+        $whatsappSelecionadoRef = ['id' => null, 'whatsapp' => null];
+        if ($refUserId && Schema::hasTable('users')) {
+            $refUser = User::find($refUserId);
+            if ($refUser) {
+                $whatsappSelecionadoRef = $this->selecionarWhatsappAtendimento($refUser);
+            }
+        }
+
+        $dados_portal = $this->dados_portal;
         $dados = [
-            'whatsapp_atendimento' => $ref['whatsapp_atendimento'] ?? $dados_portal->telefone_suporte_alunos,
-            'whatsapp_atendimento_tempo' => $ref['whatsapp_atendimento_tempo'] ?? $dados_portal->whatsapp_atendimento_tempo,
-            'meta_pixel_id' => $ref['meta_pixel_id'] ?? null,
-            'formulario_pre_checkout' => $ref['formulario_pre_checkout'] ?? $dados_portal->formulario_pre_checkout ,
-            'formulario_whatsapp' => $ref['formulario_whatsapp'] ?? $dados_portal->formulario_whatsapp,
-            'user_id' => $ref['id'] ?? null,
-            'affiliate_code' => $ref['codigo_ref'] ?? null
+            'whatsapp_atendimento' => $whatsappSelecionadoRef['whatsapp'] ?? ($refWhatsapp ?? $dados_portal['telefone_suporte_alunos']),
+            'whatsapp_atendimento_id' => $whatsappSelecionadoRef['id'] ?? null,
+            'whatsapp_atendimento_tempo' => $refWhatsappTempo ?? $dados_portal['whatsapp_atendimento_tempo'],
+            'meta_pixel_id' => $refMetaPixel,
+            'formulario_pre_checkout' => $refFormularioPreCheckout ?? $dados_portal['formulario_pre_checkout'],
+            'formulario_whatsapp' => $refFormularioWhatsapp ?? $dados_portal['formulario_whatsapp'],
+            'user_id' => $refUserId,
+            'affiliate_code' => $refCodigo
         ];
 
         if($curso){
@@ -370,7 +430,13 @@ class Home_e_cursosController extends Controller
     //DADOS DO USUARIO - AFILIADO OU PRODUTOR - PARA HOME PAGE
     private function dadosusuario_home($dominio, $afiliadoID = null){
         //VERIFICAR SE É UM SOBDOMINIO OU DOMINIO COMPRADO
-        if(($dominio!='portalje.org' AND $dominio!='dns.portalje.org' AND $dominio!='jemp.me' AND $dominio!='jovemempreendedor.org' AND $dominio!='dns.jovemempreendedor.org') OR $afiliadoID){            
+        if(
+            Schema::hasTable('users') &&
+            (
+                ($dominio!='portalje.org' AND $dominio!='dns.portalje.org' AND $dominio!='jemp.me' AND $dominio!='jovemempreendedor.org' AND $dominio!='dns.jovemempreendedor.org')
+                OR $afiliadoID
+            )
+        ){            
 
             if($afiliadoID){
                 $verificar = User::find($afiliadoID);
@@ -391,14 +457,18 @@ class Home_e_cursosController extends Controller
                     'user_id' => $verificar->id,
                 ];
 
-                $dados['cursos'] = Codigo_ref::where('codigo_ref.user_id', $verificar->id)
-                ->join('curso', 'curso.id', '=', 'codigo_ref.curso_id')
-                ->select(
-                    'codigo_ref.*', 
-                    'curso.*',
-                )
-                ->orderBy('ordem')
-                ->get();
+                if (Schema::hasTable('codigo_ref') && Schema::hasTable('curso')) {
+                    $dados['cursos'] = Codigo_ref::where('codigo_ref.user_id', $verificar->id)
+                    ->join('curso', 'curso.id', '=', 'codigo_ref.curso_id')
+                    ->select(
+                        'codigo_ref.*', 
+                        'curso.*',
+                    )
+                    ->orderBy('ordem')
+                    ->get();
+                } else {
+                    $dados['cursos'] = collect();
+                }
             
 
                 return $dados;
@@ -406,20 +476,24 @@ class Home_e_cursosController extends Controller
 
         }
 
-        $dados_portal = Dados_portal::first();
+        $dados_portal = $this->dados_portal;
         $dados['dados'] = [
             'afiliado' => false,
-            'whatsapp_atendimento' => $dados_portal->telefone_suporte_alunos,
-            'whatsapp_atendimento_tempo' => $dados_portal->whatsapp_atendimento_tempo,
+            'whatsapp_atendimento' => $dados_portal['telefone_suporte_alunos'],
+            'whatsapp_atendimento_tempo' => $dados_portal['whatsapp_atendimento_tempo'],
             'meta_pixel_id' => null,
-            'formulario_pre_checkout' => $dados_portal->formulario_pre_checkout,
-            'formulario_whatsapp' => $dados_portal->formulario_whatsapp,
+            'formulario_pre_checkout' => $dados_portal['formulario_pre_checkout'],
+            'formulario_whatsapp' => $dados_portal['formulario_whatsapp'],
             'user_id' => null,
             'affiliate_code' => null
         ];
-        $dados['cursos'] = Curso::orderBy('gratuito', 'desc')
-                            ->orderBy('ordem')
-                            ->get();
+        if (Schema::hasTable('curso')) {
+            $dados['cursos'] = Curso::orderBy('gratuito', 'desc')
+                                ->orderBy('ordem')
+                                ->get();
+        } else {
+            $dados['cursos'] = collect();
+        }
 
         return $dados;
 
@@ -554,7 +628,9 @@ class Home_e_cursosController extends Controller
 
         if($user){ //DADOS DO AFILIADO
             $user_id = $user->id;
-            $whatsapp_atendimento = $user->whatsapp_atendimento;
+            $whatsappSelecionado = $this->selecionarWhatsappAtendimento($user);
+            $whatsapp_atendimento = $whatsappSelecionado['whatsapp'] ?? $user->whatsapp_atendimento ?? $this->dados_portal['telefone_suporte_alunos'];
+            $whatsapp_atendimento_id = $whatsappSelecionado['id'] ?? null;
             $whatsapp_atendimento_tempo = $user->whatsapp_atendimento_tempo;
             $formulario_whatsapp = $user->formulario_whatsapp;
             $formulario_pre_checkout = $user->formulario_pre_checkout;
@@ -562,6 +638,7 @@ class Home_e_cursosController extends Controller
         }else{ //DADOS DO PRODUTOR
             $dados =  $this->dados_portal;
             $whatsapp_atendimento =  $dados['telefone_suporte_alunos'];
+            $whatsapp_atendimento_id = null;
             $whatsapp_atendimento_tempo = $dados['whatsapp_atendimento_tempo'];
             $formulario_whatsapp = $dados['formulario_whatsapp'];
             $formulario_pre_checkout = $dados['formulario_pre_checkout'];
@@ -604,6 +681,7 @@ class Home_e_cursosController extends Controller
             "whatsapp_mostrar"=> true,
             "whatsapp_atendimento_tempo"=> $whatsapp_atendimento_tempo,
             "whatsapp"=>$whatsapp_atendimento,
+            "whatsapp_atendimento_id" => $whatsapp_atendimento_id,
             "whatsapp_mostrar"=> $whatsapp_mostrar,
             "formulario_whatsapp"=> $formulario_whatsapp,
             "formulario_pre_checkout"=> $formulario_pre_checkout,
@@ -621,22 +699,34 @@ class Home_e_cursosController extends Controller
         if($request->query('src')!== null){$src = "&src=".$request->query('src');}
         if($request->query('sck')!== null){$src = "&sck=".$request->query('sck');}
         $parametros = $src.$sck;
+
+        if (!Schema::hasTable('curso')) {
+            return [];
+        }
         
 
         
         
         if($user){
-            $codigos_ref = $user->codigo_ref;
+            $codigos_ref = Schema::hasTable('codigo_ref') ? $user->codigo_ref : collect();
             $formulario_whatsapp = $user->formulario_whatsapp;
             $formulario_pre_checkout = $user->formulario_pre_checkout;
-            $whatsApp =  $user->whatsapp_atendimento;
+            $whatsAppAtendimentoId = null;
+            if (in_array($pagina, ['w', 'w3', 'w4'], true)) {
+                $whatsappSelecionado = $this->selecionarWhatsappAtendimento($user);
+                $whatsApp = $whatsappSelecionado['whatsapp'] ?? $user->whatsapp_atendimento ?? $this->dados_portal['telefone_suporte_alunos'];
+                $whatsAppAtendimentoId = $whatsappSelecionado['id'] ?? null;
+            } else {
+                $whatsApp =  $user->whatsapp_atendimento;
+            }
             $data_user = $user->id;
         }else{
             $dados_portal = $this->dados_portal;
-            $codigos_ref = null;
+            $codigos_ref = collect();
             $formulario_whatsapp = $dados_portal['formulario_whatsapp'];
             $formulario_pre_checkout = $dados_portal['formulario_pre_checkout'];
             $whatsApp =  $dados_portal['telefone_suporte_alunos'];
+            $whatsAppAtendimentoId = null;
             $data_user = null;
         }
         
@@ -700,6 +790,7 @@ class Home_e_cursosController extends Controller
                     data-curso=\"$curso->id\" 
                     data-user=\"$data_user\"
                     data-origem=\"whatsapp\"
+                    data-whatsapp-atendimento-id=\"$whatsAppAtendimentoId\"
                     >
                         <img src=\"$src\" alt=\"$curso->titulo\" class=\"img-fluid rounded-4 border border-1\">
                     </a>";
@@ -766,6 +857,7 @@ class Home_e_cursosController extends Controller
                     data-curso=\"$curso->id\" 
                     data-user=\"$data_user\"
                     data-origem=\"whatsapp\"
+                    data-whatsapp-atendimento-id=\"$whatsAppAtendimentoId\"
                     style='text-decoration: none;'>
                         $imagem_curso                    
                     </a>";
@@ -945,6 +1037,35 @@ class Home_e_cursosController extends Controller
             return false;
         }
         
+    }
+
+    private function selecionarWhatsappAtendimento(?User $user): array
+    {
+        if (!$user) {
+            return ['id' => null, 'whatsapp' => null];
+        }
+
+        $fallbackWhatsapp = preg_replace('/\D/', '', (string) $user->whatsapp_atendimento);
+
+        if (!Schema::hasTable('whatsapp_atendimento')) {
+            return ['id' => null, 'whatsapp' => $fallbackWhatsapp ?: null];
+        }
+
+        $registro = $user->whatsappAtendimentos()
+            ->where('is_active', true)
+            ->orderByRaw('CASE WHEN last_lead_at IS NULL THEN 0 ELSE 1 END')
+            ->orderBy('last_lead_at')
+            ->orderBy('id')
+            ->first();
+
+        if ($registro) {
+            return [
+                'id' => $registro->id,
+                'whatsapp' => (string) $registro->whatsapp,
+            ];
+        }
+
+        return ['id' => null, 'whatsapp' => $fallbackWhatsapp ?: null];
     }
 
     public function preco_cheio_sem_desconto($preco=null){

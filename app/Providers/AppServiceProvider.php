@@ -5,12 +5,14 @@ namespace App\Providers;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Facades\Schema;
 
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Auth\Notifications\ResetPassword;
 
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Pagination\Paginator;
+use Throwable;
 
 use App\Models\Dados_portal;
 
@@ -37,11 +39,18 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        URL::forceScheme('https');
+        if (app()->environment('production')) {
+            URL::forceScheme('https');
+        }
         
         Paginator::useBootstrapFive();
-        
-        $dados_portal = Dados_portal::all();
+
+        try {
+            $dados_portal = Schema::hasTable('portal_informacoes') ? Dados_portal::all() : collect();
+        } catch (Throwable $e) {
+            $dados_portal = collect();
+        }
+
         View::share('dados_portal', $dados_portal);
 
         VerifyEmail::toMailUsing(function (object $notifiable, string $url) {

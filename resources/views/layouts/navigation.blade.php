@@ -103,6 +103,7 @@
                     <div class="px-4"><div class="font-medium text-base text-red-600">Administração</div></div>
                     <div class="mt-2 space-y-1">
                         <x-responsive-nav-link :href="route('dashboard_adm')">Dashboard ADM</x-responsive-nav-link>
+                        <x-responsive-nav-link :href="route('adm_portal_informacoes')">Informações do Portal</x-responsive-nav-link>
                         <x-responsive-nav-link :href="route('cursos.novo')">Novo Curso</x-responsive-nav-link>
                         <x-responsive-nav-link :href="route('adm_cursos_lista')">Lista de Cursos</x-responsive-nav-link>
                         <x-responsive-nav-link :href="route('aulas_gratuitas_index')">Aulas Gratuitas</x-responsive-nav-link>

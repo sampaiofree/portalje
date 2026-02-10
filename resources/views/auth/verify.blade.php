@@ -1,4 +1,4 @@
-x-app-layout>
+<x-app-layout>
     {{-- O cabeçalho da página, que geralmente vai na barra de navegação superior --}}
     <x-slot name="header">
         <h2 class="font-semibold text-xl text-gray-800 leading-tight">
