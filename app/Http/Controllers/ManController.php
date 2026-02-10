@@ -52,19 +52,7 @@ class ManController extends Controller
         
     }
 
-
-    public function gerarImagem(){
-        $assistant_id = "asst_s8wED8lm88lyfLpY3JxDQvf0";
-        $api_key = "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";
-        $prompt = "Você não vai acreditar no que essa proteína faz com seu corpo"; 
-
-        $openAIService = new OpenAIService($api_key);
-        return $openAIService->gerarImagem($prompt);
-
-        
-        
-    }
-
+    
     public function post_worpress(){
         // Dados do seu site WordPress
         $wp_site = 'https://3f7.org/wp-json/wp/v2/posts';
