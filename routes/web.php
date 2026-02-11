@@ -29,6 +29,7 @@ use App\Http\Controllers\ComboController;
 use App\Http\Controllers\LandingPageController;
 use App\Http\Controllers\FacebookConversionsController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\Afiliados\CatalogoController;
 use Laravel\Folio\Folio; 
 
 //require __DIR__.'/auth.php';
@@ -53,6 +54,9 @@ Route::view('/workshop', 'landign_pages.vendedor_online');
 
 //BIO
 Route::view('/bio', 'bio');
+
+//CATALOGO PUBLICO DE AFILIADOS (META ADS)
+Route::get('/afiliado/catalogo', [CatalogoController::class, 'index'])->name('afiliado.catalogo');
 
 //GRUPO_SEXTA_DA_OPORTUNIDADE
 Route::view('/grupo_vip', 'grupo_sexta_oportunidade');  

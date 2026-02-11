@@ -31,7 +31,7 @@
                                 <x-slot name="content">
                                     <x-dropdown-link :href="route('hotmart_leads', ['version' => null])">Leads do Portal</x-dropdown-link>
                                     <x-dropdown-link :href="route('hotmart_leads', ['version' => '2.0.0'])">Leads da Hotmart</x-dropdown-link>
-                                    <x-dropdown-link :href="route('hotmart_leads', ['version' => 'Grupo_WhatsApp'])">Leads de Grupos</x-dropdown-link>
+                                    <!--<x-dropdown-link :href="route('hotmart_leads', ['version' => 'Grupo_WhatsApp'])">Leads de Grupos</x-dropdown-link>-->
                                 </x-slot>
                             </x-dropdown>
                         </div>

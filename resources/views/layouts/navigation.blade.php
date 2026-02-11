@@ -77,6 +77,7 @@
                 <div class="px-4"><div class="font-medium text-base text-gray-800">Ferramentas</div></div>
                 <div class="mt-2 space-y-1">
                     <x-responsive-nav-link :href="route('encurtar_link_lista')">Encurtador de links</x-responsive-nav-link>
+                    <x-responsive-nav-link :href="route('afiliado.catalogo')">Catálogo Meta Ads</x-responsive-nav-link>
                 </div>
             </div>
 
