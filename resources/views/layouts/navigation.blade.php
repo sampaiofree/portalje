@@ -74,10 +74,16 @@
 
             <!-- Seção Ferramentas -->
             <div class="pt-2 pb-1 border-t border-gray-200">
+                @php
+                    $catalogoDominio = Auth::user()->dominio_externo ?: Auth::user()->dominio;
+                    $catalogoUrl = $catalogoDominio
+                        ? request()->getScheme() . '://' . $catalogoDominio . '/afiliado/catalogo'
+                        : route('afiliado.catalogo');
+                @endphp
                 <div class="px-4"><div class="font-medium text-base text-gray-800">Ferramentas</div></div>
                 <div class="mt-2 space-y-1">
                     <x-responsive-nav-link :href="route('encurtar_link_lista')">Encurtador de links</x-responsive-nav-link>
-                    <x-responsive-nav-link :href="route('afiliado.catalogo')">Catálogo Meta Ads</x-responsive-nav-link>
+                    <x-responsive-nav-link :href="$catalogoUrl">Catálogo Meta Ads</x-responsive-nav-link>
                 </div>
             </div>
 

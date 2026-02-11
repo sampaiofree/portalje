@@ -15,9 +15,10 @@ class CatalogoController extends Controller
     public function index(Request $request)
     {
         $host = $request->getHost();
-        $baseUrl = $request->getSchemeAndHttpHost();
+        $fallbackBaseUrl = $request->getSchemeAndHttpHost();
 
-        [$cursos, $refsPorCurso] = $this->cursosPorDominio($host);
+        [$cursos, $refsPorCurso, $user] = $this->cursosPorDominio($host);
+        $baseUrl = $this->resolverBaseUrl($request, $user, $fallbackBaseUrl);
 
         $itens = $cursos->map(function ($curso) use ($baseUrl, $refsPorCurso) {
             $ref = $refsPorCurso[$curso->id] ?? null;
@@ -52,7 +53,7 @@ class CatalogoController extends Controller
     private function cursosPorDominio(string $host): array
     {
         if (!Schema::hasTable('curso')) {
-            return [collect(), collect()];
+            return [collect(), collect(), null];
         }
 
         $user = $this->buscarUsuarioPorDominio($host);
@@ -64,7 +65,7 @@ class CatalogoController extends Controller
                 ->orderBy('ordem')
                 ->get();
 
-            return [$cursos, collect()];
+            return [$cursos, collect(), null];
         }
 
         $refsPorCurso = Codigo_ref::query()
@@ -75,7 +76,7 @@ class CatalogoController extends Controller
             ->pluck('codigo_ref', 'curso_id');
 
         if ($refsPorCurso->isEmpty()) {
-            return [collect(), collect()];
+            return [collect(), collect(), $user];
         }
 
         $cursos = Curso::query()
@@ -85,7 +86,7 @@ class CatalogoController extends Controller
             ->orderBy('ordem')
             ->get();
 
-        return [$cursos, $refsPorCurso];
+        return [$cursos, $refsPorCurso, $user];
     }
 
     private function buscarUsuarioPorDominio(string $host): ?User
@@ -110,6 +111,20 @@ class CatalogoController extends Controller
             ->where('dominio', $host)
             ->orWhere('dominio_externo', $host)
             ->first();
+    }
+
+    private function resolverBaseUrl(Request $request, ?User $user, string $fallbackBaseUrl): string
+    {
+        if (!$user) {
+            return $fallbackBaseUrl;
+        }
+
+        $dominioPreferencial = trim((string) ($user->dominio_externo ?: $user->dominio));
+        if ($dominioPreferencial === '') {
+            return $fallbackBaseUrl;
+        }
+
+        return $request->getScheme() . '://' . $dominioPreferencial;
     }
 
     private function descricaoCurso($curso): string
@@ -140,4 +155,3 @@ class CatalogoController extends Controller
         return number_format($numero, 2, '.', '') . ' BRL';
     }
 }
-

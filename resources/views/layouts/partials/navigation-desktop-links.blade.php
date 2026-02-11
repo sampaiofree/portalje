@@ -17,6 +17,12 @@
 
 <!-- Menu Dropdown "Ferramentas" -->
 <div class="hidden sm:flex sm:items-center sm:ms-6">
+    @php
+        $catalogoDominio = Auth::user()->dominio_externo ?: Auth::user()->dominio;
+        $catalogoUrl = $catalogoDominio
+            ? request()->getScheme() . '://' . $catalogoDominio . '/afiliado/catalogo'
+            : route('afiliado.catalogo');
+    @endphp
     <x-dropdown align="left" width="48">
         <x-slot name="trigger">
             <button class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-gray-500 bg-white hover:text-gray-700 focus:outline-none transition ease-in-out duration-150">
@@ -26,7 +32,7 @@
         </x-slot>
         <x-slot name="content">
             <x-dropdown-link :href="route('encurtar_link_lista')">Encurtador de links</x-dropdown-link>
-            <x-dropdown-link :href="route('afiliado.catalogo')">Catálogo Meta Ads</x-dropdown-link>
+            <x-dropdown-link :href="$catalogoUrl">Catálogo Meta Ads</x-dropdown-link>
         </x-slot>
     </x-dropdown>
 </div>
