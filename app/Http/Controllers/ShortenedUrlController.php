@@ -11,6 +11,43 @@ use Illuminate\Support\Facades\Auth;
 
 class ShortenedUrlController extends Controller
 {
+    private function normalizeDomain(?string $domain): ?string
+    {
+        $domain = strtolower(trim((string) $domain));
+        if ($domain === '') {
+            return null;
+        }
+
+        if (!str_contains($domain, '://')) {
+            $domain = 'https://' . $domain;
+        }
+
+        $host = parse_url($domain, PHP_URL_HOST) ?: '';
+        $host = preg_replace('/^www\./', '', strtolower(trim($host)));
+
+        return $host !== '' ? $host : null;
+    }
+
+    private function domainCandidates(string $host): array
+    {
+        $candidates = [
+            $host,
+            'www.' . $host,
+            'http://' . $host,
+            'https://' . $host,
+            'http://www.' . $host,
+            'https://www.' . $host,
+        ];
+
+        $normalized = [];
+        foreach ($candidates as $candidate) {
+            $normalized[] = rtrim($candidate, '/');
+            $normalized[] = rtrim($candidate, '/') . '/';
+        }
+
+        return array_values(array_unique($normalized));
+    }
+
     /**
      * Método para criar um link encurtado
      */
@@ -23,7 +60,10 @@ class ShortenedUrlController extends Controller
 
     try {
         $user = Auth::user();
-        $dominio = $user->dominio_externo ?? $user->dominio;
+        $dominio = $this->normalizeDomain($user->dominio_externo ?? $user->dominio);
+        if (!$dominio) {
+            return redirect()->back()->with('error', 'Configure um domÃ­nio vÃ¡lido antes de criar links encurtados.');
+        }
 
         // Geração de um slug único
         do {
@@ -91,7 +131,7 @@ class ShortenedUrlController extends Controller
             $link->slug = $request->input('slug');
             $link->save();
 
-            $dominio = $user->dominio_externo ?? $user->dominio;
+            $dominio = $this->normalizeDomain($user->dominio_externo ?? $user->dominio) ?? ($user->dominio_externo ?? $user->dominio);
 
             return response()->json([
                 'success' => 'Link atualizado com sucesso.',
@@ -134,10 +174,13 @@ class ShortenedUrlController extends Controller
     public function redirecionar(Request $request, $slug)
     {
          // Obtém o host completo
-        $host = $request->getHost();
+        $host = $this->normalizeDomain($request->getHost());
+        if (!$host) {
+            abort(404);
+        }
 
         // Busca pelo link encurtado no banco de dados
-        $shortenedUrl = ShortenedUrl::where('dominio', $host)
+        $shortenedUrl = ShortenedUrl::whereIn('dominio', $this->domainCandidates($host))
             ->where('slug', $slug)
             ->firstOrFail();
 

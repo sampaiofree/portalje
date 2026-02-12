@@ -239,6 +239,23 @@ class UserController extends Controller
         $user->save();
     }
 
+    private function normalizeDomain(?string $domain): ?string
+    {
+        $domain = strtolower(trim((string) $domain));
+        if ($domain === '') {
+            return null;
+        }
+
+        if (!str_contains($domain, '://')) {
+            $domain = 'https://' . $domain;
+        }
+
+        $host = parse_url($domain, PHP_URL_HOST) ?: '';
+        $host = preg_replace('/^www\./', '', strtolower(trim($host)));
+
+        return $host !== '' ? $host : null;
+    }
+
     public function afiliado_configurar_site(Request $request)
     {
 
@@ -265,7 +282,7 @@ class UserController extends Controller
         $user->meta_pagina_id = $request->input('meta_pagina_id')??null;
         $user->meta_instagram_id = $request->input('meta_instagram_id')??null;
         $user->meta_app_id = $request->input('meta_app_id')??null;
-        $user->dominio_externo = $request->input('dominio_externo')??null;
+        $user->dominio_externo = $this->normalizeDomain($request->input('dominio_externo'));
         $user->many_api = $request->input('many_api')??null;
         $user->many_cliente_telefone_id = $request->input('many_cliente_telefone_id')??null;
         $user->botconversa_webhook = $request->input('botconversa_webhook')??null;
