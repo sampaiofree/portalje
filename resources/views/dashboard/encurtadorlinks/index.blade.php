@@ -38,7 +38,7 @@
                                     @forelse($links as $link)
                                         <tr x-show="search === '' || '{{ strtolower($link->dominio . $link->url_longa) }}'.includes(search.toLowerCase())" x-transition>
                                             <td class="px-6 py-4 whitespace-nowrap">
-                                                <a href="https://{{ $link->dominio }}" target="_blank" class="text-indigo-600 hover:underline break-all">{{ $link->dominio }}</a>
+                                                <a href="{{ $link->dominio }}" target="_blank" class="text-indigo-600 hover:underline break-all">{{ $link->dominio }}</a>
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap">
                                                 <a href="{{ $link->url_longa }}" target="_blank" class="text-gray-600 hover:underline truncate max-w-xs block" title="{{$link->url_longa}}">{{ $link->url_longa }}</a>

@@ -44,7 +44,7 @@
                             <div class="p-4 bg-green-50 border border-green-200 rounded-lg">
                                 <p class="text-sm text-green-800">Seu link encurtado é:</p>
                                 <p class="mt-2 font-semibold text-green-900">
-                                    <a href="https://{{ session('link_encurtado') }}" target="_blank" class="underline hover:text-green-700">https://{{ session('link_encurtado') }}</a>
+                                    <a href="{{ preg_match('/^https?:\/\//i', session('link_encurtado')) ? session('link_encurtado') : 'https://' . session('link_encurtado') }}" target="_blank" class="underline hover:text-green-700">{{ preg_match('/^https?:\/\//i', session('link_encurtado')) ? session('link_encurtado') : 'https://' . session('link_encurtado') }}</a>
                                 </p>
                             </div>
                         @endif
@@ -82,11 +82,13 @@
                         return response.json();
                     })
                     .then(data => {
+                        const rawShortUrl = (data.link_encurtado || '').trim();
+                        const shortUrl = /^https?:\/\//i.test(rawShortUrl) ? rawShortUrl : `https://${rawShortUrl}`;
                         const successHtml = `
                             <div class="p-4 bg-green-50 border border-green-200 rounded-lg">
                                 <p class="text-sm text-green-800">Seu link encurtado é:</p>
                                 <p class="mt-2 font-semibold text-green-900">
-                                    <a href="https:// ${data.link_encurtado}" target="_blank" class="underline hover:text-green-700">https://${data.link_encurtado}</a>
+                                    <a href="${shortUrl}" target="_blank" class="underline hover:text-green-700">${shortUrl}</a>
                                 </p>
                             </div>`;
                         alertDiv.innerHTML = successHtml;

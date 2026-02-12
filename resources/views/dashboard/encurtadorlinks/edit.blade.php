@@ -99,12 +99,14 @@
                 }
 
                 // Resposta de sucesso
+                const rawShortUrl = (data.link_encurtado || '').trim();
+                const shortUrl = /^https?:\/\//i.test(rawShortUrl) ? rawShortUrl : `https://${rawShortUrl}`;
                 const successHtml = `
                     <div class="p-4 bg-green-50 border border-green-200 rounded-lg" x-data="{ copied: false }">
                         <p class="text-sm text-green-800">Seu link foi alterado com sucesso!</p>
                         <div class="mt-2 flex items-stretch">
-                            <a href="https:// ${data.link_encurtado}" target="_blank" class="flex items-center w-full border border-r-0 border-gray-300 rounded-l-md text-sm bg-white font-mono px-3 py-2 break-all text-indigo-600 underline">${data.link_encurtado}</a>
-                            <button @click="navigator.clipboard.writeText('https://${data.link_encurtado}'); copied = true; setTimeout(() => copied = false, 2000)" class="px-4 py-2 bg-green-600 text-white font-semibold rounded-r-md hover:bg-green-500 text-sm transition-colors flex items-center w-32 justify-center">
+                            <a href="${shortUrl}" target="_blank" class="flex items-center w-full border border-r-0 border-gray-300 rounded-l-md text-sm bg-white font-mono px-3 py-2 break-all text-indigo-600 underline">${shortUrl}</a>
+                            <button @click="navigator.clipboard.writeText('${shortUrl}'); copied = true; setTimeout(() => copied = false, 2000)" class="px-4 py-2 bg-green-600 text-white font-semibold rounded-r-md hover:bg-green-500 text-sm transition-colors flex items-center w-32 justify-center">
                                 <span x-show="!copied"><i class="ri-file-copy-line mr-1"></i> Copiar</span>
                                 <span x-show="copied" x-transition><i class="ri-check-line mr-1"></i> Copiado!</span>
                             </button>
