@@ -253,6 +253,18 @@ Route::prefix('administrador')->group(function () {
     Route::get('curso_novo', [AdminController::class, 'create'])->name('cursos.novo');
 
     Route::get('leads/hotmart', [AdminController::class, 'leads_hotmart'])->name('leads.hotmart');
+    Route::get('purchase_events', [AdminController::class, 'purchase_events'])
+        ->middleware(['auth', 'check.admin'])
+        ->name('admin.purchase_events');
+    Route::get('purchase_events/suggestions', [AdminController::class, 'purchase_events_suggestions'])
+        ->middleware(['auth', 'check.admin'])
+        ->name('admin.purchase_events.suggestions');
+    Route::get('purchase_events/related', [AdminController::class, 'purchase_events_related'])
+        ->middleware(['auth', 'check.admin'])
+        ->name('admin.purchase_events.related');
+    Route::get('purchase_events/export-csv', [AdminController::class, 'purchase_events_export_csv'])
+        ->middleware(['auth', 'check.admin'])
+        ->name('admin.purchase_events.export_csv');
 
     Route::get('/portal-informacoes', [DadosPortalController::class, 'index'])->name('adm_portal_informacoes');
     Route::post('/portal-informacoes', [DadosPortalController::class, 'update'])->name('adm_portal_informacoes_update');
