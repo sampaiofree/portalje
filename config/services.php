@@ -35,4 +35,14 @@ return [
         ],
     ],
 
+    'hotmart' => [
+        'api_base_url' => env('HOTMART_API_BASE_URL', 'https://developers.hotmart.com'),
+        'auth_base_url' => env('HOTMART_AUTH_BASE_URL', 'https://api-sec-vlc.hotmart.com'),
+        'client_id' => env('HOTMART_CLIENT_ID'),
+        'client_secret' => env('HOTMART_CLIENT_SECRET'),
+        'basic_token' => env('HOTMART_BASIC_TOKEN'),
+        'hottok' => env('HOTMART_HOTTOK', env('Hotmart_Hottok')),
+        'timeout' => env('HOTMART_TIMEOUT', 30),
+    ],
+
 ];
