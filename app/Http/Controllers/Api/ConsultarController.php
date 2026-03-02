@@ -50,7 +50,10 @@ class ConsultarController extends Controller
         $query = Curso::query();
 
         if ($id) {
-            $query->where('id', $id);
+            $query->where(function ($q) use ($id) {
+                $q->where('id', $id)
+                  ->orWhere('codigo_id_hotmart', $id);
+            });
         } else {
             $query->where(function ($q) {
                 $q->where('publicado', '1')
