@@ -98,7 +98,7 @@
                                         hasCodigoRef: {{ $curso->codigo_ref ? 'true' : 'false' }},
                                         codigoRefId: {{ $curso->codigo_ref_id ? (int) $curso->codigo_ref_id : 'null' }},
                                         codigoRef: @js($curso->codigo_ref),
-                                        mostrarCurso: {{ $curso->mostrar_curso ? 'true' : 'false' }},
+                                        mostrarCurso: {{ $curso->codigo_ref ? ($curso->mostrar_curso ? 'true' : 'false') : 'true' }},
                                         formularioPreCheckout: @js((isset($curso->formulario_pre_checkout) ? (bool) $curso->formulario_pre_checkout : true) ? '1' : '0'),
                                         modoPrecos: @js(in_array(($curso->modo_precos ?? 'padrao'), ['padrao', 'um_preco', 'dois_precos'], true) ? $curso->modo_precos : 'padrao'),
                                         cupomPrincipalId: @js(!empty($curso->cupom_principal_id) ? (string) $curso->cupom_principal_id : ''),

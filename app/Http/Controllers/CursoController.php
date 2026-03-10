@@ -15,6 +15,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 
 class CursoController extends Controller 
 {
@@ -80,6 +81,11 @@ class CursoController extends Controller
 
 
     public function afiliados_cadastrar_curso_ref(Request $request){
+        $codigoRefInput = trim((string) $request->input('codigo_ref', ''));
+        $request->merge([
+            'codigo_ref' => $codigoRefInput,
+        ]);
+
         $temCupons = Schema::hasTable('cupons') && Cupom::query()->exists();
 
         $rules = [
@@ -168,13 +174,44 @@ class CursoController extends Controller
           ]);
       }
 
+      $isNewCodigoRef = !$codigo_ref->exists;
+      if ($request->has('mostrar_curso')) {
+          $mostrarCurso = $request->boolean('mostrar_curso');
+      } elseif ($isNewCodigoRef) {
+          $mostrarCurso = true;
+      } else {
+          $mostrarCurso = (bool) ($codigo_ref->mostrar_curso ?? false);
+      }
+
+      $codigoRefNovo = (string) $request->input('codigo_ref');
+      $codigoRefAtual = $codigo_ref->exists ? trim((string) $codigo_ref->codigo_ref) : null;
+      $deveValidarHotmart = !$codigo_ref->exists || $codigoRefAtual !== $codigoRefNovo;
+
+      if ($deveValidarHotmart) {
+          $resultadoValidacao = $this->validarCodigoRefNoHotmart($codigoRefNovo);
+
+          if ($resultadoValidacao === 'invalid') {
+              return $this->codigoRefValidationErrorResponse(
+                  $request,
+                  'Código REF inválido. Verifique se o link da Hotmart existe antes de salvar.'
+              );
+          }
+
+          if ($resultadoValidacao === 'unavailable') {
+              return $this->codigoRefValidationErrorResponse(
+                  $request,
+                  'Não foi possível validar o Código REF na Hotmart agora. Tente novamente em instantes.'
+              );
+          }
+      }
+
       if ($codigo_ref->exists) {
           // Registro já existe
           $codigo_ref->update([
               'user_id' => $userId,
               'curso_id' => $request->input('curso_id'),
               'codigo_ref' => $request->input('codigo_ref'),
-              'mostrar_curso' =>  $request->input('mostrar_curso') ?? 0,
+              'mostrar_curso' => $mostrarCurso,
               'formulario_pre_checkout' => $formularioPreCheckout,
               'modo_precos' => $modoPrecos,
               'cupom_principal_id' => $cupomPrincipalId,
@@ -187,7 +224,7 @@ class CursoController extends Controller
               'user_id' => $userId,
               'curso_id' => $request->input('curso_id'),
               'codigo_ref' => $request->input('codigo_ref'),
-              'mostrar_curso' =>  $request->input('mostrar_curso') ?? 0,
+              'mostrar_curso' => $mostrarCurso,
               'formulario_pre_checkout' => $formularioPreCheckout,
               'modo_precos' => $modoPrecos,
               'cupom_principal_id' => $cupomPrincipalId,
@@ -227,6 +264,61 @@ class CursoController extends Controller
             return redirect()->back()->with('success', "Código REF do curso ".$request->input('titulo')." cadastrado com sucesso!");
         }
         
+    }
+
+    private function validarCodigoRefNoHotmart(string $codigoRef): string
+    {
+        if ($codigoRef === '') {
+            return 'invalid';
+        }
+
+        $url = 'https://go.hotmart.com/' . urlencode($codigoRef);
+
+        try {
+            $response = Http::timeout(8)
+                ->connectTimeout(5)
+                ->withOptions([
+                    'allow_redirects' => true,
+                ])
+                ->withHeaders([
+                    'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'User-Agent' => 'Mozilla/5.0 (compatible; PortalJE/1.0; +https://portalje.org)',
+                ])
+                ->get($url);
+
+            $status = $response->status();
+
+            if (in_array($status, [400, 404, 410], true)) {
+                return 'invalid';
+            }
+
+            if ($status >= 500 || in_array($status, [0, 401, 403, 429], true)) {
+                return 'unavailable';
+            }
+
+            return 'valid';
+        } catch (\Throwable $e) {
+            return 'unavailable';
+        }
+    }
+
+    private function codigoRefValidationErrorResponse(Request $request, string $message)
+    {
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => 'Os dados informados são inválidos.',
+                'errors' => [
+                    'codigo_ref' => [$message],
+                ],
+            ], 422);
+        }
+
+        return redirect()
+            ->back()
+            ->withErrors([
+                'codigo_ref' => $message,
+            ])
+            ->withInput();
     }
 
     public function aulas_gratuitas_index()

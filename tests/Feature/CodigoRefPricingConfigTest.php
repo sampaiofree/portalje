@@ -3,15 +3,27 @@
 namespace Tests\Feature;
 
 use App\Http\Middleware\MinhaJornada;
+use App\Models\Codigo_ref;
 use App\Models\Cupom;
 use App\Models\Curso;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Factory as HttpFactory;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Request as HttpRequest;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class CodigoRefPricingConfigTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->fakeHotmartValidationStatus(200);
+    }
 
     public function test_store_saves_padrao_mode_correctly(): void
     {
@@ -36,6 +48,8 @@ class CodigoRefPricingConfigTest extends TestCase
         $response->assertJsonPath('modo_precos', 'padrao');
         $response->assertJsonPath('cupom_principal_id', null);
         $response->assertJsonPath('cupom_secundario_id', null);
+        Http::assertSentCount(1);
+        Http::assertSent(fn (HttpRequest $request) => str_starts_with($request->url(), 'https://go.hotmart.com/'));
 
         $this->assertDatabaseHas('codigo_ref', [
             'user_id' => $user->id,
@@ -72,6 +86,7 @@ class CodigoRefPricingConfigTest extends TestCase
         $response->assertJsonPath('modo_precos', 'um_preco');
         $response->assertJsonPath('cupom_principal_id', $cupom->id);
         $response->assertJsonPath('cupom_secundario_id', null);
+        Http::assertSentCount(1);
 
         $this->assertDatabaseHas('codigo_ref', [
             'user_id' => $user->id,
@@ -109,6 +124,7 @@ class CodigoRefPricingConfigTest extends TestCase
         $response->assertJsonPath('modo_precos', 'dois_precos');
         $response->assertJsonPath('cupom_principal_id', $cupomPrincipal->id);
         $response->assertJsonPath('cupom_secundario_id', $cupomSecundario->id);
+        Http::assertSentCount(1);
     }
 
     public function test_store_rejects_duplicate_coupon_between_main_and_secondary(): void
@@ -231,6 +247,169 @@ class CodigoRefPricingConfigTest extends TestCase
         ]);
     }
 
+    public function test_store_defaults_mostrar_curso_to_true_on_first_creation_when_omitted(): void
+    {
+        $this->withoutMiddleware(MinhaJornada::class);
+
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+        ]);
+
+        $curso = $this->createCurso('curso-mostrar-default', 'Curso Mostrar Default');
+
+        $response = $this->actingAs($user)->postJson(route('cadastrar_codigo_ref'), [
+            'user_id' => $user->id,
+            'curso_id' => $curso->id,
+            'codigo_ref' => 'AFILIADO8',
+            'modo_precos' => 'padrao',
+            'titulo' => $curso->titulo,
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('mostrar_curso', true);
+
+        $this->assertDatabaseHas('codigo_ref', [
+            'user_id' => $user->id,
+            'curso_id' => $curso->id,
+            'codigo_ref' => 'AFILIADO8',
+            'mostrar_curso' => 1,
+        ]);
+    }
+
+    public function test_store_rejects_codigo_ref_when_hotmart_returns_invalid_status(): void
+    {
+        $this->withoutMiddleware(MinhaJornada::class);
+        $this->fakeHotmartValidationStatus(400);
+
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+        ]);
+
+        $curso = $this->createCurso('curso-codigo-invalido', 'Curso Código Inválido');
+
+        $response = $this->actingAs($user)->postJson(route('cadastrar_codigo_ref'), [
+            'user_id' => $user->id,
+            'curso_id' => $curso->id,
+            'codigo_ref' => 'CODIGOX1',
+            'mostrar_curso' => '1',
+            'modo_precos' => 'padrao',
+            'titulo' => $curso->titulo,
+        ]);
+
+        Http::assertSentCount(1);
+        Http::assertSent(fn (HttpRequest $request) => $request->url() === 'https://go.hotmart.com/CODIGOX1');
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors(['codigo_ref']);
+
+        $this->assertDatabaseMissing('codigo_ref', [
+            'user_id' => $user->id,
+            'curso_id' => $curso->id,
+            'codigo_ref' => 'CODIGOX1',
+        ]);
+    }
+
+    public function test_store_rejects_when_hotmart_validation_is_unavailable(): void
+    {
+        $this->withoutMiddleware(MinhaJornada::class);
+
+        Http::fake(function () {
+            throw new ConnectionException('Timeout');
+        });
+
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+        ]);
+
+        $curso = $this->createCurso('curso-codigo-timeout', 'Curso Código Timeout');
+
+        $response = $this->actingAs($user)->postJson(route('cadastrar_codigo_ref'), [
+            'user_id' => $user->id,
+            'curso_id' => $curso->id,
+            'codigo_ref' => 'CODIGOTIME1',
+            'mostrar_curso' => '1',
+            'modo_precos' => 'padrao',
+            'titulo' => $curso->titulo,
+        ]);
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors(['codigo_ref']);
+
+        $this->assertDatabaseMissing('codigo_ref', [
+            'user_id' => $user->id,
+            'curso_id' => $curso->id,
+            'codigo_ref' => 'CODIGOTIME1',
+        ]);
+    }
+
+    public function test_store_skips_hotmart_validation_when_codigo_ref_does_not_change(): void
+    {
+        $this->withoutMiddleware(MinhaJornada::class);
+        Http::fake();
+
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+        ]);
+
+        $curso = $this->createCurso('curso-sem-revalidacao', 'Curso Sem Revalidação');
+
+        $registro = Codigo_ref::create([
+            'user_id' => $user->id,
+            'curso_id' => $curso->id,
+            'codigo_ref' => 'REFSEMVALIDAR1',
+            'mostrar_curso' => true,
+        ]);
+
+        $response = $this->actingAs($user)->postJson(route('cadastrar_codigo_ref'), [
+            'id' => $registro->id,
+            'user_id' => $user->id,
+            'curso_id' => $curso->id,
+            'codigo_ref' => 'REFSEMVALIDAR1',
+            'mostrar_curso' => '0',
+            'modo_precos' => 'padrao',
+            'titulo' => $curso->titulo,
+        ]);
+
+        $response->assertOk();
+        Http::assertNothingSent();
+    }
+
+    public function test_store_revalidates_when_codigo_ref_changes(): void
+    {
+        $this->withoutMiddleware(MinhaJornada::class);
+        $this->fakeHotmartValidationStatus(200);
+
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+        ]);
+
+        $curso = $this->createCurso('curso-revalidacao', 'Curso Revalidação');
+
+        $registro = Codigo_ref::create([
+            'user_id' => $user->id,
+            'curso_id' => $curso->id,
+            'codigo_ref' => 'REFANTIGO123',
+            'mostrar_curso' => true,
+        ]);
+
+        $response = $this->actingAs($user)->postJson(route('cadastrar_codigo_ref'), [
+            'id' => $registro->id,
+            'user_id' => $user->id,
+            'curso_id' => $curso->id,
+            'codigo_ref' => 'REFNOVO1234',
+            'mostrar_curso' => '1',
+            'modo_precos' => 'padrao',
+            'titulo' => $curso->titulo,
+        ]);
+
+        $response->assertOk();
+        Http::assertSentCount(1);
+        $this->assertDatabaseHas('codigo_ref', [
+            'id' => $registro->id,
+            'codigo_ref' => 'REFNOVO1234',
+        ]);
+    }
+
     private function createCurso(string $url, string $titulo): Curso
     {
         return Curso::create([
@@ -245,5 +424,14 @@ class CodigoRefPricingConfigTest extends TestCase
             'areas_de_atuacao' => 'Atendimento/Vendas',
             'horas_completo' => 120,
         ]);
+    }
+
+    private function fakeHotmartValidationStatus(int $status): void
+    {
+        $factory = new HttpFactory();
+        $factory->fake(static function () use ($status) {
+            return Http::response('<html></html>', $status);
+        });
+        Http::swap($factory);
     }
 }

@@ -242,6 +242,24 @@ a {
     font-weight: 800;
 }
 
+@media (min-width: 1031px) {
+    .w3-reasons-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        overflow: visible;
+        scroll-snap-type: none;
+        padding-bottom: 0;
+    }
+
+    .w3-reason-card {
+        width: auto;
+        max-width: none;
+        min-width: 0;
+        flex: initial;
+        scroll-snap-align: unset;
+    }
+}
+
 .w3-section--courses {
     padding-top: 34px;
 }
