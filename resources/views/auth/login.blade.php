@@ -4,6 +4,12 @@
         <p class="text-gray-600 mb-4">Digite seu e-mail e senha para acessar o portal dos parceiros.</p>
     </div>
 
+    @if (session('error'))
+        <div class="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {{ session('error') }}
+        </div>
+    @endif
+
     <form method="POST" action="{{ route('login') }}">
         @csrf
 
@@ -60,8 +66,15 @@
 <script>
     if (window.location.pathname === '/login' && 'serviceWorker' in navigator) {
       navigator.serviceWorker
-        .register('/sw.js')
-        .then(reg => console.log('✅ SW registrado:', reg.scope))
+        .register('/sw.js', { updateViaCache: 'none' })
+        .then(registration => {
+          return navigator.serviceWorker.getRegistrations()
+            .then(registrations => {
+              registrations.forEach(reg => reg.update());
+              return registration;
+            });
+        })
+        .then(registration => console.log('✅ SW registrado:', registration.scope))
         .catch(err => console.error('❌ Falha SW:', err));
     
       let deferredPrompt;

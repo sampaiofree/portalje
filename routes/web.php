@@ -239,9 +239,18 @@ Route::prefix('administrador')->group(function () {
         return app(App\Http\Controllers\CursoController::class)->aulas_gratuitas_index();
     })->name('aulas_gratuitas_index');
 
+    Route::get('/aulas_gratuitas/editar/{id}', function ($id) { //CURSOS
+        if (!Auth::check() || Auth::user()->nivel_acesso !== 'admin') {
+            return redirect('dashboard')->with('error', 'Você não tem permissão para acessar esta página.');
+        }
+        // Chame seu controlador ou lógica aqui
+        return app(App\Http\Controllers\CursoController::class)->aulas_gratuitas_editar($id);
+    })->name('aulas_gratuitas_editar');
+
     Route::delete('/aulas-demonstrativas/{id}', [CursoController::class, 'aulas_gratuitas_destroy'])->name('aulas_gratuitas_destroy');
 
     Route::post('/aulas_gratuitas/cadastrar/post', [CursoController::class, 'aulas_gratuitas_cadastrar_post'])->name('aulas_gratuitas_cadastrar_post');
+    Route::put('/aulas_gratuitas/editar/{id}', [CursoController::class, 'aulas_gratuitas_editar_post'])->name('aulas_gratuitas_editar_post');
     //FIM AULAS GRATUITAS
 
 

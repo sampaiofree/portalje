@@ -1,5 +1,11 @@
 @php
     $tituloCurso = trim((string) ($curso->titulo ?? 'Curso profissionalizante'));
+    $empresaNome = trim((string) ($curso->company_name ?? 'Programa Jovem Empreendedor'));
+    if ($empresaNome === '') {
+        $empresaNome = 'Programa Jovem Empreendedor';
+    }
+    $logoPadraoUrl = $curso->logo_padrao_url ?? asset('img/home_page/logojecolor.webp');
+    $logoDarkUrl = $curso->logo_dark_url ?? asset('img/home_page/logowhite.png');
     $headlineCurso = trim((string) ($curso->headline ?? 'Aprenda habilidades práticas e acelere sua carreira com certificado reconhecido.'));
     $descricaoSeo = $headlineCurso !== '' ? $headlineCurso : 'Curso online com certificado e aplicação prática para o mercado de trabalho.';
     $canonicalUrl = url(request()->path());
@@ -125,6 +131,22 @@
         ? ($curso->preco_cheio_basico ?? 'Consulte')
         : ($curso->preco_parcelado_basico ?? 'Consulte');
 
+    $heroPriceLabel = $mostrarPlanoSecundario
+        ? 'Investimento único de'
+        : 'Investimento do plano completo';
+    $heroPriceValue = $mostrarPlanoSecundario
+        ? $exibicaoPrecoBasico
+        : $exibicaoPrecoCompleto;
+    $heroShowCashLine = $mostrarPlanoSecundario
+        ? false
+        : !$ocultarParceladoCompleto;
+    $heroCashValue = $curso->preco_cheio_completo ?? 'consulte';
+
+    $backRedirectParams = request()->query();
+    unset($backRedirectParams['g'], $backRedirectParams['aula']);
+    $backRedirectParams['g'] = 1;
+    $backRedirectUrl = url()->current() . '?' . http_build_query($backRedirectParams);
+
     $pixelIds = array_values(array_unique(array_filter([
         env('META_PIXEL_ID_PRIMARY', '419961365827965'),
         env('META_PIXEL_ID_SECONDARY', '948808649224691'),
@@ -139,6 +161,7 @@
         'ref' => request()->query('ref'),
         'csrf_token' => csrf_token(),
         'lead_endpoint' => route('lead_whatsapp'),
+        'back_redirect_url' => $backRedirectUrl,
     ];
 
     $lpCssVersion = file_exists(public_path('css/lp-course.css'))
@@ -155,7 +178,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <title>{{ $tituloCurso }} | Portal Jovem Empreendedor</title>
+    <title>{{ $tituloCurso }} | {{ $empresaNome }}</title>
     <meta name="description" content="{{ $descricaoSeo }}">
     <meta name="robots" content="index, follow">
     <link rel="canonical" href="{{ $canonicalUrl }}">
@@ -212,7 +235,7 @@
     <header class="lp-header">
         <div class="lp-shell lp-header__inner">
             <a class="lp-brand" href="#hero" aria-label="Topo da página">
-                <img src="{{ asset('img/home_page/logojecolor.webp') }}" alt="Portal Jovem Empreendedor" width="180" height="47">
+                <img src="{{ $logoPadraoUrl }}" alt="{{ $empresaNome }}" width="180" height="47">
             </a>
             <a
                 href="#planos"
@@ -253,11 +276,11 @@
                     </ul>
 
                     <div class="lp-price-highlight">
-                        <span class="lp-price-highlight__label">Investimento do plano completo</span>
-                        <strong>{{ $exibicaoPrecoCompleto }}</strong>
-                        @unless($ocultarParceladoCompleto)
-                            <small>ou {{ $curso->preco_cheio_completo ?? 'consulte' }} à vista</small>
-                        @endunless
+                        <span class="lp-price-highlight__label">{{ $heroPriceLabel }}</span>
+                        <strong>{{ $heroPriceValue }}</strong>
+                        @if($heroShowCashLine)
+                            <small>ou {{ $heroCashValue }} à vista</small>
+                        @endif
                     </div>
 
                     <div class="lp-hero__actions">
@@ -332,7 +355,7 @@
             <div class="lp-shell">
                 <div class="lp-heading">
                     <h2 class="lp-heading__title">
-                        <svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-book"></use></svg>
+                        
                         <span>O que você vai aprender</span>
                     </h2>
                     <p>Conteúdo organizado para acelerar sua evolução, com foco em prática e aplicação no mercado.</p>
@@ -373,7 +396,20 @@
                 </div>
 
                 @if(!empty($areasAtuacao))
-                    <p class="lp-areas">Áreas de atuação: {{ implode(', ', $areasAtuacao) }}.</p>
+                    <div class="lp-areas-block">
+                        <h3 class="lp-areas__title">
+                            <svg class="lp-icon lp-icon--sm" aria-hidden="true"><use href="#lp-icon-briefcase"></use></svg>
+                            <span>Áreas de atuação</span>
+                        </h3>
+                        <ul class="lp-areas__list">
+                            @foreach($areasAtuacao as $area)
+                                <li class="lp-areas__item">
+                                    <svg class="lp-icon lp-icon--sm" aria-hidden="true"><use href="#lp-icon-check-circle"></use></svg>
+                                    <span>{{ $area }}</span>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
                 @endif
             </div>
         </section>
@@ -382,7 +418,7 @@
             <div class="lp-shell">
                 <div class="lp-heading">
                     <h2 class="lp-heading__title">
-                        <svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-gift"></use></svg>
+                        
                         <span>Bônus e diferenciais</span>
                     </h2>
                     <p>Além do conteúdo principal, você recebe recursos extras para acelerar sua entrada no mercado.</p>
@@ -432,7 +468,7 @@
             <div class="lp-shell">
                 <div class="lp-heading lp-heading--light">
                     <h2 class="lp-heading__title">
-                        <svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-tag"></use></svg>
+                        
                         <span>Escolha seu plano de acesso</span>
                     </h2>
                     <p>Oferta ativa por tempo limitado. Garanta o valor promocional enquanto as vagas estão abertas.</p>
@@ -518,7 +554,7 @@
                 <div>
                     <div class="lp-heading">
                         <h2 class="lp-heading__title">
-                            <svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-certificate"></use></svg>
+                            
                             <span>Certificação para fortalecer seu currículo</span>
                         </h2>
                     </div>
@@ -642,8 +678,8 @@
 
     <footer class="lp-footer">
         <div class="lp-shell lp-footer__inner">
-            <img src="{{ asset('img/home_page/logowhite.png') }}" alt="Portal Jovem Empreendedor" width="150" height="34" loading="lazy">
-            <p>© {{ date('Y') }} Portal Jovem Empreendedor. Todos os direitos reservados.</p>
+            <img src="{{ $logoDarkUrl }}" alt="{{ $empresaNome }}" width="150" height="34" loading="lazy">
+            <p>© {{ date('Y') }} {{ $empresaNome }}. Todos os direitos reservados.</p>
         </div>
     </footer>
 

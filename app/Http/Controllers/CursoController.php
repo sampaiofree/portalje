@@ -14,6 +14,7 @@ use App\Models\Cupom;
 use App\Models\User;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\DB;
 
 class CursoController extends Controller 
 {
@@ -29,22 +30,52 @@ class CursoController extends Controller
  
     public function updateOrder(Request $request)
     {
-        $order = $request->input('order');
-
-        if (is_array($order)) {
-            foreach ($order as $item) {
-                // Encontra o curso pelo ID e atualiza o campo "ordem"
-                $curso = Curso::find($item['id']);
-                if ($curso) {
-                    $curso->ordem = $item['ordem'];
-                    $curso->save();
-                }
-            }
-
-            return response()->json(['success' => true, 'message' => 'Ordem atualizada com sucesso.']);
+        $payload = $request->input('order');
+        if (!is_array($payload)) {
+            return response()->json(['success' => false, 'message' => 'Dados inválidos.'], 400);
         }
 
-        return response()->json(['success' => false, 'message' => 'Dados inválidos.'], 400);
+        $idsRecebidos = collect($payload)
+            ->map(function ($item) {
+                if (!is_array($item) || !isset($item['id'])) {
+                    return null;
+                }
+                return (int) $item['id'];
+            })
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values();
+
+        if ($idsRecebidos->isEmpty()) {
+            return response()->json(['success' => false, 'message' => 'Nenhum curso válido enviado.'], 422);
+        }
+
+        DB::transaction(function () use ($idsRecebidos) {
+            $idsAtuais = Curso::query()
+                ->orderBy('ordem')
+                ->orderBy('id')
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->values();
+
+            $idsPrioritarios = $idsRecebidos
+                ->filter(fn ($id) => $idsAtuais->contains($id))
+                ->values();
+
+            $idsRestantes = $idsAtuais
+                ->reject(fn ($id) => $idsPrioritarios->contains($id))
+                ->values();
+
+            $ordemNormalizada = $idsPrioritarios->concat($idsRestantes)->values();
+
+            foreach ($ordemNormalizada as $index => $cursoId) {
+                Curso::whereKey($cursoId)->update([
+                    'ordem' => $index + 1,
+                ]);
+            }
+        });
+
+        return response()->json(['success' => true, 'message' => 'Ordem atualizada com sucesso.']);
     }
 
 
@@ -200,8 +231,16 @@ class CursoController extends Controller
 
     public function aulas_gratuitas_index()
     {
-        $aulas = AulasDemonstrativa::all(); // Pega todas as aulas cadastradas
+        $aulas = AulasDemonstrativa::with('curso')->orderByDesc('id')->get(); // Pega todas as aulas cadastradas
         return view('adm.cursos.aulas_gratuitas_lista', compact('aulas'));
+    }
+
+    public function aulas_gratuitas_editar($id)
+    {
+        $aula = AulasDemonstrativa::findOrFail($id);
+        $cursos = Curso::orderBy('titulo')->get();
+
+        return view('adm.cursos.aulas_gratuitas_inserir', compact('cursos', 'aula'));
     }
 
     public function aulas_gratuitas_destroy($id)
@@ -235,6 +274,24 @@ class CursoController extends Controller
 
         return redirect()->route('aulas_gratuitas_cadastrar')->with('success', 'Aula demonstrativa criada com sucesso!');
         
+    }
+
+    public function aulas_gratuitas_editar_post(Request $request, $id)
+    {
+        $request->validate([
+            'id_curso' => 'required|exists:curso,id',
+            'aula_titulo' => 'required|string|max:255',
+            'aula_id_youtube' => 'required|string|max:255',
+        ]);
+
+        $aula = AulasDemonstrativa::findOrFail($id);
+        $aula->update([
+            'id_curso' => $request->id_curso,
+            'aula_titulo' => $request->aula_titulo,
+            'aula_id_youtube' => $request->aula_id_youtube,
+        ]);
+
+        return redirect()->route('aulas_gratuitas_index')->with('success', 'Aula demonstrativa atualizada com sucesso!');
     }
     
 }

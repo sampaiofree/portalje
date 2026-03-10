@@ -38,6 +38,12 @@
     .plyr__video-wrapper iframe{
         width: 600% !important; 
         margin-left: -250% !important;
+        /*height: 150% !important;
+        margin-top: -50% !important;*/
+    }
+
+    .plyr__video-wrapper iframe #player #movie_player .ytp-pause-overlay{
+        display: none !important;
     }
 
     .form-control::placeholder {
@@ -102,6 +108,22 @@
     }
     .play-button-overlay .bi-play-fill { font-size: 40px; color: white; margin-left: 5px; }
     .video-facade:hover .play-button-overlay { background-color: rgba(229, 9, 20, 0.8); }
+    .video-empty-state {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 1.5rem;
+      color: var(--text-muted);
+      gap: 0.5rem;
+    }
+    .video-empty-state .bi {
+      font-size: 2.6rem;
+      color: #6c757d;
+    }
     .playlist-container {
       background-color: var(--bg-darker); border-radius: 8px;
       padding: 1rem; max-height: 70vh; overflow-y: auto;
@@ -121,6 +143,14 @@
     .playlist-item .item-info { flex-grow: 1; overflow: hidden; }
     .playlist-item .item-title { font-size: 0.9rem; font-weight: 500; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .playlist-item .now-playing { color: var(--brand-green); font-size: 0.8rem; font-weight: bold; }
+    .playlist-empty-state {
+      border: 1px dashed #4d4d4d;
+      border-radius: 8px;
+      padding: 1rem;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
     .certificate-section {
       background-color: var(--bg-darker); border-radius: 8px;
       padding: 1.5rem; margin-top: 1.5rem; text-align: center;
@@ -178,18 +208,83 @@
 <body>
 
     @php
-        // MUDANÇA 1: LÓGICA PARA DETERMINAR O VÍDEO ATIVO
-        $aulas = $curso->aulas_demonstrativas;
-        $primeiraAulaId = !$aulas->isEmpty() ? str_replace("https://youtu.be/", "", $aulas->first()['aula_id_youtube']) : '';
-        
+        $extractYoutubeId = static function ($rawValue): ?string {
+            if (!is_scalar($rawValue)) {
+                return null;
+            }
+
+            $value = trim((string) $rawValue);
+            if ($value === '') {
+                return null;
+            }
+
+            if (preg_match('/^[A-Za-z0-9_-]{11}$/', $value) === 1) {
+                return $value;
+            }
+
+            $patterns = [
+                '~youtu\.be/([A-Za-z0-9_-]{11})~i',
+                '~youtube\.com/watch\?[^#\n]*v=([A-Za-z0-9_-]{11})~i',
+                '~youtube\.com/embed/([A-Za-z0-9_-]{11})~i',
+                '~youtube\.com/shorts/([A-Za-z0-9_-]{11})~i',
+                '~youtube\.com/live/([A-Za-z0-9_-]{11})~i',
+            ];
+
+            foreach ($patterns as $pattern) {
+                if (preg_match($pattern, $value, $matches) === 1 && !empty($matches[1])) {
+                    return $matches[1];
+                }
+            }
+
+            $queryString = parse_url($value, PHP_URL_QUERY);
+            if (is_string($queryString)) {
+                parse_str($queryString, $params);
+                if (!empty($params['v']) && preg_match('/^[A-Za-z0-9_-]{11}$/', (string) $params['v']) === 1) {
+                    return (string) $params['v'];
+                }
+            }
+
+            return null;
+        };
+
+        $aulas = collect($curso->aulas_demonstrativas ?? [])
+            ->map(function ($aula) use ($extractYoutubeId) {
+                $youtubeId = $extractYoutubeId(data_get($aula, 'aula_id_youtube'));
+                if (!$youtubeId) {
+                    return null;
+                }
+
+                $titulo = trim((string) data_get($aula, 'aula_titulo', 'Aula gratuita'));
+                if ($titulo === '') {
+                    $titulo = 'Aula gratuita';
+                }
+
+                return [
+                    'aula_titulo' => $titulo,
+                    'aula_id_youtube' => $youtubeId,
+                ];
+            })
+            ->filter()
+            ->unique('aula_id_youtube')
+            ->values();
+
+        $primeiraAulaId = !$aulas->isEmpty() ? $aulas->first()['aula_id_youtube'] : '';
         $modulosCompletos = $curso->conteudo_principal_acordion;
-        
-        // Pega o ID da aula da URL, ou usa o ID da primeira aula como padrão
-        $activeVideoId = request()->query('aula', $primeiraAulaId);
-        
-        // Define a thumbnail e o número de aulas a serem exibidas
-        $activeVideoThumbnail = "https://img.youtube.com/vi/{$activeVideoId}/hqdefault.jpg";
-        $n_aulas = request()->query('n_aulas', 25);
+
+        $requestedAulaId = $extractYoutubeId(request()->query('aula', ''));
+        $activeVideoId = $primeiraAulaId;
+        if (
+            $requestedAulaId &&
+            $aulas->contains(static fn (array $aula): bool => $aula['aula_id_youtube'] === $requestedAulaId)
+        ) {
+            $activeVideoId = $requestedAulaId;
+        }
+
+        $hasAulasDisponiveis = !$aulas->isEmpty() && $activeVideoId !== '';
+        $activeVideoThumbnail = $hasAulasDisponiveis
+            ? "https://img.youtube.com/vi/{$activeVideoId}/hqdefault.jpg"
+            : null;
+        $n_aulas = max(1, (int) request()->query('n_aulas', 25));
     @endphp
     
     <div id="alertaTelefone" class="alert alert-danger alert-dismissible fade position-fixed top-0 start-50 translate-middle-x mt-3 w-75" role="alert" style="z-index: 99999999; display: none;">
@@ -206,14 +301,21 @@
             <!-- Coluna do Vídeo -->
             <div class="col-lg-8 mb-4 mb-lg-0">
                 <div class="video-container shadow-lg">
-                    <!-- MUDANÇA 2: O player agora usa as variáveis do vídeo ativo -->
-                    <div id="video-player-area" class="video-facade" data-video-id="{{ $activeVideoId }}" onclick="loadVideo(this)">
-                        <img loading="lazy" src="{{ $activeVideoThumbnail }}" alt="{{ $curso->titulo }}" class="img-fluid">
-                        <div class="play-button-overlay">
-                            <i class="bi bi-play-fill"></i>
+                    @if($hasAulasDisponiveis)
+                        <div id="video-player-area" class="video-facade" data-video-id="{{ $activeVideoId }}" onclick="loadVideo(this)">
+                            <img loading="lazy" src="{{ $activeVideoThumbnail }}" alt="{{ $curso->titulo }}" class="img-fluid">
+                            <div class="play-button-overlay">
+                                <i class="bi bi-play-fill"></i>
+                            </div>
                         </div>
-                    </div>
-                    <div class="video-overlay-top"></div>
+                        <div class="video-overlay-top"></div>
+                    @else
+                        <div id="video-player-area-empty" class="video-empty-state">
+                            <i class="bi bi-camera-video-off"></i>
+                            <h5 class="mb-1">Não há aula gratuita disponível no momento</h5>
+                            <p class="mb-0">Estamos atualizando os vídeos deste curso. Tente novamente mais tarde.</p>
+                        </div>
+                    @endif
                 </div>
             </div>
 
@@ -222,17 +324,25 @@
                 <div class="playlist-container shadow-lg">
                     <div class="playlist-header">
                         <h5 class="fw-bold mb-1">{{ $curso->titulo }}</h5>
-                        <p class="small mb-0" style="color">Selecione uma aula para começar</p>
+                        <p class="small mb-0">
+                            @if($hasAulasDisponiveis)
+                                Selecione uma aula para começar
+                            @else
+                                No momento não há aulas gratuitas disponíveis
+                            @endif
+                        </p>
                     </div>
                     
                     <div id="playlist-list">
-                        @if(isset($aulas) && !$aulas->isEmpty())
+                        @if($hasAulasDisponiveis)
                             @foreach($aulas->take($n_aulas) as $aula)
                                 @php
-                                    $aula_id_youtube = str_replace("https://youtu.be/", "", $aula['aula_id_youtube']); 
-                                    // MUDANÇA 3: Lógica para marcar a aula ativa e definir o link de recarregamento
+                                    $aula_id_youtube = $aula['aula_id_youtube'];
                                     $is_active = ($aula_id_youtube == $activeVideoId);
-                                    $aula_link = request()->url() . '?g=1&aula=' . $aula_id_youtube;
+                                    $aulaQuery = request()->query();
+                                    $aulaQuery['g'] = 1;
+                                    $aulaQuery['aula'] = $aula_id_youtube;
+                                    $aula_link = request()->url() . '?' . http_build_query($aulaQuery);
                                 @endphp
                                 <a href="{{ $aula_link }}" class="playlist-item @if($is_active) active @endif">
                                     <img src="https://img.youtube.com/vi/{{$aula_id_youtube}}/mqdefault.jpg" alt="Miniatura da Aula" class="thumbnail">
@@ -244,6 +354,10 @@
                                     </div>
                                 </a>
                             @endforeach
+                        @else
+                            <div class="playlist-empty-state">
+                                Não encontramos vídeos gratuitos válidos para este curso.
+                            </div>
                         @endif
 
                         <!-- CONTEÚDO COMPLETO (BLOQUEADO) -->
@@ -269,14 +383,24 @@
                 </div>
 
                 @php
+                    $queryParametrosPadrao = request()->query();
+                    unset($queryParametrosPadrao['g'], $queryParametrosPadrao['aula']);
+
+                    $linkPaginaPadraoCurso = url()->current();
+                    if (!empty($queryParametrosPadrao)) {
+                        $linkPaginaPadraoCurso .= '?' . http_build_query($queryParametrosPadrao);
+                    }
+
+                    $fluxoWhatsappGratuito = request()->segment(2) === 'w';
+
                     if($curso->gratuito){
                         $p = "Após assistir as aulas, emita seu certificado.";
                         $a = "<button data-bs-toggle='modal' data-bs-target='#certModal' class='btn-certificate'>
                                     <i class='bi bi-patch-check-fill me-2'></i>Emitir meu Certificado
                                 </button> ";
                     }else{
-
-                        $a = "<a href='{$curso->link_checkout_completo}&offDiscount=50OFF' class='btn-certificate' style='margin-top: 15px;}'>Quero Me Inscrever Agora</a>";
+                        $destinoInscricao = $fluxoWhatsappGratuito ? $curso->link_checkout_completo : $linkPaginaPadraoCurso;
+                        $a = "<a href='{$destinoInscricao}' class='btn-certificate' style='margin-top: 15px;}'>Quero Me Inscrever Agora</a>";
                         $p = "Inscreva-se agora mesmo <br>para liberar todas as aulas.";
 
                     };
@@ -402,12 +526,53 @@
     <script>
     // MUDANÇA 4: SCRIPT SIMPLIFICADO
     let player;
+    let preventReloadUntil = 0;
+
+    function restoreVideoFacade(element) {
+    if (!element) return;
+
+    preventReloadUntil = Date.now() + 900;
+
+    const facadeHtml = element.getAttribute('data-facade-html');
+    if (facadeHtml) {
+        element.innerHTML = facadeHtml;
+    }
+    element.setAttribute('data-video-state', 'facade');
+
+    if (player && typeof player.destroy === 'function') {
+        try {
+            player.destroy();
+        } catch (error) {
+            // no-op
+        }
+    }
+
+    player = null;
+}
 
     // Esta função agora só carrega o player na primeira vez que o usuário clica.
     function loadVideo(element) {
-    if (element.querySelector('iframe')) return;
+    if (!element || element.querySelector('iframe')) return;
+    if (Date.now() < preventReloadUntil) return;
+    if (element.getAttribute('data-video-state') === 'loading') return;
 
-    var videoId = element.getAttribute('data-video-id');
+    element.setAttribute('data-video-state', 'loading');
+
+    if (!element.getAttribute('data-facade-html')) {
+        element.setAttribute('data-facade-html', element.innerHTML);
+    }
+
+    var videoId = (element.getAttribute('data-video-id') || '').trim();
+    if (!/^[A-Za-z0-9_-]{11}$/.test(videoId)) {
+        element.innerHTML = `
+            <div class="video-empty-state">
+                <i class="bi bi-camera-video-off"></i>
+                <h5 class="mb-1">Vídeo indisponível</h5>
+                <p class="mb-0">Este conteúdo não está mais disponível.</p>
+            </div>`;
+        return;
+    }
+
     var playerHTML = `
         <div class="plyr__video-embed" style="position: relative;">
             <iframe
@@ -423,6 +588,24 @@
 
     player = new Plyr('.plyr__video-embed', {
         controls: ['play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'fullscreen'],
+    });
+    const pauseGuardUntil = Date.now() + 700;
+
+    player.on('ready', function () {
+        element.setAttribute('data-video-state', 'ready');
+    });
+
+    player.on('play', function () {
+        element.setAttribute('data-video-state', 'playing');
+    });
+
+    player.on('pause', function () {
+        if (Date.now() < pauseGuardUntil) return;
+        restoreVideoFacade(element);
+    });
+
+    player.on('ended', function () {
+        restoreVideoFacade(element);
     });
 }
 

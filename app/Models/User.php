@@ -34,6 +34,9 @@ class User extends Authenticatable implements MustVerifyEmail
         'telefone_pessoal_1',
         'telefone_pessoal_2',
         'apelido',
+        'nome_empresa',
+        'logo_padrao_path',
+        'logo_dark_path',
         'mentorado',
         'meta_pixel_id',
         'meta_pixel_api',
@@ -73,6 +76,9 @@ class User extends Authenticatable implements MustVerifyEmail
         'w3_whatsapp_float_delay_seconds' => 'integer',
         'home_page_destination' => 'string',
         'home_page_whatsapp_flow' => 'string',
+        'nome_empresa' => 'string',
+        'logo_padrao_path' => 'string',
+        'logo_dark_path' => 'string',
     ];
 
     public function codigo_ref()

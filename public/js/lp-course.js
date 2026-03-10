@@ -26,6 +26,7 @@
     var selectedCheckoutUrl = '';
     var selectedCtaContext = {};
     var isSubmittingLead = false;
+    var isRedirectingBack = false;
 
     function compactObject(obj) {
         var output = {};
@@ -285,6 +286,54 @@
         return true;
     }
 
+    function setupBackRedirect() {
+        var backRedirectUrl = typeof config.back_redirect_url === 'string'
+            ? config.back_redirect_url.trim()
+            : '';
+
+        if (!backRedirectUrl) {
+            return;
+        }
+
+        if (!window.history || typeof window.history.pushState !== 'function') {
+            return;
+        }
+
+        var currentUrl = window.location.href;
+        var guardUrl = currentUrl;
+
+        try {
+            var parsedCurrentUrl = new URL(currentUrl, window.location.origin);
+            parsedCurrentUrl.searchParams.set('_lpbr', String(Date.now()));
+            guardUrl = parsedCurrentUrl.toString();
+        } catch (error) {
+            guardUrl = currentUrl;
+        }
+
+        try {
+            if (typeof window.history.replaceState === 'function') {
+                window.history.replaceState({ lp_back_base: true }, '', currentUrl);
+            }
+
+            window.history.pushState({ lp_back_redirect: true, at: Date.now() }, '', guardUrl);
+
+            if (guardUrl !== currentUrl && typeof window.history.replaceState === 'function') {
+                window.history.replaceState({ lp_back_redirect: true, at: Date.now() }, '', currentUrl);
+            }
+        } catch (error) {
+            return;
+        }
+
+        window.addEventListener('popstate', function () {
+            if (isRedirectingBack) {
+                return;
+            }
+
+            isRedirectingBack = true;
+            window.location.replace(backRedirectUrl);
+        });
+    }
+
     function syncTestimonialsVisibility() {
         if (!testimonialsSection || !testimonialsContainer) {
             return;
@@ -521,6 +570,7 @@
         leadForm.addEventListener('submit', onLeadSubmit);
     }
 
+    setupBackRedirect();
     syncTestimonialsVisibility();
     ensureMetaPixel(config.pixel_ids || []);
     trackMeta('ViewContent', buildPayload());

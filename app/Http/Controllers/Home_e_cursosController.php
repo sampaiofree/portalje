@@ -12,6 +12,7 @@ use App\Models\Cupom;
 use App\Models\User;
 use App\Models\Dados_portal;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 
 use DOMDocument;
 use DOMXPath;
@@ -195,6 +196,9 @@ class Home_e_cursosController extends Controller
         $curso->formulario = (bool)($dados['formulario_pre_checkout'] ?? true);
         $curso->user_id = $dados['user_id'];
         $curso->affiliate_code = $dados['affiliate_code'];
+        $curso->company_name = $dados['company_name'] ?? 'Programa Jovem Empreendedor';
+        $curso->logo_padrao_url = $dados['logo_padrao_url'] ?? asset('img/home_page/logojecolor.webp');
+        $curso->logo_dark_url = $dados['logo_dark_url'] ?? asset('img/home_page/logowhite.png');
         $curso->modo_precos = 'padrao';
         $curso->cupom_principal_id = null;
         $curso->cupom_secundario_id = null;
@@ -267,6 +271,9 @@ class Home_e_cursosController extends Controller
                     'whatsapp_atendimento_id' => $whatsappSelecionado['id'] ?? null,
                     'whatsapp_atendimento_tempo' => $verificar->whatsapp_atendimento_tempo,
                     'meta_pixel_id' => $verificar->meta_pixel_id,
+                    'company_name' => $this->resolverNomeEmpresa($verificar),
+                    'logo_padrao_url' => $this->resolverLogoPadraoUrl($verificar),
+                    'logo_dark_url' => $this->resolverLogoDarkUrl($verificar),
                     'formulario_pre_checkout' => $verificar->formulario_pre_checkout,
                     'formulario_whatsapp' => $verificar->formulario_whatsapp,
                     'user_id' => $verificar->id,
@@ -311,6 +318,9 @@ class Home_e_cursosController extends Controller
         $refWhatsapp = is_object($ref) ? ($ref->whatsapp_atendimento ?? null) : (is_array($ref) ? ($ref['whatsapp_atendimento'] ?? null) : null);
         $refWhatsappTempo = is_object($ref) ? ($ref->whatsapp_atendimento_tempo ?? null) : (is_array($ref) ? ($ref['whatsapp_atendimento_tempo'] ?? null) : null);
         $refMetaPixel = is_object($ref) ? ($ref->meta_pixel_id ?? null) : (is_array($ref) ? ($ref['meta_pixel_id'] ?? null) : null);
+        $refNomeEmpresa = is_object($ref) ? ($ref->nome_empresa ?? null) : (is_array($ref) ? ($ref['nome_empresa'] ?? null) : null);
+        $refLogoPadraoPath = is_object($ref) ? ($ref->logo_padrao_path ?? null) : (is_array($ref) ? ($ref['logo_padrao_path'] ?? null) : null);
+        $refLogoDarkPath = is_object($ref) ? ($ref->logo_dark_path ?? null) : (is_array($ref) ? ($ref['logo_dark_path'] ?? null) : null);
         $refFormularioPreCheckout = is_object($ref)
             ? ($ref->codigo_ref_formulario_pre_checkout ?? $ref->formulario_pre_checkout ?? null)
             : (is_array($ref) ? ($ref['codigo_ref_formulario_pre_checkout'] ?? $ref['formulario_pre_checkout'] ?? null) : null);
@@ -325,6 +335,9 @@ class Home_e_cursosController extends Controller
             $refUser = User::find($refUserId);
             if ($refUser) {
                 $whatsappSelecionadoRef = $this->selecionarWhatsappAtendimento($refUser);
+                $refNomeEmpresa = $refUser->nome_empresa ?? $refNomeEmpresa;
+                $refLogoPadraoPath = $refUser->logo_padrao_path ?? $refLogoPadraoPath;
+                $refLogoDarkPath = $refUser->logo_dark_path ?? $refLogoDarkPath;
             }
         }
 
@@ -334,6 +347,9 @@ class Home_e_cursosController extends Controller
             'whatsapp_atendimento_id' => $whatsappSelecionadoRef['id'] ?? null,
             'whatsapp_atendimento_tempo' => $refWhatsappTempo ?? $dados_portal['whatsapp_atendimento_tempo'],
             'meta_pixel_id' => $refMetaPixel,
+            'company_name' => $this->resolverNomeEmpresaFromRaw($refNomeEmpresa),
+            'logo_padrao_url' => $this->resolverLogoPadraoUrlFromPath($refLogoPadraoPath),
+            'logo_dark_url' => $this->resolverLogoDarkUrlFromPath($refLogoDarkPath),
             'formulario_pre_checkout' => $refFormularioPreCheckout ?? $dados_portal['formulario_pre_checkout'],
             'formulario_whatsapp' => $refFormularioWhatsapp ?? $dados_portal['formulario_whatsapp'],
             'user_id' => $refUserId,
@@ -542,6 +558,9 @@ class Home_e_cursosController extends Controller
                     'whatsapp_atendimento_tempo' => $whatsappDelaySeconds,
                     'whatsapp_mostrar' => $whatsappMostrar,
                     'meta_pixel_id' => $verificar->meta_pixel_id,
+                    'company_name' => $this->resolverNomeEmpresa($verificar),
+                    'logo_padrao_url' => $this->resolverLogoPadraoUrl($verificar),
+                    'logo_dark_url' => $this->resolverLogoDarkUrl($verificar),
                     'home_page_layout' => in_array((string) $verificar->home_page_layout, ['padrao', 'w3'], true)
                         ? (string) $verificar->home_page_layout
                         : 'padrao',
@@ -563,7 +582,8 @@ class Home_e_cursosController extends Controller
                         'codigo_ref.*', 
                         'curso.*',
                     )
-                    ->orderBy('ordem')
+                    ->orderBy('curso.ordem')
+                    ->orderBy('curso.id')
                     ->get();
                 } else {
                     $dados['cursos'] = collect();
@@ -582,6 +602,9 @@ class Home_e_cursosController extends Controller
             'whatsapp_atendimento_tempo' => 0,
             'whatsapp_mostrar' => true,
             'meta_pixel_id' => null,
+            'company_name' => 'Programa Jovem Empreendedor',
+            'logo_padrao_url' => $this->resolverLogoPadraoUrl(),
+            'logo_dark_url' => $this->resolverLogoDarkUrl(),
             'home_page_layout' => 'padrao',
             'home_page_destination' => 'curso',
             'home_page_whatsapp_flow' => 'formulario',
@@ -591,8 +614,8 @@ class Home_e_cursosController extends Controller
             'affiliate_code' => null
         ];
         if (Schema::hasTable('curso')) {
-            $dados['cursos'] = Curso::orderBy('gratuito', 'desc')
-                                ->orderBy('ordem')
+            $dados['cursos'] = Curso::orderBy('ordem')
+                                ->orderBy('id')
                                 ->get();
         } else {
             $dados['cursos'] = collect();
@@ -719,7 +742,10 @@ class Home_e_cursosController extends Controller
         $curso_id = null;
         $user_id = null;
         $botao_whatsapp_flutuante = null;
-        $botao_whatsapp_flutuante_nome_curso = "os cursos do Programa Jovem Empreendedor";
+        $company_name = 'Programa Jovem Empreendedor';
+        $logo_padrao_url = $this->resolverLogoPadraoUrl();
+        $logo_dark_url = $this->resolverLogoDarkUrl();
+        $botao_whatsapp_flutuante_nome_curso = "os cursos do {$company_name}";
         $form_lead_titulo = "Para receber mais informações, preencha o formulário abaixo.";
         $form_lead_botao = "Saiba mais do WhatsApp";
         
@@ -746,6 +772,9 @@ class Home_e_cursosController extends Controller
             $whatsappSelecionado = $this->selecionarWhatsappAtendimento($user);
             $whatsapp_atendimento = $whatsappSelecionado['whatsapp'] ?? $user->whatsapp_atendimento ?? $this->dados_portal['telefone_suporte_alunos'];
             $whatsapp_atendimento_id = $whatsappSelecionado['id'] ?? null;
+            $company_name = $this->resolverNomeEmpresa($user);
+            $logo_padrao_url = $this->resolverLogoPadraoUrl($user);
+            $logo_dark_url = $this->resolverLogoDarkUrl($user);
             $whatsapp_atendimento_tempo = isset($user->w3_whatsapp_float_delay_seconds)
                 ? (int) $user->w3_whatsapp_float_delay_seconds
                 : (int) ($user->whatsapp_atendimento_tempo ?? 0);
@@ -765,6 +794,8 @@ class Home_e_cursosController extends Controller
             $formulario_pre_checkout = $dados['formulario_pre_checkout'];
             $pidel_id = null;
         }
+
+        $botao_whatsapp_flutuante_nome_curso = "os cursos do {$company_name}";
 
         if($nome_cidade){
             $headline = "27 Bolsas de Estudo liberadas para <span style='color: rgb(13, 110, 253) !important;'>$nome_cidade</span>";
@@ -806,7 +837,65 @@ class Home_e_cursosController extends Controller
             "form_lead_titulo"=> $form_lead_titulo,
             "form_lead_botao"=> $form_lead_botao,
             "pidel_id"=> $pidel_id,
+            "company_name"=> $company_name,
+            "logo_padrao_url"=> $logo_padrao_url,
+            "logo_dark_url"=> $logo_dark_url,
         ];
+    }
+
+    private function resolverNomeEmpresa(?User $user = null): string
+    {
+        if (!$user) {
+            return 'Programa Jovem Empreendedor';
+        }
+
+        return $this->resolverNomeEmpresaFromRaw($user->nome_empresa ?? null);
+    }
+
+    private function resolverNomeEmpresaFromRaw($valor): string
+    {
+        $nomeEmpresa = trim((string) ($valor ?? ''));
+        return $nomeEmpresa !== '' ? $nomeEmpresa : 'Programa Jovem Empreendedor';
+    }
+
+    private function resolverLogoPadraoUrl(?User $user = null): string
+    {
+        $path = $user?->logo_padrao_path ?? null;
+        return $this->resolverLogoPadraoUrlFromPath($path);
+    }
+
+    private function resolverLogoDarkUrl(?User $user = null): string
+    {
+        $path = $user?->logo_dark_path ?? null;
+        return $this->resolverLogoDarkUrlFromPath($path);
+    }
+
+    private function resolverLogoPadraoUrlFromPath($path): string
+    {
+        return $this->resolverLogoUsuarioUrl($path, 'img/home_page/logojecolor.webp');
+    }
+
+    private function resolverLogoDarkUrlFromPath($path): string
+    {
+        return $this->resolverLogoUsuarioUrl($path, 'img/home_page/logowhite.png');
+    }
+
+    private function resolverLogoUsuarioUrl($path, string $fallbackAsset): string
+    {
+        $path = trim((string) ($path ?? ''));
+        if ($path === '') {
+            return asset($fallbackAsset);
+        }
+
+        try {
+            if (Storage::disk('public')->exists($path)) {
+                return asset('storage/' . ltrim($path, '/'));
+            }
+        } catch (Throwable $e) {
+            return asset($fallbackAsset);
+        }
+
+        return asset($fallbackAsset);
     }
 
     public function listar_cursos($request, $user = null, $pagina = 'home', $modoCardsW3 = null, $usarFormularioWhatsapp = true){
@@ -849,7 +938,9 @@ class Home_e_cursosController extends Controller
             $data_user = null;
         }
         
-        $datacursos = Curso::orderBy('ordem')->get();
+        $datacursos = Curso::orderBy('ordem')
+            ->orderBy('id')
+            ->get();
 
         $cursos = [];
         $vagas = $this->vagas();
@@ -980,7 +1071,9 @@ class Home_e_cursosController extends Controller
 
     public function listar_todos_cursos(){
 
-        $cursos = Curso::orderBy('gratuito','ordem')->get(); //Curso::all();
+        $cursos = Curso::orderBy('ordem')
+            ->orderBy('id')
+            ->get();
         return $cursos;
     }
 

@@ -15,6 +15,41 @@
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 text-gray-900">
+                    @if (session('success'))
+                        <div class="mb-6 p-4 bg-green-50 border border-green-200 text-green-800 rounded-lg">
+                            <p class="text-sm font-medium">{{ session('success') }}</p>
+                            @if (session('link_encurtado'))
+                                @php
+                                    $sessionLink = (string) session('link_encurtado');
+                                    $sessionLinkNormalized = preg_match('/^https?:\/\//i', $sessionLink)
+                                        ? $sessionLink
+                                        : 'https://' . $sessionLink;
+                                @endphp
+                                <div class="mt-2 flex items-stretch">
+                                    <a
+                                        href="{{ $sessionLinkNormalized }}"
+                                        target="_blank"
+                                        class="flex items-center w-full border border-r-0 border-gray-300 rounded-l-md text-sm bg-white font-mono px-3 py-2 break-all text-indigo-600 underline"
+                                    >
+                                        {{ $sessionLinkNormalized }}
+                                    </a>
+                                    <button
+                                        type="button"
+                                        data-copy-link="{{ $sessionLinkNormalized }}"
+                                        class="px-4 py-2 bg-green-600 text-white font-semibold rounded-r-md hover:bg-green-500 text-sm transition-colors flex items-center"
+                                    >
+                                        <i class="ri-file-copy-line mr-1"></i> Copiar
+                                    </button>
+                                </div>
+                            @endif
+                        </div>
+                    @endif
+
+                    @if (session('error'))
+                        <div class="mb-6 p-4 bg-red-50 border border-red-200 text-red-800 rounded-lg">
+                            <p class="text-sm font-medium">{{ session('error') }}</p>
+                        </div>
+                    @endif
                     
                     <!-- Container da Tabela com Alpine.js para a busca -->
                     <div x-data="{ search: '' }">
@@ -83,4 +118,70 @@
             </div>
         </div>
     </div>
+
+    @push('scripts')
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                document.addEventListener('click', function (event) {
+                    const button = event.target.closest('[data-copy-link]');
+                    if (!button) {
+                        return;
+                    }
+
+                    const link = button.getAttribute('data-copy-link') || '';
+                    if (!link) {
+                        return;
+                    }
+
+                    const originalLabel = button.innerHTML;
+                    const showCopiedState = () => {
+                        button.innerHTML = '<i class="ri-check-line mr-1"></i> Copiado!';
+                        setTimeout(() => {
+                            button.innerHTML = originalLabel;
+                        }, 1600);
+                    };
+
+                    const fallbackCopy = (value) => {
+                        const textArea = document.createElement('textarea');
+                        textArea.value = value;
+                        textArea.setAttribute('readonly', '');
+                        textArea.style.position = 'fixed';
+                        textArea.style.opacity = '0';
+                        document.body.appendChild(textArea);
+                        textArea.select();
+                        textArea.setSelectionRange(0, value.length);
+
+                        let copied = false;
+                        try {
+                            copied = document.execCommand('copy');
+                        } catch (err) {
+                            copied = false;
+                        }
+                        document.body.removeChild(textArea);
+                        return copied;
+                    };
+
+                    if (navigator.clipboard && window.isSecureContext) {
+                        navigator.clipboard.writeText(link)
+                            .then(showCopiedState)
+                            .catch(() => {
+                                if (fallbackCopy(link)) {
+                                    showCopiedState();
+                                    return;
+                                }
+                                window.prompt('Copie manualmente o link:', link);
+                            });
+                        return;
+                    }
+
+                    if (fallbackCopy(link)) {
+                        showCopiedState();
+                        return;
+                    }
+
+                    window.prompt('Copie manualmente o link:', link);
+                });
+            });
+        </script>
+    @endpush
 </x-app-layout>

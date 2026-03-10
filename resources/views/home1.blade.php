@@ -34,6 +34,12 @@
      <meta name="google-adsense-account" content="ca-pub-9796869151117705">-->
     @endif
     @php
+      $homeCompanyName = trim((string) ($info['company_name'] ?? 'Programa Jovem Empreendedor'));
+      if ($homeCompanyName === '') {
+        $homeCompanyName = 'Programa Jovem Empreendedor';
+      }
+      $homeLogoPadraoUrl = $info['logo_padrao_url'] ?? asset('img/home_page/logojecolor.webp');
+      $homeLogoDarkUrl = $info['logo_dark_url'] ?? asset('img/home_page/logowhite.png');
       $homeCssVersion = file_exists(public_path('css/home-course.css'))
         ? (string) filemtime(public_path('css/home-course.css'))
         : null;
@@ -41,7 +47,7 @@
         ? (string) filemtime(public_path('js/home-course.js'))
         : null;
       $homeWhatsappNumber = preg_replace('/\D/', '', (string) ($info['whatsapp_atendimento'] ?? ''));
-      $homeWhatsappMessage = rawurlencode('Olá quero saber sobre os cursos do Programa Jovem Empreendedor');
+      $homeWhatsappMessage = rawurlencode("Olá quero saber sobre os cursos do {$homeCompanyName}");
       $homeWhatsappFloatUrl = $homeWhatsappNumber
         ? "https://api.whatsapp.com/send/?phone={$homeWhatsappNumber}&text={$homeWhatsappMessage}"
         : '#';
@@ -72,13 +78,13 @@
     <section class="hero home-section home-section--hero @if($info['cidade'] OR $desconto_banner) home-section--hero-offset @endif">
         <div class="hero-content home-hero__content">
             <img
-              alt="Portal Jovem Empreendedor"
+              alt="{{ $homeCompanyName }}"
               loading="eager"
               decoding="async"
               width="150"
               height="36"
               class="home-hero__brand"
-              src="{{asset('img/home_page/logowhite.webp')}}"
+              src="{{ $homeLogoDarkUrl }}"
             />
             @if($info['cidade'])
                 <p class="home-hero__city-lead mt-4 mb-0 text-uppercase">27 Bolsas de Estudo liberadas para</p>
@@ -668,7 +674,7 @@
                         </h2>
                         <div id="flush-collapse08" class="accordion-collapse collapse" aria-labelledby="flush-heading08"
                             data-bs-parent="#accordionFlushExample">
-                            <div class="accordion-body"> Os cursos do Portal Jovem Empreendedor são acessíveis a pessoas de todas as idades e níveis de escolaridade. Mesmo para cursos em profissões que exigem ensino médio completo, é possível se matricular e iniciar o aprendizado enquanto conclui seus estudos.</div>
+                            <div class="accordion-body"> Os cursos do {{ $homeCompanyName }} são acessíveis a pessoas de todas as idades e níveis de escolaridade. Mesmo para cursos em profissões que exigem ensino médio completo, é possível se matricular e iniciar o aprendizado enquanto conclui seus estudos.</div>
                         </div>
                     </div>
                 </div>
@@ -685,7 +691,7 @@
                 <div class="row">
                     <!-- Logo -->
                     <div class="col-sm-4 mb-2 text-center text-md-start lazy-load">
-                        <img data-src="{{asset('img/home_page/logowhite.png')}}" alt="Logo" class="img-fluid mb-2 home-footer__logo" loading="lazy" decoding="async" width="150" height="36">
+                        <img data-src="{{ $homeLogoDarkUrl }}" alt="Logo" class="img-fluid mb-2 home-footer__logo" loading="lazy" decoding="async" width="150" height="36">
                         <!--<p style="font-size: small">Cnpj: 21.798.932/0001-00</p>-->
                     </div>
 

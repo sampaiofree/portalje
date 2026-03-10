@@ -50,7 +50,7 @@ class AdminController extends Controller
 
     public function adm_cursos_lista() 
     {
-        $cursos = Curso::orderBy('ordem')->get(); // Ordena pela coluna 'ordem' e obtém os cursos
+        $cursos = Curso::orderBy('ordem')->orderBy('id')->get();
         return view('adm.cursos.cursos_lista', compact('cursos'));
     }
     

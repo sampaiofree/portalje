@@ -3,14 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Models\ShortenedUrl;
-use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 use Illuminate\Support\Facades\Auth;
 
 class ShortenedUrlController extends Controller
 {
+    private const SLUG_REGEX = '/^[a-z0-9_-]+$/';
+
     private function normalizeDomain(?string $domain): ?string
     {
         $domain = strtolower(trim((string) $domain));
@@ -48,47 +50,93 @@ class ShortenedUrlController extends Controller
         return array_values(array_unique($normalized));
     }
 
+    private function normalizeSlug(?string $slug): ?string
+    {
+        $slug = strtolower(trim((string) $slug));
+
+        return $slug === '' ? null : $slug;
+    }
+
     /**
      * Método para criar um link encurtado
      */
     public function encurtar(Request $request)
-{
-    // A validação já redireciona de volta com os erros automaticamente
-    $request->validate([
-        'url_longa' => 'required|url',
-    ]);
-
-    try {
+    {
         $user = Auth::user();
         $dominio = $this->normalizeDomain($user->dominio_externo ?? $user->dominio);
         if (!$dominio) {
-            return redirect()->back()->with('error', 'Configure um domÃ­nio vÃ¡lido antes de criar links encurtados.');
+            $message = 'Configure um domínio válido antes de criar links encurtados.';
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $message], 422);
+            }
+
+            return redirect()->back()->with('error', $message);
         }
 
-        // Geração de um slug único
-        do {
-            $slug = Str::random(6);
-        } while (ShortenedUrl::where('slug', $slug)->where('dominio', $dominio)->exists());
-
-        // Criação do link encurtado
-        $shortenedUrl = ShortenedUrl::create([
-            'user_id' => $user->id,
-            'dominio' => $dominio,
-            'slug' => $slug,
-            'url_longa' => $request->url_longa,
+        $request->merge([
+            'slug' => $this->normalizeSlug($request->input('slug')),
         ]);
-        
-        // Constrói o link completo para enviar na mensagem
-        $linkCompleto = $dominio . '/e/' . $slug;
 
-        // Retorna para a página anterior com uma mensagem de sucesso na sessão
-        return redirect()->back()->with('success', 'Link criado com sucesso!')->with('link_encurtado', $linkCompleto);
+        $validated = $request->validate([
+            'url_longa' => 'required|url',
+            'slug' => [
+                'nullable',
+                'string',
+                'max:64',
+                'regex:' . self::SLUG_REGEX,
+                Rule::unique('shortened_urls', 'slug')->where(static function ($query) use ($dominio) {
+                    $query->where('dominio', $dominio);
+                }),
+            ],
+        ], [
+            'slug.regex' => 'O slug deve conter apenas letras, números, hífen e underscore.',
+            'slug.max' => 'O slug deve ter no máximo 64 caracteres.',
+            'slug.unique' => 'Este slug já está em uso no seu domínio.',
+        ]);
 
-    } catch (\Exception $e) {
-        // Em caso de qualquer outro erro, retorna com uma mensagem de erro na sessão
-        return redirect()->back()->with('error', 'Ocorreu um erro inesperado ao criar o link.')->withInput();
+        try {
+            $slug = $validated['slug'] ?? null;
+
+            if (!$slug) {
+                do {
+                    $slug = Str::lower(Str::random(6));
+                } while (ShortenedUrl::where('slug', $slug)->where('dominio', $dominio)->exists());
+            }
+
+            ShortenedUrl::create([
+                'user_id' => $user->id,
+                'dominio' => $dominio,
+                'slug' => $slug,
+                'url_longa' => $validated['url_longa'],
+            ]);
+
+            $linkCompleto = $dominio . '/e/' . $slug;
+
+            if ($request->expectsJson()) {
+                $request->session()->flash('success', 'Link criado com sucesso!');
+                $request->session()->flash('link_encurtado', $linkCompleto);
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Link criado com sucesso!',
+                    'link_encurtado' => $linkCompleto,
+                    'redirect_to' => route('encurtar_link_lista'),
+                ]);
+            }
+
+            return redirect()->route('encurtar_link_lista')
+                ->with('success', 'Link criado com sucesso!')
+                ->with('link_encurtado', $linkCompleto);
+        } catch (\Throwable $e) {
+            $message = 'Ocorreu um erro inesperado ao criar o link.';
+
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $message], 500);
+            }
+
+            return redirect()->back()->with('error', $message)->withInput();
+        }
     }
-}
 
     public function editar_mostrar($id){
         $link = ShortenedUrl::where('id', $id)->first();
@@ -99,50 +147,60 @@ class ShortenedUrlController extends Controller
 
     public function editar(Request $request, $id)
     {
+        $user = Auth::user();
+        $link = ShortenedUrl::where('id', $id)->where('user_id', $user->id)->first();
+
+        if (!$link) {
+            return response()->json([
+                'error' => 'Link não encontrado ou você não tem permissão para editá-lo.',
+            ], 404);
+        }
+
+        $dominioAtual = $this->normalizeDomain($user->dominio_externo ?? $user->dominio);
+        $dominio = $dominioAtual ?: $link->dominio;
+        if (!$dominio) {
+            return response()->json([
+                'message' => 'Configure um domínio válido antes de editar links encurtados.',
+            ], 422);
+        }
+
+        $request->merge([
+            'slug' => $this->normalizeSlug($request->input('slug')),
+        ]);
+
+        $validated = $request->validate([
+            'url_longa' => 'required|url',
+            'slug' => [
+                'required',
+                'string',
+                'max:64',
+                'regex:' . self::SLUG_REGEX,
+                Rule::unique('shortened_urls', 'slug')
+                    ->where(static function ($query) use ($dominio) {
+                        $query->where('dominio', $dominio);
+                    })
+                    ->ignore($link->id),
+            ],
+        ], [
+            'slug.regex' => 'O slug deve conter apenas letras, números, hífen e underscore.',
+            'slug.max' => 'O slug deve ter no máximo 64 caracteres.',
+            'slug.unique' => 'Este slug já está em uso no seu domínio.',
+        ]);
+
         try {
-            // Valida os novos valores para a URL longa e o slug
-            $request->validate([
-                'url_longa' => 'required|url',
-                'slug' => 'required|string|max:255|unique:shortened_urls,slug,' . $id,
-            ]);
-
-            // Obtém o usuário autenticado
-            $user = Auth::user();
-
-            // Busca o link encurtado pelo ID e garante que ele pertence ao usuário autenticado
-            $link = ShortenedUrl::where('id', $id)->where('user_id', $user->id)->first();
-
-            if (!$link) {
-                return response()->json([
-                    'error' => 'Link não encontrado ou você não tem permissão para editá-lo.'
-                ], 404);
-            }
-
-            //VERIFICAR SE JÁ EXISTE O LINK COM O MESMO SLUG COM O MESMO DOMINIO
-            /*$slug = ShortenedUrl::where('slug', $request->input('slug'))->where('dominio', $user->dominio)->exists();
-            if ($slug) {
-                return response()->json([
-                    'error' => 'Você já tem um link encurtado com o mesmo slug'
-                ], 404);
-            }*/
-
-            // Atualiza o link com os novos valores
-            $link->url_longa = $request->input('url_longa');
-            $link->slug = $request->input('slug');
+            $link->dominio = $dominio;
+            $link->url_longa = $validated['url_longa'];
+            $link->slug = $validated['slug'];
             $link->save();
-
-            $dominio = $this->normalizeDomain($user->dominio_externo ?? $user->dominio) ?? ($user->dominio_externo ?? $user->dominio);
 
             return response()->json([
                 'success' => 'Link atualizado com sucesso.',
                 'link_encurtado' => $dominio . '/e/' . $link->slug,
             ], 200);
-
-        } catch (\Exception $e) {
-            // Captura e retorna a mensagem de erro
+        } catch (\Throwable $e) {
             return response()->json([
                 'error' => 'Ocorreu um erro ao tentar editar o link.',
-                'message' => $e->getMessage(), 
+                'message' => $e->getMessage(),
             ], 500);
         }
     }

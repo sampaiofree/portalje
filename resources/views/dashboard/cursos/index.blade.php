@@ -93,6 +93,8 @@
 
                                         resourcesExpanded: false,
 
+                                        publicPageConfigExpanded: false,
+
                                         hasCodigoRef: {{ $curso->codigo_ref ? 'true' : 'false' }},
                                         codigoRefId: {{ $curso->codigo_ref_id ? (int) $curso->codigo_ref_id : 'null' }},
                                         codigoRef: @js($curso->codigo_ref),
@@ -314,8 +316,12 @@
                                             </template>
 
                                             <template x-if="hasCodigoRef">
-                                                <div class="space-y-4 rounded-lg border border-blue-100 bg-blue-50/40 p-4">
-                                                    <div class="flex items-start justify-between gap-2">
+                                                <div class="rounded-lg border border-blue-100 bg-blue-50/40 overflow-hidden">
+                                                    <button
+                                                        type="button"
+                                                        @click="publicPageConfigExpanded = !publicPageConfigExpanded"
+                                                        class="w-full px-4 py-3 text-left flex items-start justify-between gap-3 hover:bg-blue-100/50 transition-colors"
+                                                    >
                                                         <div class="flex items-start gap-2">
                                                             <i class="ri-settings-3-line text-blue-600 mt-0.5"></i>
                                                             <div>
@@ -323,107 +329,87 @@
                                                                 <p class="text-xs text-gray-600">Defina formulário pré-checkout e modelo de preços por curso.</p>
                                                             </div>
                                                         </div>
-                                                        <span x-show="isSavingPricing" class="text-[11px] text-blue-600 font-medium">Salvando...</span>
-                                                        <span x-show="!isSavingPricing && pricingSaveMessage" x-text="pricingSaveMessage" class="text-[11px] text-green-600 font-medium"></span>
-                                                    </div>
-
-                                                    <p x-show="pricingSaveError" x-text="pricingSaveError" class="rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-700"></p>
-
-                                                    <div>
-                                                        <x-input-label for="formulario_pre_checkout_{{$curso->id}}" value="Formulário antes de continuar" class="text-sm font-medium" />
-                                                        <div class="relative mt-1">
-                                                            <select
-                                                                id="formulario_pre_checkout_{{$curso->id}}"
-                                                                name="formulario_pre_checkout"
-                                                                x-model="formularioPreCheckout"
-                                                                @change="triggerPricingSave()"
-                                                                :disabled="isSavingPricing"
-                                                                class="block w-full appearance-none rounded-lg border border-slate-300 bg-white px-3 py-2.5 pr-10 text-sm text-slate-800 shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 disabled:bg-slate-100 disabled:text-slate-500"
-                                                            >
-                                                                <option value="1">Com formulário antes de continuar</option>
-                                                                <option value="0">Sem formulário (ir direto)</option>
-                                                            </select>
-                                                            <i class="ri-arrow-down-s-line pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                                        <div class="flex items-center gap-2">
+                                                            <span x-show="isSavingPricing" class="text-[11px] text-blue-600 font-medium">Salvando...</span>
+                                                            <span x-show="!isSavingPricing && pricingSaveMessage" x-text="pricingSaveMessage" class="text-[11px] text-green-600 font-medium"></span>
+                                                            <i class="ri-arrow-down-s-line text-gray-500 transition-transform" :class="publicPageConfigExpanded ? 'rotate-180' : ''"></i>
                                                         </div>
-                                                        <p class="mt-1 text-xs text-gray-500">Esta opção vale para botões de checkout e WhatsApp da página pública.</p>
-                                                    </div>
+                                                    </button>
 
-                                                    <div>
-                                                        <p class="text-sm font-medium text-gray-800">Preços na página pública</p>
-                                                        <p class="text-xs text-gray-600">Defina se a página terá o modelo padrão, 1 plano ou 2 planos com cupons.</p>
-                                                    </div>
+                                                    <div x-show="publicPageConfigExpanded" x-transition class="space-y-4 px-4 pb-4 border-t border-blue-100">
+                                                        <p x-show="pricingSaveError" x-text="pricingSaveError" class="rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-700"></p>
 
-                                                    <template x-if="!hasCuponsDisponiveis">
-                                                        <div class="rounded-md border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs text-yellow-800">
-                                                            Nenhum cupom disponível. A página seguirá no modo padrão atual.
+                                                        <div>
+                                                            <x-input-label for="formulario_pre_checkout_{{$curso->id}}" value="Formulário antes de continuar" class="text-sm font-medium" />
+                                                            <div class="relative mt-1">
+                                                                <select
+                                                                    id="formulario_pre_checkout_{{$curso->id}}"
+                                                                    name="formulario_pre_checkout"
+                                                                    x-model="formularioPreCheckout"
+                                                                    @change="triggerPricingSave()"
+                                                                    :disabled="isSavingPricing"
+                                                                    class="block w-full appearance-none rounded-lg border border-slate-300 bg-white px-3 py-2.5 pr-10 text-sm text-slate-800 shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 disabled:bg-slate-100 disabled:text-slate-500"
+                                                                >
+                                                                    <option value="1">Com formulário antes de continuar</option>
+                                                                    <option value="0">Sem formulário (ir direto)</option>
+                                                                </select>
+                                                                <i class="ri-arrow-down-s-line pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                                            </div>
+                                                            <p class="mt-1 text-xs text-gray-500">Esta opção vale para botões de checkout e WhatsApp da página pública.</p>
                                                         </div>
-                                                    </template>
 
-                                                    <template x-if="hasCuponsDisponiveis">
-                                                        <div class="space-y-4">
-                                                            <div>
-                                                                <x-input-label for="modo_precos_{{$curso->id}}" value="Tipo de página" class="text-sm font-medium" />
-                                                                <div class="relative mt-1">
-                                                                    <select
-                                                                        id="modo_precos_{{$curso->id}}"
-                                                                        name="modo_precos"
-                                                                        x-model="modoPrecos"
-                                                                        @change="
-                                                                            if (modoPrecos === 'padrao') {
-                                                                                cupomPrincipalId = '';
-                                                                                cupomSecundarioId = '';
-                                                                            } else if (modoPrecos === 'um_preco') {
-                                                                                cupomSecundarioId = '';
-                                                                            }
-                                                                            triggerPricingSave();
-                                                                        "
-                                                                        :disabled="isSavingPricing"
-                                                                        class="block w-full appearance-none rounded-lg border border-slate-300 bg-white px-3 py-2.5 pr-10 text-sm text-slate-800 shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 disabled:bg-slate-100 disabled:text-slate-500"
-                                                                    >
-                                                                        <option value="padrao">Página padrão</option>
-                                                                        <option value="um_preco">Página com um plano</option>
-                                                                        <option value="dois_precos">Página com dois planos</option>
-                                                                    </select>
-                                                                    <i class="ri-arrow-down-s-line pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
-                                                                </div>
-                                                                <p x-show="modoPrecos === 'padrao'" class="mt-1 text-xs text-gray-500">Usa o comportamento padrão da página.</p>
-                                                                <p x-show="modoPrecos === 'um_preco'" class="mt-1 text-xs text-gray-500">Exibe apenas o plano completo com o cupom escolhido.</p>
-                                                                <p x-show="modoPrecos === 'dois_precos'" class="mt-1 text-xs text-gray-500">Exibe plano completo e plano básico, cada um com seu cupom.</p>
+                                                        <div>
+                                                            <p class="text-sm font-medium text-gray-800">Preços na página pública</p>
+                                                            <p class="text-xs text-gray-600">Defina se a página terá o modelo padrão, 1 plano ou 2 planos com cupons.</p>
+                                                        </div>
+
+                                                        <template x-if="!hasCuponsDisponiveis">
+                                                            <div class="rounded-md border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs text-yellow-800">
+                                                                Nenhum cupom disponível. A página seguirá no modo padrão atual.
                                                             </div>
+                                                        </template>
 
-                                                            <div x-show="modoPrecos === 'um_preco'" x-transition>
-                                                                <x-input-label for="cupom_principal_id_{{$curso->id}}" value="Preço do plano" class="text-sm font-medium" />
-                                                                <div class="relative mt-1">
-                                                                    <select
-                                                                        id="cupom_principal_id_{{$curso->id}}"
-                                                                        name="cupom_principal_id"
-                                                                        x-model="cupomPrincipalId"
-                                                                        @change="triggerPricingSave()"
-                                                                        :disabled="isSavingPricing || modoPrecos !== 'um_preco'"
-                                                                        class="block w-full appearance-none rounded-lg border border-slate-300 bg-white px-3 py-2.5 pr-10 text-sm text-slate-800 shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 disabled:bg-slate-100 disabled:text-slate-500"
-                                                                    >
-                                                                        <option value="">Padrão (sem cupom)</option>
-                                                                        @foreach(($cupons ?? collect()) as $cupom)
-                                                                            <option value="{{ $cupom->id }}">{{ $cupom->desconto }}% OFF ({{ $cupom->codigo }})</option>
-                                                                        @endforeach
-                                                                    </select>
-                                                                    <i class="ri-arrow-down-s-line pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
-                                                                </div>
-                                                            </div>
-
-                                                            <div x-show="modoPrecos === 'dois_precos'" x-transition class="space-y-3">
+                                                        <template x-if="hasCuponsDisponiveis">
+                                                            <div class="space-y-4">
                                                                 <div>
-                                                                    <x-input-label for="cupom_principal_id_{{$curso->id}}" value="Preço do plano completo" class="text-sm font-medium" />
+                                                                    <x-input-label for="modo_precos_{{$curso->id}}" value="Tipo de página" class="text-sm font-medium" />
+                                                                    <div class="relative mt-1">
+                                                                        <select
+                                                                            id="modo_precos_{{$curso->id}}"
+                                                                            name="modo_precos"
+                                                                            x-model="modoPrecos"
+                                                                            @change="
+                                                                                if (modoPrecos === 'padrao') {
+                                                                                    cupomPrincipalId = '';
+                                                                                    cupomSecundarioId = '';
+                                                                                } else if (modoPrecos === 'um_preco') {
+                                                                                    cupomSecundarioId = '';
+                                                                                }
+                                                                                triggerPricingSave();
+                                                                            "
+                                                                            :disabled="isSavingPricing"
+                                                                            class="block w-full appearance-none rounded-lg border border-slate-300 bg-white px-3 py-2.5 pr-10 text-sm text-slate-800 shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 disabled:bg-slate-100 disabled:text-slate-500"
+                                                                        >
+                                                                            <option value="padrao">Página padrão</option>
+                                                                            <option value="um_preco">Página com um plano</option>
+                                                                            <option value="dois_precos">Página com dois planos</option>
+                                                                        </select>
+                                                                        <i class="ri-arrow-down-s-line pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                                                    </div>
+                                                                    <p x-show="modoPrecos === 'padrao'" class="mt-1 text-xs text-gray-500">Usa o comportamento padrão da página.</p>
+                                                                    <p x-show="modoPrecos === 'um_preco'" class="mt-1 text-xs text-gray-500">Exibe apenas o plano completo com o cupom escolhido.</p>
+                                                                    <p x-show="modoPrecos === 'dois_precos'" class="mt-1 text-xs text-gray-500">Exibe plano completo e plano básico, cada um com seu cupom.</p>
+                                                                </div>
+
+                                                                <div x-show="modoPrecos === 'um_preco'" x-transition>
+                                                                    <x-input-label for="cupom_principal_id_{{$curso->id}}" value="Preço do plano" class="text-sm font-medium" />
                                                                     <div class="relative mt-1">
                                                                         <select
                                                                             id="cupom_principal_id_{{$curso->id}}"
                                                                             name="cupom_principal_id"
                                                                             x-model="cupomPrincipalId"
-                                                                            @change="
-                                                                                if (cupomSecundarioId && cupomSecundarioId === cupomPrincipalId) cupomSecundarioId = '';
-                                                                                triggerPricingSave();
-                                                                            "
-                                                                            :disabled="isSavingPricing || modoPrecos !== 'dois_precos'"
+                                                                            @change="triggerPricingSave()"
+                                                                            :disabled="isSavingPricing || modoPrecos !== 'um_preco'"
                                                                             class="block w-full appearance-none rounded-lg border border-slate-300 bg-white px-3 py-2.5 pr-10 text-sm text-slate-800 shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 disabled:bg-slate-100 disabled:text-slate-500"
                                                                         >
                                                                             <option value="">Padrão (sem cupom)</option>
@@ -435,37 +421,62 @@
                                                                     </div>
                                                                 </div>
 
-                                                                <div>
-                                                                    <x-input-label for="cupom_secundario_id_{{$curso->id}}" value="Preço do plano básico" class="text-sm font-medium" />
-                                                                    <div class="relative mt-1">
-                                                                        <select
-                                                                            id="cupom_secundario_id_{{$curso->id}}"
-                                                                            name="cupom_secundario_id"
-                                                                            x-model="cupomSecundarioId"
-                                                                            @change="triggerPricingSave()"
-                                                                            :disabled="isSavingPricing || modoPrecos !== 'dois_precos'"
-                                                                            class="block w-full appearance-none rounded-lg border border-slate-300 bg-white px-3 py-2.5 pr-10 text-sm text-slate-800 shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 disabled:bg-slate-100 disabled:text-slate-500"
-                                                                        >
-                                                                            <option value="">Selecione um cupom</option>
-                                                                            @foreach(($cupons ?? collect()) as $cupom)
-                                                                                <option
-                                                                                    value="{{ $cupom->id }}"
-                                                                                    :disabled="cupomPrincipalId === '{{ $cupom->id }}'"
-                                                                                >
-                                                                                    {{ $cupom->desconto }}% OFF ({{ $cupom->codigo }})
-                                                                                </option>
-                                                                            @endforeach
-                                                                        </select>
-                                                                        <i class="ri-arrow-down-s-line pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                                                <div x-show="modoPrecos === 'dois_precos'" x-transition class="space-y-3">
+                                                                    <div>
+                                                                        <x-input-label for="cupom_principal_id_{{$curso->id}}" value="Preço do plano completo" class="text-sm font-medium" />
+                                                                        <div class="relative mt-1">
+                                                                            <select
+                                                                                id="cupom_principal_id_{{$curso->id}}"
+                                                                                name="cupom_principal_id"
+                                                                                x-model="cupomPrincipalId"
+                                                                                @change="
+                                                                                    if (cupomSecundarioId && cupomSecundarioId === cupomPrincipalId) cupomSecundarioId = '';
+                                                                                    triggerPricingSave();
+                                                                                "
+                                                                                :disabled="isSavingPricing || modoPrecos !== 'dois_precos'"
+                                                                                class="block w-full appearance-none rounded-lg border border-slate-300 bg-white px-3 py-2.5 pr-10 text-sm text-slate-800 shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 disabled:bg-slate-100 disabled:text-slate-500"
+                                                                            >
+                                                                                <option value="">Padrão (sem cupom)</option>
+                                                                                @foreach(($cupons ?? collect()) as $cupom)
+                                                                                    <option value="{{ $cupom->id }}">{{ $cupom->desconto }}% OFF ({{ $cupom->codigo }})</option>
+                                                                                @endforeach
+                                                                            </select>
+                                                                            <i class="ri-arrow-down-s-line pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    <div>
+                                                                        <x-input-label for="cupom_secundario_id_{{$curso->id}}" value="Preço do plano básico" class="text-sm font-medium" />
+                                                                        <div class="relative mt-1">
+                                                                            <select
+                                                                                id="cupom_secundario_id_{{$curso->id}}"
+                                                                                name="cupom_secundario_id"
+                                                                                x-model="cupomSecundarioId"
+                                                                                @change="triggerPricingSave()"
+                                                                                :disabled="isSavingPricing || modoPrecos !== 'dois_precos'"
+                                                                                class="block w-full appearance-none rounded-lg border border-slate-300 bg-white px-3 py-2.5 pr-10 text-sm text-slate-800 shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 disabled:bg-slate-100 disabled:text-slate-500"
+                                                                            >
+                                                                                <option value="">Selecione um cupom</option>
+                                                                                @foreach(($cupons ?? collect()) as $cupom)
+                                                                                    <option
+                                                                                        value="{{ $cupom->id }}"
+                                                                                        :disabled="cupomPrincipalId === '{{ $cupom->id }}'"
+                                                                                    >
+                                                                                        {{ $cupom->desconto }}% OFF ({{ $cupom->codigo }})
+                                                                                    </option>
+                                                                                @endforeach
+                                                                            </select>
+                                                                            <i class="ri-arrow-down-s-line pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                                                        </div>
                                                                     </div>
                                                                 </div>
                                                             </div>
-                                                        </div>
-                                                    </template>
+                                                        </template>
 
-                                                    <input x-show="!hasCuponsDisponiveis" :disabled="hasCuponsDisponiveis" type="hidden" name="modo_precos" value="padrao">
-                                                    <input x-show="!hasCuponsDisponiveis" :disabled="hasCuponsDisponiveis" type="hidden" name="cupom_principal_id" value="">
-                                                    <input x-show="!hasCuponsDisponiveis" :disabled="hasCuponsDisponiveis" type="hidden" name="cupom_secundario_id" value="">
+                                                        <input x-show="!hasCuponsDisponiveis" :disabled="hasCuponsDisponiveis" type="hidden" name="modo_precos" value="padrao">
+                                                        <input x-show="!hasCuponsDisponiveis" :disabled="hasCuponsDisponiveis" type="hidden" name="cupom_principal_id" value="">
+                                                        <input x-show="!hasCuponsDisponiveis" :disabled="hasCuponsDisponiveis" type="hidden" name="cupom_secundario_id" value="">
+                                                    </div>
                                                 </div>
                                             </template>
 

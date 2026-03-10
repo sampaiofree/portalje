@@ -7,6 +7,8 @@ use App\Models\Curso;
 use App\Models\User;
 use App\Models\WhatsappAtendimento;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class DashboardHomeLayoutPreferenceTest extends TestCase
@@ -28,6 +30,35 @@ class DashboardHomeLayoutPreferenceTest extends TestCase
         $response->assertSee('id="w3_whatsapp_float_enabled"', false);
         $response->assertSee('id="w3_whatsapp_float_delay_seconds"', false);
         $response->assertSee('Configuração aplicada à home (/) e /cursos, além da W3 (/w3 e /w3/{cidade}).', false);
+    }
+
+    public function test_configurar_site2_shows_logo_remove_icons_only_when_custom_logo_exists(): void
+    {
+        $comLogoCustom = User::factory()->create([
+            'email_verified_at' => now(),
+            'logo_padrao_path' => 'uploads/user-logos/1/logo-padrao.png',
+            'logo_dark_path' => 'uploads/user-logos/1/logo-dark.png',
+        ]);
+
+        $comLogoResponse = $this->actingAs($comLogoCustom)->get('/user/configurar_site2');
+        $comLogoResponse->assertOk();
+        $comLogoResponse->assertSee('id="remove_logo_padrao"', false);
+        $comLogoResponse->assertSee('id="remove_logo_dark"', false);
+        $comLogoResponse->assertSee('id="toggle_remove_logo_padrao"', false);
+        $comLogoResponse->assertSee('id="toggle_remove_logo_dark"', false);
+
+        $semLogoCustom = User::factory()->create([
+            'email_verified_at' => now(),
+            'logo_padrao_path' => null,
+            'logo_dark_path' => null,
+        ]);
+
+        $semLogoResponse = $this->actingAs($semLogoCustom)->get('/user/configurar_site2');
+        $semLogoResponse->assertOk();
+        $semLogoResponse->assertSee('id="remove_logo_padrao"', false);
+        $semLogoResponse->assertSee('id="remove_logo_dark"', false);
+        $semLogoResponse->assertDontSee('id="toggle_remove_logo_padrao"', false);
+        $semLogoResponse->assertDontSee('id="toggle_remove_logo_dark"', false);
     }
 
     public function test_configurar_site_post_persists_w3_float_button_settings(): void
@@ -69,6 +100,116 @@ class DashboardHomeLayoutPreferenceTest extends TestCase
 
         $response->assertRedirect('/user/configurar_site2');
         $response->assertSessionHasErrors(['w3_whatsapp_float_delay_seconds']);
+    }
+
+    public function test_configurar_site_post_removes_custom_logos_when_remove_flags_are_enabled(): void
+    {
+        Storage::fake('public');
+
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'logo_padrao_path' => 'uploads/user-logos/100/logo-padrao.png',
+            'logo_dark_path' => 'uploads/user-logos/100/logo-dark.png',
+        ]);
+
+        Storage::disk('public')->put($user->logo_padrao_path, 'fake-padrao');
+        Storage::disk('public')->put($user->logo_dark_path, 'fake-dark');
+
+        $response = $this->actingAs($user)
+            ->from('/user/configurar_site2')
+            ->post('/user/configurar_site', [
+                'remove_logo_padrao' => '1',
+                'remove_logo_dark' => '1',
+            ]);
+
+        $response->assertRedirect('/user/configurar_site2');
+        $response->assertSessionHas('success');
+
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'logo_padrao_path' => null,
+            'logo_dark_path' => null,
+        ]);
+
+        Storage::disk('public')->assertMissing('uploads/user-logos/100/logo-padrao.png');
+        Storage::disk('public')->assertMissing('uploads/user-logos/100/logo-dark.png');
+    }
+
+    public function test_configurar_site_post_upload_has_precedence_over_remove_flag_for_same_logo(): void
+    {
+        Storage::fake('public');
+
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'logo_padrao_path' => 'uploads/user-logos/200/logo-antiga.png',
+            'logo_dark_path' => null,
+        ]);
+
+        Storage::disk('public')->put($user->logo_padrao_path, 'fake-antiga');
+
+        $novaLogoPadrao = UploadedFile::fake()->image('logo-nova-padrao.png', 300, 80);
+
+        $response = $this->actingAs($user)
+            ->from('/user/configurar_site2')
+            ->post('/user/configurar_site', [
+                'remove_logo_padrao' => '1',
+                'logo_padrao' => $novaLogoPadrao,
+            ]);
+
+        $response->assertRedirect('/user/configurar_site2');
+        $response->assertSessionHas('success');
+
+        $userAtualizado = $user->fresh();
+        $this->assertNotNull($userAtualizado->logo_padrao_path);
+        $this->assertStringStartsWith('uploads/user-logos/' . $user->id . '/', $userAtualizado->logo_padrao_path);
+        $this->assertStringEndsWith('.png', $userAtualizado->logo_padrao_path);
+        $this->assertNotSame('uploads/user-logos/200/logo-antiga.png', $userAtualizado->logo_padrao_path);
+
+        Storage::disk('public')->assertMissing('uploads/user-logos/200/logo-antiga.png');
+        Storage::disk('public')->assertExists($userAtualizado->logo_padrao_path);
+    }
+
+    public function test_after_logo_removal_public_pages_render_fallback_logos(): void
+    {
+        Storage::fake('public');
+
+        [$user, $curso] = $this->createAffiliateWithConfiguredCurso(
+            'afiliado-logo-fallback.test',
+            'padrao',
+            'curso-logo-fallback'
+        );
+
+        $user->update([
+            'logo_padrao_path' => 'uploads/user-logos/300/logo-padrao-custom.png',
+            'logo_dark_path' => 'uploads/user-logos/300/logo-dark-custom.png',
+        ]);
+
+        Storage::disk('public')->put('uploads/user-logos/300/logo-padrao-custom.png', 'fake-padrao');
+        Storage::disk('public')->put('uploads/user-logos/300/logo-dark-custom.png', 'fake-dark');
+
+        $this->actingAs($user)->post('/user/configurar_site', [
+            'remove_logo_padrao' => '1',
+            'remove_logo_dark' => '1',
+        ]);
+
+        $homeResponse = $this->get('http://afiliado-logo-fallback.test/');
+        $homeResponse->assertOk();
+        $homeResponse->assertSee('img/home_page/logowhite.png', false);
+        $homeResponse->assertDontSee('storage/uploads/user-logos/300/logo-dark-custom.png', false);
+
+        $w3Response = $this->get('http://afiliado-logo-fallback.test/w3');
+        $w3Response->assertOk();
+        $w3Response->assertSee('img/home_page/logojecolor.webp', false);
+        $w3Response->assertSee('img/home_page/logowhite.png', false);
+        $w3Response->assertDontSee('storage/uploads/user-logos/300/logo-padrao-custom.png', false);
+        $w3Response->assertDontSee('storage/uploads/user-logos/300/logo-dark-custom.png', false);
+
+        $lpResponse = $this->get('http://afiliado-logo-fallback.test/' . $curso->url);
+        $lpResponse->assertOk();
+        $lpResponse->assertSee('img/home_page/logojecolor.webp', false);
+        $lpResponse->assertSee('img/home_page/logowhite.png', false);
+        $lpResponse->assertDontSee('storage/uploads/user-logos/300/logo-padrao-custom.png', false);
+        $lpResponse->assertDontSee('storage/uploads/user-logos/300/logo-dark-custom.png', false);
     }
 
     public function test_dashboard_tools_remove_coupon_and_use_whatsapp_channel_select(): void

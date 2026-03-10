@@ -75,7 +75,33 @@
                     <p class="text-sm text-gray-600 mb-6">Complete estes passos para ativar todas as funcionalidades da sua conta.</p>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        
+                        <div class="space-y-6">
+                            <!-- Bloco de Ação do Domínio (Condicional) -->
+                            @if (!Auth::user()->dominio_externo)
+                                <div class="p-4 border rounded-lg flex flex-col items-start">
+                                    <div class="flex items-center">
+                                        <i class="ri-global-line text-2xl text-blue-500 mr-3"></i>
+                                        <div>
+                                            <h4 class="font-semibold text-gray-800">Nome do Seu Site</h4>
+                                            <p class="text-xs text-gray-500">O endereço principal da sua estrutura.</p>
+                                        </div>
+                                    </div>
+                                    @if (Auth::user()->dominio)
+                                        <p class="mt-3 text-sm text-gray-700 bg-green-50 p-2 rounded-md w-full break-all">
+                                            Configurado: <span class="font-medium">{{ Auth::user()->dominio }}</span>
+                                        </p>
+                                    @else
+                                        <p class="mt-3 text-sm text-yellow-800 bg-yellow-50 p-2 rounded-md w-full">
+                                            <i class="ri-error-warning-line mr-1"></i>
+                                            Status: <span class="font-medium">Pendente</span>
+                                        </p>
+                                    @endif
+                                    <x-secondary-button x-data @click.prevent="$dispatch('open-modal', 'dominio-form-modal')" class="mt-4">
+                                         {{ Auth::user()->dominio ? 'Alterar Nome do Site' : 'Configurar Site' }}
+                                    </x-secondary-button>
+                                </div>
+                            @endif
+
                         <!-- Bloco de Ação do WhatsApp -->
                         <div class="p-4 border rounded-lg flex flex-col items-start">
                             <div class="flex items-center">
@@ -129,34 +155,9 @@
                                 {{ $temWhatsappAtendimento ? 'Adicionar WhatsApp' : 'Cadastrar WhatsApp' }}
                             </x-secondary-button>
                         </div>
+                        </div>
 
-                        <div class="space-y-6">
-                            <!-- Bloco de Ação do Domínio (Condicional) -->
-                            @if (!Auth::user()->dominio_externo)
-                                <div class="p-4 border rounded-lg flex flex-col items-start">
-                                    <div class="flex items-center">
-                                        <i class="ri-global-line text-2xl text-blue-500 mr-3"></i>
-                                        <div>
-                                            <h4 class="font-semibold text-gray-800">Nome do Seu Site</h4>
-                                            <p class="text-xs text-gray-500">O endereço principal da sua estrutura.</p>
-                                        </div>
-                                    </div>
-                                    @if (Auth::user()->dominio)
-                                        <p class="mt-3 text-sm text-gray-700 bg-green-50 p-2 rounded-md w-full break-all">
-                                            Configurado: <span class="font-medium">{{ Auth::user()->dominio }}</span>
-                                        </p>
-                                    @else
-                                        <p class="mt-3 text-sm text-yellow-800 bg-yellow-50 p-2 rounded-md w-full">
-                                            <i class="ri-error-warning-line mr-1"></i>
-                                            Status: <span class="font-medium">Pendente</span>
-                                        </p>
-                                    @endif
-                                    <x-secondary-button x-data @click.prevent="$dispatch('open-modal', 'dominio-form-modal')" class="mt-4">
-                                         {{ Auth::user()->dominio ? 'Alterar Nome do Site' : 'Configurar Site' }}
-                                    </x-secondary-button>
-                                </div>
-                            @endif
-
+                        <div>
                             <div
                                 x-data="configureHomeSettings($el)"
                                 data-home-model="{{ $homePageLayoutAtual }}"

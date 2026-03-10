@@ -6,6 +6,7 @@ use Carbon\Carbon;
 
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use App\Models\User;
 
 use App\Http\Controllers\Home_e_cursosController;
@@ -272,6 +273,11 @@ class UserController extends Controller
         $request->validate([
             'w3_whatsapp_float_enabled' => 'nullable|boolean',
             'w3_whatsapp_float_delay_seconds' => 'nullable|in:0,5,10,20,30,45,60,120',
+            'nome_empresa' => 'nullable|string|max:120',
+            'logo_padrao' => 'nullable|image|mimes:png,jpg,jpeg,webp|max:1024',
+            'logo_dark' => 'nullable|image|mimes:png,jpg,jpeg,webp|max:1024',
+            'remove_logo_padrao' => 'nullable|boolean',
+            'remove_logo_dark' => 'nullable|boolean',
         ]);
 
         // Atualizar os dados do usuário
@@ -304,6 +310,45 @@ class UserController extends Controller
         if (Schema::hasColumn('users', 'w3_whatsapp_float_delay_seconds')) {
             $user->w3_whatsapp_float_delay_seconds = (int) $request->input('w3_whatsapp_float_delay_seconds', 0);
         }
+
+        if (Schema::hasColumn('users', 'nome_empresa')) {
+            $nomeEmpresa = trim((string) $request->input('nome_empresa', ''));
+            $user->nome_empresa = $nomeEmpresa !== '' ? $nomeEmpresa : null;
+        }
+
+        $removerLogoPadrao = $request->boolean('remove_logo_padrao', false);
+        $removerLogoDark = $request->boolean('remove_logo_dark', false);
+
+        if (Schema::hasColumn('users', 'logo_padrao_path')) {
+            if ($request->hasFile('logo_padrao')) {
+                $novoPath = $request->file('logo_padrao')->store('uploads/user-logos/' . $user->id, 'public');
+                if (!empty($user->logo_padrao_path) && Storage::disk('public')->exists($user->logo_padrao_path)) {
+                    Storage::disk('public')->delete($user->logo_padrao_path);
+                }
+                $user->logo_padrao_path = $novoPath;
+            } elseif ($removerLogoPadrao) {
+                if (!empty($user->logo_padrao_path) && Storage::disk('public')->exists($user->logo_padrao_path)) {
+                    Storage::disk('public')->delete($user->logo_padrao_path);
+                }
+                $user->logo_padrao_path = null;
+            }
+        }
+
+        if (Schema::hasColumn('users', 'logo_dark_path')) {
+            if ($request->hasFile('logo_dark')) {
+                $novoPath = $request->file('logo_dark')->store('uploads/user-logos/' . $user->id, 'public');
+                if (!empty($user->logo_dark_path) && Storage::disk('public')->exists($user->logo_dark_path)) {
+                    Storage::disk('public')->delete($user->logo_dark_path);
+                }
+                $user->logo_dark_path = $novoPath;
+            } elseif ($removerLogoDark) {
+                if (!empty($user->logo_dark_path) && Storage::disk('public')->exists($user->logo_dark_path)) {
+                    Storage::disk('public')->delete($user->logo_dark_path);
+                }
+                $user->logo_dark_path = null;
+            }
+        }
+
         $user->save();
 
         // Retornar resposta JSON

@@ -492,9 +492,43 @@ img {
     color: #445578;
 }
 
-.lp-areas {
-    margin: 18px 0 0;
+.lp-areas-block {
+    margin-top: 18px;
+    background: #fff;
+    border: 1px solid #dbe5ff;
+    border-radius: 14px;
+    padding: 16px;
+}
+
+.lp-areas__title {
+    margin: 0;
+    font-size: 1.03rem;
+    display: inline-flex;
+    align-items: flex-start;
+    gap: 8px;
+    color: #1f3156;
+}
+
+.lp-areas__title .lp-icon,
+.lp-areas__item .lp-icon {
+    color: var(--lp-icon-light);
+}
+
+.lp-areas__list {
+    list-style: none;
+    margin: 12px 0 0;
+    padding: 0;
+    display: grid;
+    gap: 10px 18px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.lp-areas__item {
+    display: inline-flex;
+    align-items: flex-start;
+    gap: 8px;
     color: #445578;
+    line-height: 1.35;
 }
 
 .lp-bonus-grid {
@@ -1014,12 +1048,18 @@ img {
     .lp-heading__title,
     .lp-module-item__title-wrap,
     .lp-module-empty h3,
+    .lp-areas__title,
+    .lp-areas__item,
     .lp-bonus-card h3,
     .lp-bonus-extra h3,
     .lp-price-card__tag,
     .lp-guarantee,
     .lp-certificate li {
         gap: 6px;
+    }
+
+    .lp-areas-block {
+        padding: 14px;
     }
 
     .lp-keypoint__icon {

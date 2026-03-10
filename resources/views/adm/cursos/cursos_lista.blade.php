@@ -74,90 +74,87 @@
         </div>
     </div>
 
-    {{-- SCRIPTS E ESTILOS ANTIGOS AINDA SÃO NECESSÁRIOS PARA ESTA PÁGINA --}}
-    @push('head')
-        <meta name="csrf-token" content="{{ csrf_token() }}">
-        {{-- Estilos para o componente de switch do tema antigo --}}
-        <link href="{{asset('Hyper_v5.4/Admin/dist/saas/assets/css/vendor/switchery.min.css')}}" rel="stylesheet" type="text/css" />
-        <style>
-            /* Pequeno ajuste para o switch antigo se alinhar melhor */
-            .switchery { margin-bottom: 0; }
-        </style>
-    @endpush
-
     @push('scripts')
-        {{-- Carrega o jQuery, Dragula e os scripts do tema antigo necessários para a funcionalidade --}}
-        <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-        <script src="{{asset('Hyper_v5.4/Admin/dist/saas/assets/vendor/dragula/dragula.min.js')}}"></script>
-        <script src="{{asset('Hyper_v5.4/Admin/dist/saas/assets/vendor/switchery.min.js')}}"></script>
-        
-        {{-- Seu script original, sem alterações na lógica --}}
         <script>
-            // Inicializa os toggles 'data-switch'
-            $('[data-switch=bool]').each(function () {
-                new Switchery($(this)[0], $(this).data());
-            });
-
             document.addEventListener('DOMContentLoaded', function() {
-                var drake = dragula([document.getElementById('handle-dragula-left')], {
-                    moves: function (el, container, handle) {
-                        return handle.classList.contains('dragula-handle');
-                    }
-                });
-                drake.on('drop', function(el, target, source, sibling) {
-                    updateOrder();
-                });
-            });
+                const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+                const container = document.getElementById('handle-dragula-left');
 
-            function updateOrder() {
-                var order = [];
-                document.querySelectorAll('#handle-dragula-left .card').forEach(function(card, index) {
-                    var cursoId = card.querySelector('input[type="hidden"]').value;
-                    if (cursoId) {
-                        order.push({ id: cursoId, ordem: index + 1 });
-                    }
-                });
-                var csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-                $.ajax({
-                    url: '{{ route("adm_cursos_update_order") }}',
-                    type: 'POST',
-                    data: { _token: csrfToken, order: order },
-                    success: function(response) { console.log('Ordem atualizada com sucesso:', response); },
-                    error: function(xhr, status, error) { console.error('Erro ao atualizar a ordem:', error); }
-                });
-            }
-
-            $(document).ready(function() {
-                function updateCourseStatus(cursoId) {
-                    var publicado = $('#publicado_'+cursoId).is(':checked');
-                    var permitirAfiliacao = $('#permitir_afiliacao_'+cursoId).is(':checked');
-                    var mostrarNaPagina = $('#mostrar_na_pagina_'+cursoId).is(':checked');
-                    var gratuito = $('#gratuito'+cursoId).is(':checked');
-                    var csrfToken = $('meta[name="csrf-token"]').attr('content');
-                    
-                    $.ajax({
-                        url: '{{route('adm_cursos_lista_editar')}}',
-                        type: 'POST',
-                        data: {
-                            _token: csrfToken,
-                            publicado: publicado,
-                            permitir_afiliacao: permitirAfiliacao,
-                            mostrar_na_pagina: mostrarNaPagina,
-                            gratuito: gratuito,
-                            id: cursoId,
-                        },
-                        success: function(response) { console.log('Status atualizado com sucesso', response); },
-                        error: function(xhr) { console.error('Erro ao atualizar o status'); }
-                    });
+                if (!container || !csrfToken) {
+                    return;
                 }
 
-                $('input[type="checkbox"][data-switch="bool"]').on('change', function() {
-                    var cursoId = $(this).data('id');
-                    if (cursoId) {
-                        updateCourseStatus(cursoId);
-                    } else {
-                        console.error('ID do curso não encontrado');
+                const updateOrder = async () => {
+                    const order = [];
+                    container.querySelectorAll('.card').forEach((card, index) => {
+                        const cursoId = Number(card.querySelector('input[type="hidden"]')?.value || 0);
+                        if (cursoId > 0) {
+                            order.push({ id: cursoId, ordem: index + 1 });
+                        }
+                    });
+
+                    try {
+                        await fetch('{{ route("adm_cursos_update_order") }}', {
+                            method: 'POST',
+                            headers: {
+                                'X-CSRF-TOKEN': csrfToken,
+                                'Accept': 'application/json',
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ order }),
+                        });
+                    } catch (error) {
+                        console.error('Erro ao atualizar a ordem:', error);
                     }
+                };
+
+                if (window.Sortable) {
+                    new window.Sortable(container, {
+                        animation: 150,
+                        handle: '.dragula-handle',
+                        draggable: '.card',
+                        ghostClass: 'opacity-60',
+                        onEnd: updateOrder,
+                    });
+                } else {
+                    console.error('Sortable não está disponível na página.');
+                }
+
+                const updateCourseStatus = async (cursoId) => {
+                    const publicado = document.getElementById(`publicado_${cursoId}`)?.checked ?? false;
+                    const permitirAfiliacao = document.getElementById(`permitir_afiliacao_${cursoId}`)?.checked ?? false;
+                    const mostrarNaPagina = document.getElementById(`mostrar_na_pagina_${cursoId}`)?.checked ?? false;
+                    const gratuito = document.getElementById(`gratuito${cursoId}`)?.checked ?? false;
+
+                    const formData = new FormData();
+                    formData.append('_token', csrfToken);
+                    formData.append('id', String(cursoId));
+                    formData.append('publicado', String(publicado));
+                    formData.append('permitir_afiliacao', String(permitirAfiliacao));
+                    formData.append('mostrar_na_pagina', String(mostrarNaPagina));
+                    formData.append('gratuito', String(gratuito));
+
+                    try {
+                        await fetch('{{ route('adm_cursos_lista_editar') }}', {
+                            method: 'POST',
+                            headers: {
+                                'X-CSRF-TOKEN': csrfToken,
+                                'Accept': 'application/json',
+                            },
+                            body: formData,
+                        });
+                    } catch (error) {
+                        console.error('Erro ao atualizar o status:', error);
+                    }
+                };
+
+                container.querySelectorAll('input[type="checkbox"][data-switch="bool"]').forEach((checkbox) => {
+                    checkbox.addEventListener('change', function () {
+                        const cursoId = Number(this.getAttribute('data-id') || 0);
+                        if (cursoId > 0) {
+                            updateCourseStatus(cursoId);
+                        }
+                    });
                 });
             });
         </script>

@@ -1,4 +1,11 @@
 @php
+    $empresaNome = trim((string) ($pagina['company_name'] ?? 'Programa Jovem Empreendedor'));
+    if ($empresaNome === '') {
+        $empresaNome = 'Programa Jovem Empreendedor';
+    }
+    $logoPadraoUrl = $pagina['logo_padrao_url'] ?? asset('img/home_page/logojecolor.webp');
+    $logoDarkUrl = $pagina['logo_dark_url'] ?? asset('img/home_page/logowhite.png');
+
     $w3CssVersion = @filemtime(public_path('css/w3-course.css'));
     $w3JsVersion = @filemtime(public_path('js/w3-course.js'));
 
@@ -19,7 +26,7 @@
     })->values();
 
     $whatsappNumero = preg_replace('/\D/', '', (string) ($pagina['whatsapp'] ?? ''));
-    $whatsappMensagem = rawurlencode('Olá quero saber sobre os cursos do Programa Jovem Empreendedor');
+    $whatsappMensagem = rawurlencode("Olá quero saber sobre os cursos do {$empresaNome}");
     $whatsappFloatUrl = $whatsappNumero
         ? "https://api.whatsapp.com/send/?phone={$whatsappNumero}&text={$whatsappMensagem}"
         : '#';
@@ -40,7 +47,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Portal Jovem Empreendedor</title>
+    <title>{{ $empresaNome }}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
@@ -53,8 +60,8 @@
                 <div class="w3-top-banner__logo-card">
                     <img
                         class="w3-top-banner__logo"
-                        src="{{ asset('img/home_page/logoPortal.webp') }}"
-                        alt="Portal Jovem Empreendedor"
+                        src="{{ $logoPadraoUrl }}"
+                        alt="{{ $empresaNome }}"
                         width="260"
                         height="86"
                         fetchpriority="high"
@@ -154,10 +161,10 @@
 
         <section class="w3-section w3-shell">
             <header class="w3-section__head">
-                <h2>Por que estudar no Portal Jovem Empreendedor?</h2>
+                <h2>Por que estudar no {{ $empresaNome }}?</h2>
             </header>
             <div class="w3-why-grid">
-                <img src="{{ asset('img/home_page/portal-jovem-empreendedor.webp') }}" alt="Portal Jovem Empreendedor" width="700" height="430" loading="lazy" decoding="async">
+                <img src="{{ asset('img/home_page/portal-jovem-empreendedor.webp') }}" alt="{{ $empresaNome }}" width="700" height="430" loading="lazy" decoding="async">
                 <div>
                     <p>Os nossos treinamentos irão ajudar você conseguir um emprego de forma rápida mesmo que você não tenha <strong>nenhuma experiência.</strong></p>
                     <p>Somos <strong>a maior escola de cursos profissionalizantes do Brasil.</strong></p>
@@ -312,7 +319,7 @@
                 </details>
                 <details>
                     <summary>Quais os requisitos para fazer o curso?</summary>
-                    <p>Os cursos do Portal Jovem Empreendedor são acessíveis a pessoas de todas as idades e níveis de escolaridade. Mesmo para cursos em profissões que exigem ensino médio completo, é possível se matricular e iniciar o aprendizado enquanto conclui seus estudos.</p>
+                    <p>Os cursos do {{ $empresaNome }} são acessíveis a pessoas de todas as idades e níveis de escolaridade. Mesmo para cursos em profissões que exigem ensino médio completo, é possível se matricular e iniciar o aprendizado enquanto conclui seus estudos.</p>
                 </details>
             </div>
         </section>
@@ -323,7 +330,7 @@
         <div class="w3-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="lead-modal-title">
             <button type="button" class="w3-modal__close" data-close-modal aria-label="Fechar">×</button>
             <div class="w3-modal__brand">
-                <img src="{{ asset('img/home_page/logoPortal.webp') }}" alt="Portal Jovem Empreendedor" width="220" height="49">
+                <img src="{{ $logoPadraoUrl }}" alt="{{ $empresaNome }}" width="220" height="49">
             </div>
             <h2 id="lead-modal-title">{!! $pagina['form_lead_titulo'] !!}</h2>
             <form id="modal_form_lead" action="{{ route('lead_whatsapp') }}" method="POST" novalidate>
@@ -351,7 +358,7 @@
     <footer class="w3-footer">
         <div class="w3-shell w3-footer__grid">
             <div>
-                <img src="{{ asset('img/home_page/logowhite.png') }}" alt="Portal Jovem Empreendedor" width="200" height="49" loading="lazy" decoding="async">
+                <img src="{{ $logoDarkUrl }}" alt="{{ $empresaNome }}" width="200" height="49" loading="lazy" decoding="async">
                 <p>Nossa missão é especializar jovens, equipando-os com as habilidades e conhecimentos essenciais para se destacarem em seu primeiro emprego.</p>
             </div>
             <div>

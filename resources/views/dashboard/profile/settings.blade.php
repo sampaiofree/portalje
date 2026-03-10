@@ -8,7 +8,7 @@
     <div class="py-12">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
             
-            <form method="POST" action="{{ route('afiliado_configurar_site_post') }}" class="space-y-6">
+            <form method="POST" action="{{ route('afiliado_configurar_site_post') }}" class="space-y-6" enctype="multipart/form-data">
                 @csrf
 
                 <!-- Card: Dados do Parceiro -->
@@ -29,6 +29,116 @@
                             <div>
                                 <x-input-label for="apelido" value="Apelido no Ranking" />
                                 <x-text-input id="apelido" name="apelido" type="text" class="px-4 py-3 bg-gray-100 focus:bg-white mt-1 block w-full" :value="old('apelido', Auth::user()->apelido)" />
+                            </div>
+                            <div>
+                                <x-input-label for="nome_empresa" value="Nome da empresa" />
+                                <x-text-input id="nome_empresa" name="nome_empresa" type="text" class="px-4 py-3 bg-gray-100 focus:bg-white mt-1 block w-full" :value="old('nome_empresa', Auth::user()->nome_empresa)" placeholder="Programa Jovem Empreendedor" />
+                                @error('nome_empresa')
+                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                @enderror
+                                <p class="mt-1 text-xs text-gray-500">Fallback automático: Programa Jovem Empreendedor.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card: Identidade visual -->
+                <div class="p-4 sm:p-8 bg-white shadow sm:rounded-lg">
+                    @php
+                        $hasLogoPadraoCustom = !empty(Auth::user()->logo_padrao_path);
+                        $hasLogoDarkCustom = !empty(Auth::user()->logo_dark_path);
+                        $logoPadraoAtual = Auth::user()->logo_padrao_path ? asset('storage/' . Auth::user()->logo_padrao_path) : asset('img/home_page/logojecolor.webp');
+                        $logoDarkAtual = Auth::user()->logo_dark_path ? asset('storage/' . Auth::user()->logo_dark_path) : asset('img/home_page/logowhite.png');
+                        $removeLogoPadraoOld = (int) old('remove_logo_padrao', 0);
+                        $removeLogoDarkOld = (int) old('remove_logo_dark', 0);
+                    @endphp
+                    <div class="max-w-2xl">
+                        <h2 class="text-lg font-medium text-gray-900">Logos da Home e dos Cursos</h2>
+                        <p class="mt-1 text-sm text-gray-600">Envie sua logo padrão e sua logo dark. Limite por arquivo: 1MB (PNG, JPG, JPEG ou WEBP). Se não enviar, usamos as logos atuais como fallback.</p>
+
+                        <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <input type="hidden" id="remove_logo_padrao" name="remove_logo_padrao" value="{{ $removeLogoPadraoOld ? '1' : '0' }}">
+                                <x-input-label for="logo_padrao" value="Logo padrão" />
+                                <input
+                                    id="logo_padrao"
+                                    name="logo_padrao"
+                                    type="file"
+                                    accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
+                                    class="mt-1 block w-full text-sm text-gray-700 file:mr-3 file:rounded-md file:border-0 file:bg-indigo-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-indigo-500"
+                                >
+                                @error('logo_padrao')
+                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                @enderror
+                                <div class="mt-3 rounded-md border border-gray-200 p-3 bg-white">
+                                    <div class="flex items-center justify-between gap-3 mb-2">
+                                        <p class="text-xs text-gray-500">Logo atual</p>
+                                        @if($hasLogoPadraoCustom)
+                                            <button
+                                                type="button"
+                                                id="toggle_remove_logo_padrao"
+                                                data-remove-target="remove_logo_padrao"
+                                                data-status-target="remove_logo_padrao_status"
+                                                data-default-class="text-red-600"
+                                                data-active-class="text-amber-600"
+                                                data-file-input="logo_padrao"
+                                                class="inline-flex items-center gap-1 text-xs font-medium text-red-600 hover:text-red-700"
+                                            >
+                                                <i class="ri-delete-bin-line"></i>
+                                                <span>Excluir</span>
+                                            </button>
+                                        @endif
+                                    </div>
+                                    <img src="{{ $logoPadraoAtual }}" alt="Logo padrão atual" class="h-12 w-auto object-contain">
+                                    <p
+                                        id="remove_logo_padrao_status"
+                                        class="mt-2 text-xs font-medium text-amber-700 {{ $removeLogoPadraoOld ? '' : 'hidden' }}"
+                                    >
+                                        Logo será removida ao salvar.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div>
+                                <input type="hidden" id="remove_logo_dark" name="remove_logo_dark" value="{{ $removeLogoDarkOld ? '1' : '0' }}">
+                                <x-input-label for="logo_dark" value="Logo dark" />
+                                <input
+                                    id="logo_dark"
+                                    name="logo_dark"
+                                    type="file"
+                                    accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
+                                    class="mt-1 block w-full text-sm text-gray-700 file:mr-3 file:rounded-md file:border-0 file:bg-indigo-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-indigo-500"
+                                >
+                                @error('logo_dark')
+                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                @enderror
+                                <div class="mt-3 rounded-md border border-gray-700 p-3 bg-gray-900">
+                                    <div class="flex items-center justify-between gap-3 mb-2">
+                                        <p class="text-xs text-gray-300">Logo atual</p>
+                                        @if($hasLogoDarkCustom)
+                                            <button
+                                                type="button"
+                                                id="toggle_remove_logo_dark"
+                                                data-remove-target="remove_logo_dark"
+                                                data-status-target="remove_logo_dark_status"
+                                                data-default-class="text-red-300"
+                                                data-active-class="text-amber-300"
+                                                data-file-input="logo_dark"
+                                                class="inline-flex items-center gap-1 text-xs font-medium text-red-300 hover:text-red-200"
+                                            >
+                                                <i class="ri-delete-bin-line"></i>
+                                                <span>Excluir</span>
+                                            </button>
+                                        @endif
+                                    </div>
+                                    <img src="{{ $logoDarkAtual }}" alt="Logo dark atual" class="h-12 w-auto object-contain">
+                                    <p
+                                        id="remove_logo_dark_status"
+                                        class="mt-2 text-xs font-medium text-amber-300 {{ $removeLogoDarkOld ? '' : 'hidden' }}"
+                                    >
+                                        Logo será removida ao salvar.
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -129,6 +239,53 @@
                         this.value = sanitizedValue;
                     });
                 }
+
+                function bindLogoRemoveToggle(buttonId) {
+                    const button = document.getElementById(buttonId);
+                    if (!button) return;
+
+                    const removeInputId = button.getAttribute('data-remove-target');
+                    const statusId = button.getAttribute('data-status-target');
+                    const defaultClass = button.getAttribute('data-default-class');
+                    const activeClass = button.getAttribute('data-active-class');
+                    const fileInputId = button.getAttribute('data-file-input');
+                    const removeInput = removeInputId ? document.getElementById(removeInputId) : null;
+                    const status = statusId ? document.getElementById(statusId) : null;
+                    const fileInput = fileInputId ? document.getElementById(fileInputId) : null;
+                    const label = button.querySelector('span');
+
+                    if (!removeInput || !status || !label) return;
+
+                    const applyState = (isRemoving) => {
+                        removeInput.value = isRemoving ? '1' : '0';
+                        status.classList.toggle('hidden', !isRemoving);
+                        label.textContent = isRemoving ? 'Cancelar remoção' : 'Excluir';
+                        if (defaultClass) {
+                            button.classList.toggle(defaultClass, !isRemoving);
+                        }
+                        if (activeClass) {
+                            button.classList.toggle(activeClass, isRemoving);
+                        }
+                    };
+
+                    applyState(removeInput.value === '1');
+
+                    button.addEventListener('click', function () {
+                        const nextRemoving = removeInput.value !== '1';
+                        applyState(nextRemoving);
+                    });
+
+                    if (fileInput) {
+                        fileInput.addEventListener('change', function () {
+                            if (fileInput.files && fileInput.files.length > 0) {
+                                applyState(false);
+                            }
+                        });
+                    }
+                }
+
+                bindLogoRemoveToggle('toggle_remove_logo_padrao');
+                bindLogoRemoveToggle('toggle_remove_logo_dark');
             });
         </script>
     @endpush

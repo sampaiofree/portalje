@@ -53,6 +53,9 @@ class PublicCoursePricingDisplayTest extends TestCase
         $response->assertSee('Plano Completo');
         $response->assertDontSee('Plano Básico');
         $response->assertSee('offDiscount=MAIN25', false);
+        $heroPriceHighlight = $this->extractHeroPriceHighlight($response->getContent());
+        $this->assertStringContainsString('Investimento do plano completo', $heroPriceHighlight);
+        $this->assertStringNotContainsString('Investimento único de', $heroPriceHighlight);
     }
 
     public function test_dois_precos_mode_renders_complete_and_basico_with_distinct_coupons(): void
@@ -78,6 +81,14 @@ class PublicCoursePricingDisplayTest extends TestCase
         $response->assertSee('Plano Básico');
         $response->assertSee('offDiscount=MAIN10', false);
         $response->assertSee('offDiscount=BASIC35', false);
+        $heroPriceHighlight = $this->extractHeroPriceHighlight($response->getContent());
+        $this->assertStringContainsString('Investimento único de', $heroPriceHighlight);
+        $this->assertStringNotContainsString('Investimento do plano completo', $heroPriceHighlight);
+        $this->assertStringNotContainsString(' à vista', $heroPriceHighlight);
+        $this->assertSame(
+            $this->extractHeroPriceValue($response->getContent()),
+            $this->extractFirstPlanCardValue($response->getContent())
+        );
     }
 
     public function test_invalid_or_missing_coupon_configuration_falls_back_to_padrao(): void
@@ -325,5 +336,40 @@ class PublicCoursePricingDisplayTest extends TestCase
         ]);
 
         return [$user, $curso];
+    }
+
+    private function extractHeroPriceHighlight(string $html): string
+    {
+        $matched = preg_match('/<div class="lp-price-highlight">(.*?)<\/div>/s', $html, $matches);
+        if ($matched !== 1 || empty($matches[1])) {
+            $this->fail('Bloco lp-price-highlight não encontrado na LP pública.');
+        }
+
+        return $matches[1];
+    }
+
+    private function extractHeroPriceValue(string $html): string
+    {
+        $matched = preg_match(
+            '/<div class="lp-price-highlight">.*?<strong>(.*?)<\/strong>.*?<\/div>/s',
+            $html,
+            $matches
+        );
+
+        if ($matched !== 1 || empty($matches[1])) {
+            $this->fail('Valor principal do hero não encontrado no bloco lp-price-highlight.');
+        }
+
+        return trim(strip_tags(html_entity_decode($matches[1], ENT_QUOTES, 'UTF-8')));
+    }
+
+    private function extractFirstPlanCardValue(string $html): string
+    {
+        $matched = preg_match('/<p class="lp-price-card__value">(.*?)<\/p>/', $html, $matches);
+        if ($matched !== 1 || empty($matches[1])) {
+            $this->fail('Valor do primeiro card de plano não encontrado.');
+        }
+
+        return trim(strip_tags(html_entity_decode($matches[1], ENT_QUOTES, 'UTF-8')));
     }
 }

@@ -40,6 +40,18 @@ class LoginController extends Controller
         $this->middleware('auth')->only('logout');
     }
 
+    public function showLoginForm(Request $request)
+    {
+        // Always issue a fresh CSRF token for the login form.
+        $request->session()->regenerateToken();
+
+        return response()
+            ->view('auth.login')
+            ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+            ->header('Pragma', 'no-cache')
+            ->header('Expires', 'Sat, 01 Jan 2000 00:00:00 GMT');
+    }
+
     public function logout(Request $request)
     {
         Auth::logout();
