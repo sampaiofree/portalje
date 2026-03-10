@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Portal Jovem Empreendedor</title>
     <link rel="icon" href="{{asset('/img/logo/logo-je-sm.png')}}" type="image/x-icon">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- Meta description (descrição da página) -->
     <meta name="description" content="Qualifique-se com cursos completos e certificados. Aprenda habilidades valorizadas pelo mercado e conte com suporte especializado para transformar sua carreira. Inscreva-se e conquiste oportunidades reais com a ajuda dos nossos professores experientes!">
     <!-- Meta keywords (palavras-chave relacionadas ao conteúdo) -->
@@ -34,204 +33,26 @@
      crossorigin="anonymous"></script>
      <meta name="google-adsense-account" content="ca-pub-9796869151117705">-->
     @endif
-
-
-
-    <style>
-        /* PADRÃO DO SITE */
-        .color1{color: #505a64;}
-        .color2{color: #007bff;}
-        .color3{color: #28a745;}
-        .color4{color: #fdfd88;}
-
-        .bg-portal{background:  linear-gradient(150deg, #0056b3, #181b1e);}
-        .bg-portal2{background: #002147;}
-        .bg-portal3{background:  #f2f2f2;}
-
-        /* SESSAO HERO */
-        #selos_primeira_dobra img{
-            max-height: 65px;
-            
-        }
-
-        #selos_primeira_dobra, #selos_primeira_dobra .row, #selos_primeira_dobra .col-4{
-            box-sizing: border-box;
-        }
-        .col-4 {
-        flex: 0 0 auto;
-        width: 33.33333333%;
-        }
-
-        .fw-bold {
-        font-weight: 700 !important;
-        }
-
-        .mx-auto {
-        margin-right: auto !important;
-        margin-left: auto !important;
-        }
-
-        .mb-4 {
-        margin-bottom: 1.5rem !important;
-        }
-
-        .text-uppercase {
-        text-transform: uppercase !important;
-        }
-
-        .mt-3 {
-        margin-top: 1rem !important;
-        }
-
-        .text-white {
-        --bs-text-opacity: 1;
-        color: rgba(var(--bs-white-rgb),var(--bs-text-opacity)) !important;
-        }
-
-        .hero {
-        background-image: url('{{asset('img/padrao/fundo_certificado3.webp')}}');
-        background-size: 500px; /* Tamanho original da imagem */
-        background-repeat: repeat; /* Repetir tanto horizontalmente quanto verticalmente */
-        background-position: center;
-        position: relative;
-        text-align: center;
-        color: var(--accent-color);
-        padding: 60px 20px;
-        }
-
-        .hero::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: linear-gradient(to bottom, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.9));
-        z-index: 1;
-        }
-
-        .hero-content {
-        position: relative;
-        z-index: 2;
-        }
-
-        .hero h1 {
-        font-size: 2rem;
-        margin-bottom: 20px;
-        line-height: 1.1;
-        }
-
-        .hero h2 {
-        font-size: 1.5rem;
-        margin-bottom: 20px;
-        color: var(--secondary-color);
-        line-height: 1.1;
-        }
-
-        .hero p {
-        font-size: 1.1rem;
-        margin-bottom: 20px;
-        line-height: 1.3;
-        }
-
-        /* Estilizando o botão CTA */
-        .btn-cta {
-        display: inline-block;
-        padding: 15px 30px;
-        font-size: 1.2rem;
-        font-weight: bold;
-        color: #fff;
-        text-decoration: none;
-        background: linear-gradient(45deg, #007bff, #28a745);
-        border: none;
-        border-radius: 5px;
-        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-        cursor: pointer;
-        box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.5);
-        }
-
-        .btn-cta:hover {
-        background: linear-gradient(45deg, #28a745, #34d058);
-        }
-
-        .top-banner {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            background-color: #1338df;
-            color: white;
-            text-align: center;
-            padding: 10px 0;
-            font-size: 1rem;
-            font-weight: bold;
-            z-index: 9999; /* Mantém o banner acima de outros elementos */
-            /*white-space: nowrap; /* Garante que o texto fique em uma linha */
-            overflow: hidden; /* Evita overflow caso o texto seja maior que o contêiner */
-        }
-    
-    /**APENAS MOBILE**/
-    @media (max-width: 768px) {
-
-    /**CARROSSEL EMPRESAS**/
-    .carousel-container {
-        overflow: hidden; /* Esconde qualquer coisa fora da área de visualização */
-        width: 100%; /* Ocupa 100% da largura do container */
-    }
-
-    .carousel-logos {
-        display: flex;
-        justify-content: space-around;
-        align-items: center;
-        width: calc(80px * 7); /* Ajuste a largura total para incluir o número de logos duplicadas */
-        animation: scroll 20s linear infinite; /* Tempo da animação ajustado para a nova largura */
-    }
-
-    .carousel-logos img {
-        /*max-width: 80px; /* Defina o tamanho máximo das logos */
-        /*height: auto;*/
-        margin: 0 15px;
-        opacity: 0.8;
-        transition: transform 0.2s ease, opacity 0.2s ease;
-    }
-
-    .carousel-logos img:hover {
-        transform: scale(1.1); /* Aumenta um pouco ao passar o mouse */
-        opacity: 1;
-    }
-
-    /* Animação de rolagem contínua */
-    @keyframes scroll {
-        0% {
-            transform: translateX(0);
-        }
-        100% {
-            transform: translateX(-50%); /* Mova metade da largura total */
-        }
-    }
-}
-
-/**APENAS DESKTOP**/
-@media (min-width: 769px) {
-    #headline{
-        max-width: 50%;
-        margin-right: auto !important;
-        margin-left: auto !important;}
-
-    
-
-     /**CARROSSEL DESKTOP**/
-    .carousel-logos img {
-            max-width: 80px; /* Defina o tamanho máximo das logos */
-            height: auto;
-            margin: 0 15px;
-            opacity: 0.8;
-            transition: transform 0.2s ease, opacity 0.2s ease;
-    }
-}
-    </style>
+    @php
+      $homeCssVersion = file_exists(public_path('css/home-course.css'))
+        ? (string) filemtime(public_path('css/home-course.css'))
+        : null;
+      $homeJsVersion = file_exists(public_path('js/home-course.js'))
+        ? (string) filemtime(public_path('js/home-course.js'))
+        : null;
+      $homeWhatsappNumber = preg_replace('/\D/', '', (string) ($info['whatsapp_atendimento'] ?? ''));
+      $homeWhatsappMessage = rawurlencode('Olá quero saber sobre os cursos do Programa Jovem Empreendedor');
+      $homeWhatsappFloatUrl = $homeWhatsappNumber
+        ? "https://api.whatsapp.com/send/?phone={$homeWhatsappNumber}&text={$homeWhatsappMessage}"
+        : '#';
+      $homeConfig = [
+        'whatsapp_show' => (bool) ($info['whatsapp_mostrar'] ?? true),
+        'whatsapp_delay_seconds' => max(0, (int) ($info['whatsapp_atendimento_tempo'] ?? 0)),
+      ];
+    @endphp
+    <link rel="stylesheet" href="{{ asset('css/home-course.css') }}{{ $homeCssVersion ? '?v=' . $homeCssVersion : '' }}">
   </head>
-  <body style="box-sizing: border-box;">
+  <body class="home-course color1">
     @if($info['cidade'])
     <!-- Elemento fixo no topo -->
     <!--<div class="top-banner">
@@ -242,42 +63,50 @@
     </div>-->
     @elseif($desconto_banner)
     <!-- Elemento fixo no topo -->
-    <div class="top-banner" style="position: fixed;top: 0;left: 0;width: 100%;background-color: rgb(0, 0, 0);color: white;text-align: center;padding: 10px 0;font-size: 1rem;font-weight: bold;z-index: 9999;overflow: hidden;">
-        <p class="my-0" style="font-size: 1.5rem;">Desconto especial de {{$desconto_banner}}%</p>
-        <p class="my-0" style="font-size: 0.8rem;">Termina em <span class="color4 countdown"></span></p>
+    <div class="top-banner top-banner--discount">
+        <p class="my-0 top-banner__title">Desconto especial de {{$desconto_banner}}%</p>
+        <p class="my-0 top-banner__subtitle">Termina em <span class="color4 countdown"></span></p>
     </div>
     @endif 
     <!-- Seção Hero -->
-    <section class="hero" style="box-sizing: border-box; justify-content: center !important; align-items: center !important; display: flex !important;@if($info['cidade'] OR $desconto_banner) padding-top: 100px; @endif">
-        <div class="hero-content" style="text-align: center !important;">
-            <img alt='Portal Jovem Empreendedor' style="width: 150px; height: 36.3833px;" src="{{asset('img/home_page/logowhite.webp')}}" />
+    <section class="hero home-section home-section--hero @if($info['cidade'] OR $desconto_banner) home-section--hero-offset @endif">
+        <div class="hero-content home-hero__content">
+            <img
+              alt="Portal Jovem Empreendedor"
+              loading="eager"
+              decoding="async"
+              width="150"
+              height="36"
+              class="home-hero__brand"
+              src="{{asset('img/home_page/logowhite.webp')}}"
+            />
             @if($info['cidade'])
-                <p class="mt-4 mb-0 text-uppercase" style="color: white; font-weight: 700 !important; text-shadow: 1px 1px 10px rgb(0, 0, 0);line-height: 1.1;font-size: 1.4rem;" class="mt-0 fs-4">27 Bolsas de Estudo liberadas para</p>
-                <h1 class="mt-0 fw-bold" style="color: white; font-weight: 700 !important; text-shadow: 1px 1px 10px rgb(0, 0, 0);"><span class="text-uppercase" style="color: #fdfd88;font-size:2rem;">{{$info['cidade']}}</span></h1>
+                <p class="home-hero__city-lead mt-4 mb-0 text-uppercase">27 Bolsas de Estudo liberadas para</p>
+                <h1 class="home-hero__city mt-0 fw-bold"><span class="text-uppercase">{{$info['cidade']}}</span></h1>
                 
-                <h2 id="headline" class="fw-bold mb-0 color4 mx-auto" style="color: #ffffff; text-shadow: 1px 1px 10px rgb(0, 0, 0);font-size: 1.3rem;"><strong>CURSOS PROFISSIONALIZANTES</strong> em mais de 40 áreas.</h2>
-                <p class="mt-1 mb-4" style="color: white; text-shadow: 1px 1px 10px rgb(0, 0, 0);line-height: 1.2;font-size: 1rem;" class="mt-0 fs-4">Escolha seu curso para falar com o nosso consultor pelo WhatsApp</p>
+                <h2 id="headline" class="home-hero__headline fw-bold mb-0 mx-auto"><strong>CURSOS PROFISSIONALIZANTES</strong> em mais de 40 áreas.</h2>
+                <p class="home-hero__subheadline mt-1 mb-4">Escolha seu curso para falar com o nosso consultor pelo WhatsApp</p>
             @else
-                <h2 id="headline" class="fw-bold mb-0 mt-4 color4 mx-auto" style="color: #ffffff; text-shadow: 1px 1px 10px rgb(0, 0, 0);font-size: 1.3rem;"><strong>CURSOS PROFISSIONALIZANTES</strong> em mais de 40 áreas.</h2>
-                <p class="mt-1 mb-4" style="color: white; text-shadow: 1px 1px 10px rgb(0, 0, 0);line-height: 1.2;font-size: 1rem;" class="mt-0 fs-4">Escolha seu curso e comece ainda hoje!</p>
+                <h2 id="headline" class="home-hero__headline fw-bold mb-0 mt-4 mx-auto"><strong>CURSOS PROFISSIONALIZANTES</strong> em mais de 40 áreas.</h2>
+                <p class="home-hero__subheadline mt-1 mb-4">Escolha seu curso e comece ainda hoje!</p>
             @endif  
-            <a href="#sessao_cursos" class="btn-cta text-uppercase" style="text-align: center !important;font-size: 1rem;">Escolher meu curso AGORA</a>
+            <a href="#sessao_cursos" class="btn-cta home-cta home-scroll-trigger text-uppercase">Escolher meu curso AGORA</a>
             
             <!-- Selos -->
-            <div id="selos_primeira_dobra" class="mt-3 text-white" style="">
+            <div id="selos_primeira_dobra" class="home-hero__seals mt-3 text-white">
                 <div class="row text-center d-flex align-items-center">
                     <div class="col-4 col-md-2 offset-md-3">
-                        <img src="{{asset('img/icons/mec2.webp')}}" style="width: 65px; height: 65px" class="img-fluid " alt="Imagem 1">
+                        <img loading="lazy" decoding="async" width="65" height="65" src="{{asset('img/icons/mec2.webp')}}" class="img-fluid" alt="Cursos autorizados pelo MEC">
                         <!--<h5 class="mt-3">Título 1</h5>-->
                         
                     </div>
                     <div class="col-4 col-md-2">
-                        <img src="{{asset('img/icons/certificado.png')}}" style="width: 65px; height: 65x" class="img-fluid " alt="Imagem 2">
+                        <img loading="lazy" decoding="async" width="65" height="65" src="{{asset('img/icons/certificado.png')}}" class="img-fluid" alt="Certificado reconhecido">
                         
                     
                     </div>
                     <div class="col-4 col-md-2">
-                        <img src="{{asset('img/icons/112mil.png')}}" style="width: 65px; height: 65x" class="img-fluid " alt="Imagem 3">                 
+                        <img loading="lazy" decoding="async" width="65" height="65" src="{{asset('img/icons/112mil.png')}}" class="img-fluid" alt="Mais de 112 mil alunos">                 
                         
                     </div>
                     
@@ -285,30 +114,30 @@
                 <div class="row mt-1">
                     <div class="col-4 col-md-2 offset-md-3">
                         
-                        <p style="font-size: xx-small; color: white;">Cursos autorizados pelo MEC ministrados por profissionais.</p>
+                        <p class="home-hero__seal-text">Cursos autorizados pelo MEC ministrados por profissionais.</p>
                     </div>
                     <div class="col-4 col-md-2">
                         
                         
-                        <p style="font-size: xx-small; color: white;">Certificação válido e reconhecido em todo o território nacional.</p>
+                        <p class="home-hero__seal-text">Certificação válido e reconhecido em todo o território nacional.</p>
                     </div>
                     <div class="col-4 col-md-2">
                         
                         
-                        <p style="font-size: xx-small; : white;">112 mil alunos formados no Brasil e em +14 países.</p>
+                        <p class="home-hero__seal-text">112 mil alunos formados no Brasil e em +14 países.</p>
                     </div>
                 </div>
             </div>
         </div>
     </section>
     <!-- Empresas LOGOS -->
-    <section style="text-align: center !important; background-color: white; padding-top: 3rem !important;padding-bottom: 3rem !important;">
-        <div class="container-fluid color1">
+    <section class="home-section home-section--proof text-center">
+        <div class="container-fluid">
         <!-- Ki - Introdução -->
-        <h3 class="text-center fw-bold my-0" style="font-weight: 700 !important;box-sizing: border-box;font-size: calc(1.3rem + .6vw);">
-            Mais de <span style="font-weight: bolder;" class="color2">112 mil formados</span> em todo o Brasil e em +14 países.
+        <h3 class="home-section__title text-center fw-bold my-0">
+            Mais de <span class="color2">112 mil formados</span> em todo o Brasil e em +14 países.
         </h3>
-        <p class="my-0 text-center fw-bold" style="font-size: small;">
+        <p class="home-section__subtitle my-0 text-center fw-bold">
             Nossos alunos já trabalham em empresas como:
         </p>
         
@@ -329,14 +158,22 @@
                 @endphp
                 @foreach ($logo_empresas as $logo_empresa)
                     
-                    <img src="{{$logo_empresa[0]}}" alt="Empresas onde nossos alunos trabalham" class="logos" style="width: 80px; height: {{$logo_empresa[1]}}px;">
+                    <img
+                      loading="lazy"
+                      decoding="async"
+                      src="{{$logo_empresa[0]}}"
+                      alt="Empresas onde nossos alunos trabalham"
+                      class="logos"
+                      width="80"
+                      height="{{ (int) $logo_empresa[1] }}"
+                    >
                 @endforeach
             </div>
         </div>
         </div>
     </section>
     <!-- Por que escolher nossos cursos? -->
-    <section id="beneficios" class="bg-portal3 color1 lazy-load" style="padding-bottom: 50px; padding-top: 50px;">
+    <section id="beneficios" class="home-section home-section--benefits lazy-load">
         <div class="container-fluid">
             <div class="row">
                 <div class="col-md-12 text-center">
@@ -421,12 +258,12 @@
         </div>
     </section>-->
     <!-- Nossos Cursos Disponíveis para Você se Qualificar -->
-    <section id="sessao_cursos" class="lazy-load py-5 color1">
+    <section id="sessao_cursos" class="home-section home-section--courses lazy-load py-5">
         <div class="container-fluid">
-            <h3 id="beneficios_h3" class="fw-bold text-center">Escolha Sua Nova Profissão</h3>
-            <p class="lead text-center">Escolha o curso ideal para começar sua jornada profissional</p>
+            <h3 id="beneficios_h3" class="home-section__title fw-bold text-center">Escolha Sua Nova Profissão</h3>
+            <p class="home-section__subtitle lead text-center">Escolha o curso ideal para começar sua jornada profissional</p>
 
-            <div id="lista_cursos" class="row mx-auto mt-3" style="max-width: 1100px;">
+            <div id="lista_cursos" class="row mx-auto mt-3 home-courses-list">
                 @php
                     $notas = [
                         "4.9",
@@ -461,7 +298,7 @@
                         }
 
                         //TAG DA IMAGEM DO CURSO
-                        $tag = "<span class='position-absolute d-flex  align-items-center translate-middle badge bg-danger' style='left: 80% !important;top: 6% !important;font-size: x-small;'>
+                        $tag = "<span class='home-course-tag position-absolute d-flex align-items-center translate-middle badge bg-danger'>
                                     <i class='bi bi-clock-fill me-1'></i>".$curso->horas_completo." horas
                                     <span class='visually-hidden'>Carga Horária</span>
                                 </span>";
@@ -475,7 +312,7 @@
                             if($curso->gratuito){
                                 $curso->link_checkout_completo = "https://".request()->getHost()."/".$curso->url.$info['parametros']."&ga=1";
 
-                                $tag = "<span class='position-absolute d-flex  align-items-center translate-middle badge bg-danger' style='left: 70% !important;top: 6% !important;font-size: x-small;'>
+                                $tag = "<span class='home-course-tag home-course-tag--free position-absolute d-flex align-items-center translate-middle badge bg-danger'>
                                     <i class='bi bi-gift-fill me-1'></i>CURSO GRATUITO
                                     <span class='visually-hidden'>Carga Horária</span>
                                 </span>"; 
@@ -485,7 +322,7 @@
                         if($curso->gratuito){
                                 $curso->link_checkout_completo = "https://".request()->getHost()."/".$curso->url.$info['parametros']."&ga=1";
 
-                                $tag = "<span class='position-absolute d-flex  align-items-center translate-middle badge bg-danger' style='left: 70% !important;top: 6% !important;font-size: x-small;'>
+                                $tag = "<span class='home-course-tag home-course-tag--free position-absolute d-flex align-items-center translate-middle badge bg-danger'>
                                     <i class='bi bi-gift-fill me-1'></i>CURSO GRATUITO
                                     <span class='visually-hidden'>Carga Horária</span>
                                 </span>"; 
@@ -517,21 +354,29 @@
                                 
                     @endphp
                     @if($curso['publicado'] AND $curso['mostrar_na_pagina'])
-                    <div class="lazy-load col-12 col-sm-6 col-lg-4 mb-2 mt-1 py-1 pb-3" style="border-bottom: 10px solid #cccccc5e;">
+                    <div class="lazy-load col-12 col-sm-6 col-lg-4 mb-2 mt-1 py-1 pb-3 home-course-card-wrapper">
                         <div class="row row_curso_individual align-items-center d-flex">
                             <!-- Coluna da Imagem -->
                             <div class="col-6 position-relative">
                                 <div class="img-overlay">
-                                    <img  data-src="{{asset('/storage/'.$curso['capa_vertical'])}}"  class=" img-fluid w-100"alt="curso de {{$curso['titulo']}}" style="">
+                                    <img
+                                      data-src="{{asset('/storage/'.$curso['capa_vertical'])}}"
+                                      class="img-fluid w-100"
+                                      alt="curso de {{$curso['titulo']}}"
+                                      loading="lazy"
+                                      decoding="async"
+                                      width="164"
+                                      height="237"
+                                    >
                                     <!-- Degradê e Título no rodapé da Imagem -->
                                     <div class="img-gradient-overlay">
                                         <div class="img-title text-white">
-                                            <p class="m-0 text-center" style="font-size: 0.8rem; font-weight: bold;line-height: 1.1;">{{$curso['titulo']}}</p>
+                                            <p class="m-0 text-center home-course-card__title">{{$curso['titulo']}}</p>
                                             <!--<p class="mt-1 mb-0 d-flex justify-content-center align-items-center color4" style="font-size: x-small">
                                                 <i class="bi bi-star-fill  me-1"></i>
                                                 <span>Nota {{$randomFloat}} de 5</span>
                                             </p>-->
-                                            <p class="my-0 d-flex justify-content-center align-items-center color4" style="font-size: x-small">
+                                            <p class="my-0 d-flex justify-content-center align-items-center color4 home-course-card__meta">
                                                 <i class="bi bi-people-fill  me-1"></i>
                                                 <span>{{ $curso->numero_alunos }} alunos</span>
                                             </p>
@@ -545,11 +390,11 @@
 
                             <!-- Coluna de Texto e Botão -->
                             <div class="col-6">
-                                <p class="mb-2" style="font-size: 0.8rem;line-height: 1.3;font-weight: 700">{{$curso->titulo}}</p>
-                                <p class="mb-2" style="font-size: 0.8rem;line-height: 1.3;font-weight: 400">{{ str_replace('"', '', $curso['headline']) }} <!--Salário pode chegar a R${{$curso->salario_maximo}}--></p>
+                                <p class="mb-2 home-course-card__title">{{$curso->titulo}}</p>
+                                <p class="mb-2 home-course-card__headline">{{ str_replace('"', '', $curso['headline']) }} <!--Salário pode chegar a R${{$curso->salario_maximo}}--></p>
                                 <a onclick="@if(!$info['whatsapp']) fbq('track', 'ViewContent') @elseif(!$info['formulario']) fbq('track', 'Lead') @endif" 
                                 data-cursoid="{{$curso->id}}" 
-                                href="{{$curso->link_checkout_completo}}" class="mt-1 btn-cta btn-inscricao text-center" style="font-size: small; padding-bottom: 10px; padding-top: 10px;">SAIBA MAIS</a> 
+                                href="{{$curso->link_checkout_completo}}" class="mt-1 btn-cta btn-inscricao text-center home-cta home-cta--small">SAIBA MAIS</a> 
                             </div>
                         </div>
                     </div>
@@ -559,15 +404,15 @@
         </div>
     </section>
     <!--Depoimentos-->
-    <section id="depoimentos" class="lazy-load py-5 bg-portal text-white">
+    <section id="depoimentos" class="home-section home-section--dark lazy-load py-5 text-white">
         <div class="container-fluid">
             <div class="row">
                 <div class="text-center col-sm-8 offset-sm-2 col-md-6 offset-md-3 col-lg-4 offset-lg-4">
                     <!-- Título da sessão -->
-                    <h3 class="fw-bold ">Histórias de quem já participou</h3>
+                    <h3 class="home-section__title fw-bold">Histórias de quem já participou</h3>
                     <p class="lead">Nada melhor do que ouvir diretamente de quem já passou pela mesma jornada e conquistaram novas oportunidades.</p>
                 </div>
-                <div class="col-sm-10 offset-sm-1 mx-auto" style="max-width: 1100px;">
+                <div class="col-sm-10 offset-sm-1 mx-auto home-testimonials-wrap">
                     @php
                         $depoimentos = [
                             'rejxwJ2lX-Q',
@@ -587,7 +432,15 @@
                         @foreach($depoimentos as $depoimento)
                         <div class="col-sm-4 col-videos mb-4 lazy-load">
                             <div class="video-facade" data-video-id="{{ $depoimento }}" onclick="loadVideo(this)">
-                                <img data-src="https://img.youtube.com/vi/{{ $depoimento }}/hqdefault.jpg" alt="Thumbnail {{ $depoimento }}" class=" img-fluid ">
+                                <img
+                                  data-src="https://img.youtube.com/vi/{{ $depoimento }}/hqdefault.jpg"
+                                  alt="Thumbnail {{ $depoimento }}"
+                                  class="img-fluid"
+                                  loading="lazy"
+                                  decoding="async"
+                                  width="480"
+                                  height="360"
+                                >
                                 <div class="play-button">
                                     <i class="bi bi-play-fill"></i> <!-- Ícone do Bootstrap -->
                                 </div>
@@ -608,7 +461,7 @@
             </div>
             <div class="row d-flex align-items-center lazy-load">
                 <div class="col-3 col-sm-1 offset-sm-4">
-                    <img alt='Portal Jovem Empreendedor' class=" img-fluid " data-src="{{asset('img/home_page/garantia-7-dias.png')}}" style="width: 83px; height:83px">
+                    <img alt='Portal Jovem Empreendedor' class="img-fluid" data-src="{{asset('img/home_page/garantia-7-dias.png')}}" loading="lazy" decoding="async" width="83" height="83">
                 </div>
                 <div class="col-9 col-sm-3">
                     <p>Tem dúvidas? Não se preocupe, o curso oferece uma <strong>garantia de 7 dias.</strong> Se não estiver satisfeito, devolvemos o seu dinheiro sem complicações.</p>
@@ -627,16 +480,16 @@
         </div>
     </section>
      <!-- Seção Certificado -->
-     <section id="certificado" class="lazy-load container-fluid bg-white py-5 color1">
+     <section id="certificado" class="home-section home-section--cert lazy-load container-fluid py-5">
         <div class="row">
             <div class="text-center col-sm-8 offset-sm-2 col-md-6 offset-md-3 col-lg-4 offset-lg-4">
-                <h3 class="fw-bold ">Certificado <strong >reconhecido e registrado</strong></h3>
+                <h3 class="home-section__title fw-bold">Certificado <strong>reconhecido e registrado</strong></h3>
                 <p class='lead'>Você receberá um <strong> certificado de conclusão com validade em todo o Brasil.</strong> </p>
                         <p>Nosso certificado oferece uma série de benefícios para garantir sua credibilidade no mercado de trabalho.</p>
             </div>
             <div class="col-sm-8 offset-sm-2 col-md-6 offset-md-3 col-lg-4 offset-lg-4 lazy-load">
                 <div class="card border-0">
-                    <img class="rounded  img-fluid mx-auto" alt="Certificado" data-src="{{asset('img/home_page/certificadoNovo2.webp')}}" style="width: 404px; height: 285.633">
+                    <img class="rounded img-fluid mx-auto" alt="Certificado" data-src="{{asset('img/home_page/certificadoNovo2.webp')}}" loading="lazy" decoding="async" width="404" height="286">
                 </div>
             </div>
         </div>
@@ -716,10 +569,10 @@
     </section>-->
     
     <!-- Seção Perguntas e respostas -->
-    <section class="lazy-load container-fluid bg-white py-5">
+    <section class="home-section home-section--faq lazy-load container-fluid py-5">
         <div id="perguntas_e_respotas" class="row">
             <div class="col-sm-8 offset-sm-2 col-md-6 offset-md-3 col-lg-4 offset-lg-4 color1">
-                <h3 class="fw-bold text-center">Perguntas e Respostas</h3>
+                <h3 class="home-section__title fw-bold text-center">Perguntas e Respostas</h3>
                 <p class="text-center lead">Ficou alguma dúvida? Clique nas perguntas abaixo.</p>
                 <div class="mt-3 accordion accordion-flush" id="accordionFlushExample">
                     <div class="accordion-item">
@@ -825,27 +678,27 @@
    
 
     <!-- Rodapé -->
-    <footer id="rodape" class="text-white py-5 bg-dark" >
+    <footer id="rodape" class="home-section home-section--footer text-white py-5">
         <div class="container-fluid">
           <div class="row">
             <div class="col-sm-8 offset-sm-2 col-md-6 offset-md-3 col-lg-4 offset-lg-4">
                 <div class="row">
                     <!-- Logo -->
                     <div class="col-sm-4 mb-2 text-center text-md-start lazy-load">
-                        <img data-src="{{asset('img/home_page/logowhite.png')}}" alt="Logo" class=" img-fluid  mb-2 " style="width: 150px; height: 36.36px ">
+                        <img data-src="{{asset('img/home_page/logowhite.png')}}" alt="Logo" class="img-fluid mb-2 home-footer__logo" loading="lazy" decoding="async" width="150" height="36">
                         <!--<p style="font-size: small">Cnpj: 21.798.932/0001-00</p>-->
                     </div>
 
                     <!-- Redes Sociais -->
                     <div class="col-sm-4 mb-3 text-center">
-                        <a href="https://www.instagram.com/jovemempreendedororg" target="_blank" class="text-white me-3" style="text-decoration: none;" aria-label="Siga-nos no Instagram">
-                        <i class="bi bi-instagram" style="font-size: 1.5rem;"></i>
+                        <a href="https://www.instagram.com/jovemempreendedororg" target="_blank" class="text-white me-3 home-footer__social-link" aria-label="Siga-nos no Instagram">
+                        <i class="bi bi-instagram home-footer__social-icon"></i>
                         </a>
-                        <a href="https://www.youtube.com/@PortalJovemEmpreendedor" target="_blank" class="text-white me-3"  style="text-decoration: none;" aria-label="Siga-nos no Youtube">
-                        <i class="bi bi-youtube" style="font-size: 1.5rem;"></i>
+                        <a href="https://www.youtube.com/@PortalJovemEmpreendedor" target="_blank" class="text-white me-3 home-footer__social-link" aria-label="Siga-nos no Youtube">
+                        <i class="bi bi-youtube home-footer__social-icon"></i>
                         </a>
-                        <a href="https://www.facebook.com/portaljovemempreendedoroficial" target="_blank" class="text-white"  style="text-decoration: none;" aria-label="Siga-nos no Facebook">
-                        <i class="bi bi-facebook" style="font-size: 1.5rem;"></i>
+                        <a href="https://www.facebook.com/portaljovemempreendedoroficial" target="_blank" class="text-white home-footer__social-link" aria-label="Siga-nos no Facebook">
+                        <i class="bi bi-facebook home-footer__social-icon"></i>
                         </a>
                     </div>
 
@@ -870,6 +723,17 @@
           </div>
         </div>
     </footer>
+    <a
+        id="whatsapp_botao"
+        href="{{ $homeWhatsappFloatUrl }}"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="home-whatsapp-float"
+        aria-label="Falar no WhatsApp"
+        style="visibility: hidden;"
+    >
+        <img src="{{ asset('img/home_page/whatsapp.gif') }}" alt="WhatsApp" width="70" height="70" loading="lazy" decoding="async">
+    </a>
     <!-- Modal com Formulário -->
     <div class="modal fade" id="inscricaoModal" tabindex="-1" aria-labelledby="modalLabel" aria-hidden="true">
         <div class="modal-dialog modal-fullscreen">
@@ -1243,227 +1107,7 @@
         /></noscript>
         @endif
         <!-- Fim do Código base para dois Pixels do Facebook -->
-    <style>
-        .img-overlay {
-            right: -7px;
-            position: relative;
-            overflow: hidden;
-            width: 100%;
-            height: 100%px;
-            border-radius: 4px; /* Bordas arredondadas */
-            box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.3); /* Sombra na imagem */
-        }
-
-        .img-gradient-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(to top, rgba(0, 0, 0, 0.8), rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.1));
-            display: flex;
-            align-items: flex-end;
-            padding: 15px;
-            box-sizing: border-box;
-            border-radius: 4px; /* Bordas arredondadas no degradê */
-        }
-
-        .img-title {
-            text-align: left;
-            font-size: 1.2rem;
-            color: white;
-            width: 100%;
-            word-wrap: break-word;
-            margin: 0;
-        }
-
-        .items_curso{
-            font-size: x-small;
-            border-radius: 4px;
-            padding-bottom: 4px;
-            padding-top: 4px;
-            padding-left: 8px;
-        }
-
-       
-        #fundo_certificado {
-            background-image: url("{{asset('img/padrao/fundo_certificado2.webp')}}"); /* Coloque a URL da imagem desejada */
-            background-size: 500px; /* Tamanho original da imagem */
-            background-repeat: repeat; /* Repetir tanto horizontalmente quanto verticalmente */
-            background-position: center;
-            position: relative;
-        }
-
-        
-        #fundo_certificado .bg-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.8);  
-            z-index: 0;
-        }
-       
-
-        #rodape a{
-            text-decoration: none;
-        }
-
-        #professor p{
-            margin-top: 0;
-            margin-bottom: 0;
-        }
-
-        ul {
-        list-style-type: none; /* Remove os marcadores da lista */
-        padding: 0;
-        margin: 0;
-        }
-
-        ul li {
-            padding: 8px 0; /* Espaçamento vertical entre os itens */
-            border-bottom: 1px solid #e0e0e0; /* Linha fina abaixo de cada item */
-        }
-
-        ul li:last-child {
-            border-bottom: none; /* Remove a linha do último item */
-        }
-
-        .promo-info {
-            display: flex;
-            flex-direction: column;
-            align-items: flex-start;
-        }
-
-        .old-price {
-            text-decoration: line-through;        
-            color: #ff6666;
-        }
-
-        .new-price {
-            font-size: 24px;
-            font-weight: bold;
-            color: #fff;
-            margin-top: -10px;
-            margin-bottom: 0;
-        }
-
-        .countdown {
-            font-size: 18px;
-            font-weight: bold;
-            margin-top: -7px;
-            margin-bottom: 0;
-        }
-
-        .video-facade {
-            position: relative;
-            cursor: pointer;
-            overflow: hidden; /* Garante que o conteúdo extra seja cortado */
-            height: 300px;
-        }
-
-        .video-facade img {
-            width: 100%;
-            height: 85%;
-            object-fit: cover; /* Faz o crop da imagem nas extremidades verticais */
-        }
-
-        .play-button {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background-color: rgba(0, 0, 0, 0.5);
-            border-radius: 50%;
-            width: 60px;
-            height: 60px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .play-button i {
-            font-size: 30px;
-            color: white;
-        }
-
-        .modal{
-            z-index: 99999;
-        }
-
-        #beneficios p{
-            color: #505a64;
-        }
-
-        #beneficios .lead{
-            font-size: 1rem;
-        }
-
-        .bi_icone{
-            background-color: #808080c4;
-            color: #fff;
-            font-size: 0.9rem;
-            padding: 7px;
-            border-radius: 50%;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .lazy-load {
-            opacity: 0;
-            transition: opacity 0.5s ease-in; /* Animação de fade-in */
-        }
-
-        .fade-in {
-            opacity: 1; /* Torna o elemento visível com o efeito */
-        }
-
-        /**APENAS MOBILE**/
-        @media (max-width: 768px) {
-
-            /**TAMANHO DA FOTO DE CAPA DOS VÍDEOS**/
-            .video-facade {
-                position: relative;
-                cursor: pointer;
-                overflow: hidden; /* Garante que o conteúdo extra seja cortado */
-                height: 195px;
-            }
-
-            .col-videos {
-                width: 85%;
-            }
-
-            
-
-            .politicas{
-                margin-bottom: 7px
-            }
-
-            .promo-footer.show {
-                opacity: 1;
-                visibility: visible;  
-            }
-
-            .img-overlay img{
-                width: 164px; 
-                height: 237.117px;
-            }
-        }
-        /**APENAS DESKTOP**/
-        @media (min-width: 769px) {
-            #lista_cursos{
-                margin-right: auto !important;
-                margin-left: auto !important;
-                width: 80%;
-            }
-
-            #row_curso_individual{
-                padding-left: 15px;
-                padding-right: 15px;
-            }
-        }
-    </style>
+    <script id="home-course-config" type="application/json">@json($homeConfig)</script>
+    <script defer src="{{ asset('js/home-course.js') }}{{ $homeJsVersion ? '?v=' . $homeJsVersion : '' }}"></script>
   </body>
 </html>

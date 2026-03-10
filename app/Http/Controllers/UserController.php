@@ -5,6 +5,7 @@ use Illuminate\Http\Request;
 use Carbon\Carbon;
 
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
 use App\Models\User;
 
 use App\Http\Controllers\Home_e_cursosController;
@@ -268,10 +269,19 @@ class UserController extends Controller
     //     'formulario_pre_checkout' => 'nullable|boolean',
     //    ]);
 
+        $request->validate([
+            'w3_whatsapp_float_enabled' => 'nullable|boolean',
+            'w3_whatsapp_float_delay_seconds' => 'nullable|in:0,5,10,20,30,45,60,120',
+        ]);
+
         // Atualizar os dados do usuário
         $user = Auth::user();
-        $user->formulario_whatsapp = $request->input('formulario_whatsapp')??null;
-        $user->formulario_pre_checkout = $request->input('formulario_pre_checkout')??null;
+        $user->formulario_whatsapp = $request->has('formulario_whatsapp')
+            ? $request->boolean('formulario_whatsapp')
+            : (bool) ($user->formulario_whatsapp ?? true);
+        $user->formulario_pre_checkout = $request->has('formulario_pre_checkout')
+            ? $request->boolean('formulario_pre_checkout')
+            : (bool) ($user->formulario_pre_checkout ?? true);
         $user->telefone_pessoal_1 = $request->input('telefone_pessoal_1')??null;
         $user->telefone_pessoal_2 = $request->input('telefone_pessoal_2')??null;
         $user->apelido = $request->input('apelido')??null;
@@ -285,10 +295,41 @@ class UserController extends Controller
         $user->dominio_externo = $this->normalizeDomain($request->input('dominio_externo'));
         $user->many_api = $request->input('many_api')??null;
         $user->many_cliente_telefone_id = $request->input('many_cliente_telefone_id')??null;
-        $user->botconversa_webhook = $request->input('botconversa_webhook')??null;
+        if (Schema::hasColumn('users', 'botconversa_webhook')) {
+            $user->botconversa_webhook = $request->input('botconversa_webhook')??null;
+        }
+        if (Schema::hasColumn('users', 'w3_whatsapp_float_enabled')) {
+            $user->w3_whatsapp_float_enabled = $request->boolean('w3_whatsapp_float_enabled', true);
+        }
+        if (Schema::hasColumn('users', 'w3_whatsapp_float_delay_seconds')) {
+            $user->w3_whatsapp_float_delay_seconds = (int) $request->input('w3_whatsapp_float_delay_seconds', 0);
+        }
         $user->save();
 
         // Retornar resposta JSON
         return redirect()->back()->with('success', "Configurações alteradas com sucesso!");
+    }
+
+    public function update_home_page_layout(Request $request)
+    {
+        $validated = $request->validate([
+            'home_page_layout' => 'required|in:padrao,w3',
+            'home_page_destination' => 'required|in:curso,whatsapp',
+            'home_page_whatsapp_flow' => 'required_if:home_page_destination,whatsapp|in:formulario,direto',
+        ]);
+
+        $user = Auth::user();
+        $user->home_page_layout = $validated['home_page_layout'];
+        $user->home_page_destination = $validated['home_page_destination'];
+        $user->home_page_whatsapp_flow = $validated['home_page_whatsapp_flow']
+            ?? ($user->home_page_whatsapp_flow ?: 'formulario');
+        $user->save();
+
+        return response()->json([
+            'success' => 'Página inicial atualizada com sucesso!',
+            'home_page_layout' => $user->home_page_layout,
+            'home_page_destination' => $user->home_page_destination,
+            'home_page_whatsapp_flow' => $user->home_page_whatsapp_flow,
+        ]);
     }
 }

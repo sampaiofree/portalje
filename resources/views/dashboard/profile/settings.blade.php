@@ -8,8 +8,6 @@
     <div class="py-12">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
             
-            <div id="alert_container" class="mb-6"></div>
-
             <form method="POST" action="{{ route('afiliado_configurar_site_post') }}" class="space-y-6">
                 @csrf
 
@@ -60,55 +58,48 @@
                         <div class="mt-6 space-y-4">
                             <div>
                                 <x-input-label for="meta_pixel_id" value="Meta Pixel ID" />
-                                <div class="flex items-center gap-2 mt-1">
-                                    <x-text-input id="meta_pixel_id" name="meta_pixel_id" type="text" class="px-4 py-3 bg-gray-100 focus:bg-white block w-full" :value="old('meta_pixel_id', Auth::user()->meta_pixel_id)" />
-                                    <x-secondary-button type="button" id="btn_testar_pixel">Testar</x-secondary-button>
-                                </div>
-                            </div>
-                             <div>
-                                <x-input-label for="meta_pixel_api" value="Token da API de Conversões (Opcional)" />
-                                <x-text-input id="meta_pixel_api" name="meta_pixel_api" type="text" class="mt-1 px-4 py-3 bg-gray-100 focus:bg-white block w-full" :value="old('meta_pixel_api', Auth::user()->meta_pixel_api)" />
+                                <x-text-input id="meta_pixel_id" name="meta_pixel_id" type="text" class="mt-1 px-4 py-3 bg-gray-100 focus:bg-white block w-full" :value="old('meta_pixel_id', Auth::user()->meta_pixel_id)" />
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Card: ManyChat -->
+                <!-- Card: Botão Flutuante do WhatsApp -->
                 <div class="p-4 sm:p-8 bg-white shadow sm:rounded-lg">
                     <div class="max-w-xl">
-                        <h2 class="text-lg font-medium text-gray-900">Integração com ManyChat</h2>
-                        <p class="mt-1 text-sm text-gray-600">Configure suas credenciais para automações com o ManyChat.</p>
-                        
+                        <h2 class="text-lg font-medium text-gray-900">Botão flutuante do WhatsApp</h2>
+                        <p class="mt-1 text-sm text-gray-600">Configuração aplicada à home (/) e /cursos, além da W3 (/w3 e /w3/{cidade}).</p>
+
                         <div class="mt-6 space-y-4">
                             <div>
-                                <x-input-label for="many_api" value="Token da API" />
-                                <x-text-input id="many_api" name="many_api" type="text" class="mt-1 px-4 py-3 bg-gray-100 focus:bg-white block w-full" :value="old('many_api', Auth::user()->many_api)" placeholder="Cole sua chave de API aqui" />
+                                <x-input-label for="w3_whatsapp_float_enabled" value="Exibir botão flutuante" />
+                                <select
+                                    id="w3_whatsapp_float_enabled"
+                                    name="w3_whatsapp_float_enabled"
+                                    class="mt-1 px-4 py-3 bg-gray-100 focus:bg-white block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
+                                >
+                                    <option value="1" @selected((int) old('w3_whatsapp_float_enabled', (int) (Auth::user()->w3_whatsapp_float_enabled ?? 1)) === 1)>Sim</option>
+                                    <option value="0" @selected((int) old('w3_whatsapp_float_enabled', (int) (Auth::user()->w3_whatsapp_float_enabled ?? 1)) === 0)>Não</option>
+                                </select>
                             </div>
                             <div>
-                                <x-input-label for="many_cliente_telefone_id" value="ID do Campo 'cliente_telefone_id'" />
-                                <x-text-input id="many_cliente_telefone_id" name="many_cliente_telefone_id" type="text" class="mt-1 px-4 py-3 bg-gray-100 focus:bg-white block w-full" :value="old('many_cliente_telefone_id', Auth::user()->many_cliente_telefone_id)" placeholder="Cole o ID do campo customizado" />
+                                <x-input-label for="w3_whatsapp_float_delay_seconds" value="Tempo para aparecer" />
+                                <select
+                                    id="w3_whatsapp_float_delay_seconds"
+                                    name="w3_whatsapp_float_delay_seconds"
+                                    class="mt-1 px-4 py-3 bg-gray-100 focus:bg-white block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
+                                >
+                                    @php
+                                        $w3DelayAtual = (int) old('w3_whatsapp_float_delay_seconds', (int) (Auth::user()->w3_whatsapp_float_delay_seconds ?? 0));
+                                        $w3DelayOptions = [0, 5, 10, 20, 30, 45, 60, 120];
+                                    @endphp
+                                    @foreach($w3DelayOptions as $delay)
+                                        <option value="{{ $delay }}" @selected($w3DelayAtual === $delay)>
+                                            {{ $delay === 0 ? 'Imediatamente' : $delay . ' segundos' }}
+                                        </option>
+                                    @endforeach
+                                </select>
                             </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Card: BotConversa -->
-                <div class="p-4 sm:p-8 bg-white shadow sm:rounded-lg">
-                    <div class="max-w-xl">
-                        <h2 class="text-lg font-medium text-gray-900 flex items-center">
-                            Integração com BotConversa
-                            <a href="https://youtu.be/KD2bZ1miXCc" target="_blank" class="ml-2 text-blue-500 hover:text-blue-700">
-                                <i class="ri-question-fill text-xl"></i>
-                            </a>
-                        </h2>
-                        <p class="mt-1 text-sm text-gray-600">
-                            Configure o webhook para integração com o BotConversa. 
-                            <a href="https://drive.google.com/drive/folders/11NSQkACBTocGxk6DclMnBOiP3s2Arc_T?usp=drive_link" target="_blank" class="underline text-blue-600 hover:text-blue-800">Veja os materiais e vídeo aqui</a>.
-                        </p>
-                        
-                        <div class="mt-6">
-                            <x-input-label for="botconversa_webhook" value="URL do Webhook" />
-                            <x-text-input id="botconversa_webhook" name="botconversa_webhook" type="text" class="mt-1 px-4 py-3 bg-gray-100 focus:bg-white block w-full" :value="old('botconversa_webhook', Auth::user()->botconversa_webhook)" placeholder="https://seu.botconversa.com.br/webhook" />
                         </div>
                     </div>
                 </div>
@@ -136,48 +127,6 @@
                             feedbackDiv.textContent = '';
                         }
                         this.value = sanitizedValue;
-                    });
-                }
-                
-                // Lógica para o botão de Testar Pixel
-                const btnTestarPixel = document.getElementById('btn_testar_pixel');
-                if (btnTestarPixel) {
-                    btnTestarPixel.addEventListener('click', function() {
-                        const pixelId = document.getElementById('meta_pixel_id').value;
-                        const pixelApi = document.getElementById('meta_pixel_api').value;
-                        const alertContainer = document.getElementById('alert_container');
-                        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-
-                        alertContainer.innerHTML = '<p class="text-sm text-gray-500">Testando...</p>';
-
-                        fetch('{{ route('afiliado_testar_pixel') }}', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-CSRF-TOKEN': csrfToken,
-                                'Accept': 'application/json'
-                            },
-                            body: JSON.stringify({
-                                meta_pixel_id: pixelId,
-                                meta_pixel_api: pixelApi
-                            })
-                        })
-                        .then(response => response.json())
-                        .then(data => {
-                            let alertClass, message;
-                            if (data.original && data.original.error) {
-                                alertClass = 'bg-red-100 border-red-500 text-red-700';
-                                message = `<strong>Erro da API da Meta:</strong> ${data.original.error}`;
-                            } else {
-                                alertClass = 'bg-green-100 border-green-500 text-green-700';
-                                message = '<strong>Sucesso!</strong> O evento de teste foi enviado corretamente.';
-                            }
-                            alertContainer.innerHTML = `<div class="${alertClass} border-l-4 p-4" role="alert">${message}</div>`;
-                        })
-                        .catch(error => {
-                            console.error('Erro:', error);
-                            alertContainer.innerHTML = `<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4" role="alert">Ocorreu um erro de comunicação ao testar o pixel.</div>`;
-                        });
                     });
                 }
             });

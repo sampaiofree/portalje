@@ -22,6 +22,7 @@ use App\Http\Controllers\ViajandinhoController;
 use App\Http\Controllers\OpenAIController;
 use App\Http\Controllers\FormacaoEmpresarialController;
 use App\Http\Controllers\DadosPortalController;
+use App\Http\Controllers\CupomController;
 use App\Exports\TabelaExport;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Http\Controllers\Auth\LoginController;
@@ -159,6 +160,7 @@ Route::middleware(['auth', 'verified', 'minha_jornada'])->group(function () {
         Route::post('/leads/alterar_atendimento', [LeadsController::class, 'alterar_atendimento'])->name('alterar_atendimento'); //LEADS ALTERAR ATENDIMENTO
         Route::post('/dominio', [UserController::class, 'update_dominio'])->name('alterar_dominio'); //MENU > MINHA ESTRUTURA > MEU SITE || SUBMETENDO O FORMULÁRIO
         Route::post('/whatsapp_atendimento', [UserController::class, 'update_whatsapp_atendimento'])->name('alterar_whatsapp_atendimento'); //MENU > MINHA ESTRUTURA > WHATSAPP DE ATENDIMENTO || SUBMETENDO O FORMULÁRIO      
+        Route::post('/home_page_layout', [UserController::class, 'update_home_page_layout'])->name('alterar_home_page_layout');
         Route::delete('/whatsapp_atendimento/{id}', [UserController::class, 'destroy_whatsapp_atendimento'])->name('excluir_whatsapp_atendimento');
         Route::post('/afiliados_cadastrar_curso', [CursoController::class, 'afiliados_cadastrar_curso_ref'])->name('cadastrar_codigo_ref'); //MENU > MINHA ESTRUTURA > CURSOS || ENVIO DO FORMULÁRIO
         Route::post('/configurar_site', [UserController::class, 'afiliado_configurar_site'])->name('afiliado_configurar_site_post'); //MENU > MINHA ESTRUTURA > CONFIGURAÇÕES DO SITE || SUBMETENDO O FORMULÁRIO
@@ -212,6 +214,13 @@ Route::prefix('administrador')->group(function () {
         // Chame seu controlador ou lógica aqui
         return app(App\Http\Controllers\AdminController::class)->dashboard();
     })->name('dashboard_adm');
+
+    Route::middleware(['auth', 'check.admin'])->group(function () {
+        Route::get('/cupons', [CupomController::class, 'index'])->name('admin.cupons.index');
+        Route::post('/cupons', [CupomController::class, 'store'])->name('admin.cupons.store');
+        Route::put('/cupons/{cupom}', [CupomController::class, 'update'])->name('admin.cupons.update');
+        Route::delete('/cupons/{cupom}', [CupomController::class, 'destroy'])->name('admin.cupons.destroy');
+    });
 
     //AULAS GRATUITAS
     Route::get('/aulas_gratuitas/cadastrar', function () { //CURSOS
@@ -341,6 +350,18 @@ Route::prefix('viajandinho')->group(function () {
 
 //PÁGINA W3
 Route::get('/w3/{cidade?}', [Home_e_cursosController::class, 'carvalho_whatsapp'])->name('w3');
+
+//PÁGINA W4 (LEGADO) -> REDIRECIONA PARA W3
+Route::get('/w4/{cidade?}', function (Request $request, $cidade = null) {
+    $url = route('w3', ['cidade' => $cidade]);
+    $queryString = $request->getQueryString();
+
+    if (!empty($queryString)) {
+        $url .= '?' . $queryString;
+    }
+
+    return redirect()->to($url, 301);
+})->name('w4.legacy');
 
 //ANTIGA HOME PAGE
 //Route::get('/', [Home_e_cursosController::class, 'index'])->name('w3');

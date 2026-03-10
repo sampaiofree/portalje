@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\Meta_apiController;
 
 use App\Models\Curso;
+use App\Models\Cupom;
 use App\Models\User;
 use App\Models\Dados_portal;
 use Illuminate\Support\Facades\Schema;
@@ -191,9 +192,16 @@ class Home_e_cursosController extends Controller
         $curso->link_checkout_basico = $dados['link_checkout_completo'].$desconto.$query.$src."&offDiscount=50OFF";
         $curso->link_checkout_certificado = $dados['link_checkout_completo'].$desconto.$query.$src."&offDiscount=80OFF";
         $curso->meta_pixel_id = $dados['meta_pixel_id'];
-        $curso->formulario = true; //$dados['formulario_pre_checkout'];
+        $curso->formulario = (bool)($dados['formulario_pre_checkout'] ?? true);
         $curso->user_id = $dados['user_id'];
         $curso->affiliate_code = $dados['affiliate_code'];
+        $curso->modo_precos = 'padrao';
+        $curso->cupom_principal_id = null;
+        $curso->cupom_secundario_id = null;
+        $curso->cupom_principal_codigo = null;
+        $curso->cupom_secundario_codigo = null;
+
+        $this->aplicarConfiguracaoDePrecosPorCupom($curso, $dados, !empty($desconto_banner));
         $curso->origem = 'checkout_completo';
 
         $curso->cidade = request()->get('c') ?? null;
@@ -202,10 +210,15 @@ class Home_e_cursosController extends Controller
         //PAGINA DIRETO PARA O WHATSAPP
         
         if($desconto AND $desconto =='w'){
-            $curso->formulario = true; //$dados['formulario_whatsapp'];
-            if($dados['formulario_whatsapp']){$zap_complemento = "meu nome é {nome},";}else{$zap_complemento = '';}
+            $curso->formulario = (bool)($dados['formulario_pre_checkout'] ?? true);
+            if($curso->formulario){$zap_complemento = "meu nome é {nome},";}else{$zap_complemento = '';}
             $curso->link_checkout_completo = "https://wa.me/$curso->whatsapp_atendimento?text=Olá, $zap_complemento quero fazer minha inscrição no curso de $curso->titulo";
             $curso->origem = 'whatsapp';
+        }
+
+        $lpView = config('lp.course_view', 'novapagina');
+        if (!view()->exists($lpView)) {
+            $lpView = 'novapagina';
         }
 
         if(request()->get('g')=='1'){ 
@@ -216,7 +229,7 @@ class Home_e_cursosController extends Controller
             return view('cursos.3ofertas', compact('curso', 'desconto_banner')); 
         }elseif(request()->getHost() === 'jovemempreendedor.org'){
             //PÁGINA DO DOMINIO JOVEMEMPREENDEDOR.ORG
-            return view('novapagina', compact('curso', 'desconto_banner'));
+            return view($lpView, compact('curso', 'desconto_banner'));
         }elseif(request()->get('ga')=='1'){ 
             //PAGINA DAS AULAS GRATUITAS PAGINA TESTE
             return view('cursos.curso_gratuito_a', compact('curso', 'desconto_banner'));
@@ -225,7 +238,7 @@ class Home_e_cursosController extends Controller
             return view('novapagina2', compact('curso', 'desconto_banner')); 
         }else{
             //PAGINA OFICIAL DOS AFILIADOS
-            return view('novapagina', compact('curso', 'desconto_banner')); 
+            return view($lpView, compact('curso', 'desconto_banner')); 
         }   
         
         
@@ -257,6 +270,9 @@ class Home_e_cursosController extends Controller
                     'formulario_pre_checkout' => $verificar->formulario_pre_checkout,
                     'formulario_whatsapp' => $verificar->formulario_whatsapp,
                     'user_id' => $verificar->id,
+                    'modo_precos' => 'padrao',
+                    'cupom_principal_id' => null,
+                    'cupom_secundario_id' => null,
                     
                 ];
 
@@ -264,8 +280,19 @@ class Home_e_cursosController extends Controller
                     $dados_codigo_ref = Codigo_ref::where('curso_id', $curso->id)->where('user_id', $verificar->id)->first();
                     if(!$dados_codigo_ref){return false;}
                     $codigo_ref = $dados_codigo_ref['codigo_ref'];
+                    $modoPrecos = $dados_codigo_ref['modo_precos'] ?? 'padrao';
+                    if (!in_array($modoPrecos, ['padrao', 'um_preco', 'dois_precos'], true)) {
+                        $modoPrecos = 'padrao';
+                    }
+
                     $dados['link_checkout_completo'] = "https://go.hotmart.com/$codigo_ref?ap=$curso->codigo_afiliado_plano_completo";
                     $dados['affiliate_code'] = $dados_codigo_ref['codigo_ref'];
+                    $dados['modo_precos'] = $modoPrecos;
+                    $dados['cupom_principal_id'] = !empty($dados_codigo_ref['cupom_principal_id']) ? (int) $dados_codigo_ref['cupom_principal_id'] : null;
+                    $dados['cupom_secundario_id'] = !empty($dados_codigo_ref['cupom_secundario_id']) ? (int) $dados_codigo_ref['cupom_secundario_id'] : null;
+                    $dados['formulario_pre_checkout'] = isset($dados_codigo_ref['formulario_pre_checkout'])
+                        ? (bool) $dados_codigo_ref['formulario_pre_checkout']
+                        : (bool) $dados['formulario_pre_checkout'];
                 }
 
                 return $dados;
@@ -274,16 +301,24 @@ class Home_e_cursosController extends Controller
         }
 
         if($ref && Schema::hasTable('codigo_ref') && Schema::hasTable('users')){
-          $ref = Codigo_ref::where('codigo_ref', $ref)->join('users', 'users.id', '=', 'codigo_ref.user_id')->select('codigo_ref.*','users.*', )->first();
+          $ref = Codigo_ref::where('codigo_ref', $ref)
+              ->join('users', 'users.id', '=', 'codigo_ref.user_id')
+              ->select('codigo_ref.*', 'users.*', 'codigo_ref.formulario_pre_checkout as codigo_ref_formulario_pre_checkout')
+              ->first();
         }
 
         $refUserId = is_object($ref) ? ($ref->id ?? null) : (is_array($ref) ? ($ref['id'] ?? null) : null);
         $refWhatsapp = is_object($ref) ? ($ref->whatsapp_atendimento ?? null) : (is_array($ref) ? ($ref['whatsapp_atendimento'] ?? null) : null);
         $refWhatsappTempo = is_object($ref) ? ($ref->whatsapp_atendimento_tempo ?? null) : (is_array($ref) ? ($ref['whatsapp_atendimento_tempo'] ?? null) : null);
         $refMetaPixel = is_object($ref) ? ($ref->meta_pixel_id ?? null) : (is_array($ref) ? ($ref['meta_pixel_id'] ?? null) : null);
-        $refFormularioPreCheckout = is_object($ref) ? ($ref->formulario_pre_checkout ?? null) : (is_array($ref) ? ($ref['formulario_pre_checkout'] ?? null) : null);
+        $refFormularioPreCheckout = is_object($ref)
+            ? ($ref->codigo_ref_formulario_pre_checkout ?? $ref->formulario_pre_checkout ?? null)
+            : (is_array($ref) ? ($ref['codigo_ref_formulario_pre_checkout'] ?? $ref['formulario_pre_checkout'] ?? null) : null);
         $refFormularioWhatsapp = is_object($ref) ? ($ref->formulario_whatsapp ?? null) : (is_array($ref) ? ($ref['formulario_whatsapp'] ?? null) : null);
         $refCodigo = is_object($ref) ? ($ref->codigo_ref ?? null) : (is_array($ref) ? ($ref['codigo_ref'] ?? null) : null);
+        $refModoPrecosRaw = is_object($ref) ? ($ref->modo_precos ?? 'padrao') : (is_array($ref) ? ($ref['modo_precos'] ?? 'padrao') : 'padrao');
+        $refCupomPrincipalIdRaw = is_object($ref) ? ($ref->cupom_principal_id ?? null) : (is_array($ref) ? ($ref['cupom_principal_id'] ?? null) : null);
+        $refCupomSecundarioIdRaw = is_object($ref) ? ($ref->cupom_secundario_id ?? null) : (is_array($ref) ? ($ref['cupom_secundario_id'] ?? null) : null);
 
         $whatsappSelecionadoRef = ['id' => null, 'whatsapp' => null];
         if ($refUserId && Schema::hasTable('users')) {
@@ -302,7 +337,10 @@ class Home_e_cursosController extends Controller
             'formulario_pre_checkout' => $refFormularioPreCheckout ?? $dados_portal['formulario_pre_checkout'],
             'formulario_whatsapp' => $refFormularioWhatsapp ?? $dados_portal['formulario_whatsapp'],
             'user_id' => $refUserId,
-            'affiliate_code' => $refCodigo
+            'affiliate_code' => $refCodigo,
+            'modo_precos' => in_array($refModoPrecosRaw, ['padrao', 'um_preco', 'dois_precos'], true) ? $refModoPrecosRaw : 'padrao',
+            'cupom_principal_id' => !empty($refCupomPrincipalIdRaw) ? (int) $refCupomPrincipalIdRaw : null,
+            'cupom_secundario_id' => !empty($refCupomSecundarioIdRaw) ? (int) $refCupomSecundarioIdRaw : null,
         ];
 
         if($curso){
@@ -378,12 +416,52 @@ class Home_e_cursosController extends Controller
         $dados = $this->dadosusuario_home($request->getHost(), $afiliadoID);
         if (!$dados) {return redirect()->away('https://portalje.org');}
 
+        $isRootRequest = $request->getPathInfo() === '/';
+        $homePageLayout = $dados['dados']['home_page_layout'] ?? 'padrao';
+        $homePageDestination = in_array((string) ($dados['dados']['home_page_destination'] ?? 'curso'), ['curso', 'whatsapp'], true)
+            ? (string) $dados['dados']['home_page_destination']
+            : 'curso';
+        $homePageWhatsappFlow = in_array((string) ($dados['dados']['home_page_whatsapp_flow'] ?? 'formulario'), ['formulario', 'direto'], true)
+            ? (string) $dados['dados']['home_page_whatsapp_flow']
+            : 'formulario';
+        if ($isRootRequest && !empty($dados['dados']['afiliado']) && $homePageLayout === 'w3') {
+            $afiliadoUser = !empty($dados['dados']['user_id'])
+                ? User::find((int) $dados['dados']['user_id'])
+                : null;
+
+            if ($afiliadoUser) {
+                $cidadeLayout = $cidade_desconto ?? request()->get('c') ?? null;
+                $pagina = $this->dados_da_pagina($afiliadoUser, $cidadeLayout);
+                $modoCardsW3 = $this->resolverModoCardsW3($request, null, $homePageDestination);
+                $pagina['cards_destino'] = $modoCardsW3;
+                $usarFormularioWhatsappNaHomeW3 = !($modoCardsW3 === 'whatsapp' && $homePageWhatsappFlow === 'direto');
+                $pagina['whatsapp_requires_form'] = $usarFormularioWhatsappNaHomeW3;
+                $cursos = $this->listar_cursos($request, $afiliadoUser, 'w3', $modoCardsW3, $usarFormularioWhatsappNaHomeW3);
+
+                $temCursoVisivel = collect($cursos)->contains(function ($curso) {
+                    return !empty($curso->publicado) && !empty($curso->mostrar_na_pagina);
+                });
+
+                if (!$temCursoVisivel) {
+                    return redirect()->away('https://jovemempreendedor.org/');
+                }
+
+                return view('home_e_cursos.w3', compact('cursos', 'pagina'));
+            }
+        }
+
         //PEGAR TODOS OS PARAMETROS PARA COLOCAR NA URL    
         $info = $dados['dados'];
         $info['parametros'] = isset($query) ? $query.$src : $src;
 
         //CARVALHO WHATSAPP
-        $info['whatsapp'] = request()->get('w') ?? null;
+        if (request()->has('w')) {
+            $info['whatsapp'] = request()->get('w');
+        } elseif ($isRootRequest && $homePageDestination === 'whatsapp') {
+            $info['whatsapp'] = '1';
+        } else {
+            $info['whatsapp'] = null;
+        }
         if((strlen(request()->get('t')) > 10)){$info['whatsapp_atendimento']=request()->get('t');}
         $info['whatsapp'] = $watsapp_curso ?? $info['whatsapp'];
         
@@ -404,10 +482,12 @@ class Home_e_cursosController extends Controller
         
 
         /**DEFINIR SE TERÁ OU NÃO FORMULÁRIO WHATSAPP**/
-        if($info['whatsapp']){
-            $info['formulario'] = true; 
-        }else{
+        if (!$info['whatsapp']) {
             $info['formulario'] = false;
+        } elseif ($isRootRequest && $homePageWhatsappFlow === 'direto') {
+            $info['formulario'] = false;
+        } else {
+            $info['formulario'] = true;
         }
         $cursos = $dados['cursos']; 
         
@@ -445,13 +525,32 @@ class Home_e_cursosController extends Controller
             }
             
             if($verificar){
+                $whatsappSelecionado = $this->selecionarWhatsappAtendimento($verificar);
+                $whatsappAtendimento = $whatsappSelecionado['whatsapp'] ?? $verificar->whatsapp_atendimento;
+                $whatsappDelaySeconds = isset($verificar->w3_whatsapp_float_delay_seconds)
+                    ? max(0, (int) $verificar->w3_whatsapp_float_delay_seconds)
+                    : 0;
+                $whatsappMostrar = isset($verificar->w3_whatsapp_float_enabled)
+                    ? (bool) $verificar->w3_whatsapp_float_enabled
+                    : true;
 
                 //DADOS DO AFILIADO
                 $dados['dados'] = [
                     'afiliado' => true,
-                    'whatsapp_atendimento' => $verificar->whatsapp_atendimento,
-                    'whatsapp_atendimento_tempo' => $verificar->whatsapp_atendimento_tempo,
+                    'whatsapp_atendimento' => $whatsappAtendimento,
+                    'whatsapp_atendimento_id' => $whatsappSelecionado['id'] ?? null,
+                    'whatsapp_atendimento_tempo' => $whatsappDelaySeconds,
+                    'whatsapp_mostrar' => $whatsappMostrar,
                     'meta_pixel_id' => $verificar->meta_pixel_id,
+                    'home_page_layout' => in_array((string) $verificar->home_page_layout, ['padrao', 'w3'], true)
+                        ? (string) $verificar->home_page_layout
+                        : 'padrao',
+                    'home_page_destination' => in_array((string) $verificar->home_page_destination, ['curso', 'whatsapp'], true)
+                        ? (string) $verificar->home_page_destination
+                        : 'curso',
+                    'home_page_whatsapp_flow' => in_array((string) $verificar->home_page_whatsapp_flow, ['formulario', 'direto'], true)
+                        ? (string) $verificar->home_page_whatsapp_flow
+                        : 'formulario',
                     'formulario_pre_checkout' => $verificar->formulario_pre_checkout,
                     'formulario_whatsapp' => $verificar->formulario_whatsapp,
                     'user_id' => $verificar->id,
@@ -480,8 +579,12 @@ class Home_e_cursosController extends Controller
         $dados['dados'] = [
             'afiliado' => false,
             'whatsapp_atendimento' => $dados_portal['telefone_suporte_alunos'],
-            'whatsapp_atendimento_tempo' => $dados_portal['whatsapp_atendimento_tempo'],
+            'whatsapp_atendimento_tempo' => 0,
+            'whatsapp_mostrar' => true,
             'meta_pixel_id' => null,
+            'home_page_layout' => 'padrao',
+            'home_page_destination' => 'curso',
+            'home_page_whatsapp_flow' => 'formulario',
             'formulario_pre_checkout' => $dados_portal['formulario_pre_checkout'],
             'formulario_whatsapp' => $dados_portal['formulario_whatsapp'],
             'user_id' => null,
@@ -550,11 +653,23 @@ class Home_e_cursosController extends Controller
 
         //DADOS DA PÁGINA
         $pagina = $this->dados_da_pagina($dados_afiliado, $cidade);
+        $modoCardsW3 = $this->resolverModoCardsW3($request, $cidade);
+        $pagina['cards_destino'] = $modoCardsW3;
+        $pagina['whatsapp_requires_form'] = true;
 
         //LISTAR OS CURSOS 
         
-        $cursos = $this->listar_cursos($request, $dados_afiliado, 'w3');
-            return view('home_e_cursos.w3', compact('cursos', 'pagina')); 
+        $cursos = $this->listar_cursos($request, $dados_afiliado, 'w3', $modoCardsW3);
+
+        $temCursoVisivel = collect($cursos)->contains(function ($curso) {
+            return !empty($curso->publicado) && !empty($curso->mostrar_na_pagina);
+        });
+
+        if (!$temCursoVisivel) {
+            return redirect()->away('https://jovemempreendedor.org/');
+        }
+
+        return view('home_e_cursos.w3', compact('cursos', 'pagina'));
         
         /*if($w=='w3'){
             $cursos = $this->listar_cursos($request, $dados_afiliado, 'w3');
@@ -605,7 +720,7 @@ class Home_e_cursosController extends Controller
         $user_id = null;
         $botao_whatsapp_flutuante = null;
         $botao_whatsapp_flutuante_nome_curso = "os cursos do Programa Jovem Empreendedor";
-        $form_lead_titulo = "Para receber mais informações, preencha o formulário abaixo:";
+        $form_lead_titulo = "Para receber mais informações, preencha o formulário abaixo.";
         $form_lead_botao = "Saiba mais do WhatsApp";
         
 
@@ -631,7 +746,12 @@ class Home_e_cursosController extends Controller
             $whatsappSelecionado = $this->selecionarWhatsappAtendimento($user);
             $whatsapp_atendimento = $whatsappSelecionado['whatsapp'] ?? $user->whatsapp_atendimento ?? $this->dados_portal['telefone_suporte_alunos'];
             $whatsapp_atendimento_id = $whatsappSelecionado['id'] ?? null;
-            $whatsapp_atendimento_tempo = $user->whatsapp_atendimento_tempo;
+            $whatsapp_atendimento_tempo = isset($user->w3_whatsapp_float_delay_seconds)
+                ? (int) $user->w3_whatsapp_float_delay_seconds
+                : (int) ($user->whatsapp_atendimento_tempo ?? 0);
+            $whatsapp_mostrar = isset($user->w3_whatsapp_float_enabled)
+                ? (bool) $user->w3_whatsapp_float_enabled
+                : true;
             $formulario_whatsapp = $user->formulario_whatsapp;
             $formulario_pre_checkout = $user->formulario_pre_checkout;
             $pidel_id = $user->meta_pixel_id;
@@ -639,18 +759,16 @@ class Home_e_cursosController extends Controller
             $dados =  $this->dados_portal;
             $whatsapp_atendimento =  $dados['telefone_suporte_alunos'];
             $whatsapp_atendimento_id = null;
-            $whatsapp_atendimento_tempo = $dados['whatsapp_atendimento_tempo'];
+            $whatsapp_atendimento_tempo = (int) ($dados['whatsapp_atendimento_tempo'] ?? 0);
+            $whatsapp_mostrar = true;
             $formulario_whatsapp = $dados['formulario_whatsapp'];
             $formulario_pre_checkout = $dados['formulario_pre_checkout'];
             $pidel_id = null;
         }
 
-        $whatsapp_mostrar  = true; //MOSTRAR BOTÃO FLUTUANTE DO WHATSAPP
-
         if($nome_cidade){
             $headline = "27 Bolsas de Estudo liberadas para <span style='color: rgb(13, 110, 253) !important;'>$nome_cidade</span>";
             $headline_sub = "Escolha seu curso para falar com o nosso consultor pelo WhatsApp";
-            $whatsapp_mostrar = false; //MOSTRAR BOTÃO FLUTUANTE DO WHATSAPP
             $headline_botao = 'Escolher o meu curso agora!';
         }elseif($curso){
             $headline = $curso->titulo;
@@ -658,7 +776,7 @@ class Home_e_cursosController extends Controller
             $headline_botao = 'Quero saber mais';
             $botao_whatsapp_flutuante_nome_curso = "sobre o curso de $curso->titulo";
             $curso_id = $curso->id;
-            $form_lead_titulo = "Antes de prosseguir, preecha os dados abaixo!";
+            $form_lead_titulo = "Para receber mais informações, preencha o formulário abaixo.";
             $form_lead_botao = "Continuar";
         }else{
             $headline = "Bolsas de Estudo de até 85%";
@@ -678,7 +796,6 @@ class Home_e_cursosController extends Controller
             "headline"=>$headline,
             "headline_sub"=>$headline_sub,
             "headline_botao"=> $headline_botao,
-            "whatsapp_mostrar"=> true,
             "whatsapp_atendimento_tempo"=> $whatsapp_atendimento_tempo,
             "whatsapp"=>$whatsapp_atendimento,
             "whatsapp_atendimento_id" => $whatsapp_atendimento_id,
@@ -692,8 +809,10 @@ class Home_e_cursosController extends Controller
         ];
     }
 
-    public function listar_cursos($request, $user = null, $pagina = 'home'){
+    public function listar_cursos($request, $user = null, $pagina = 'home', $modoCardsW3 = null, $usarFormularioWhatsapp = true){
         
+        $modoCardsW3 = in_array($modoCardsW3, ['curso', 'whatsapp'], true) ? $modoCardsW3 : 'curso';
+
         $src = "";
         $sck = "";
         if($request->query('src')!== null){$src = "&src=".$request->query('src');}
@@ -747,6 +866,16 @@ class Home_e_cursosController extends Controller
                             $curso->codigo_ref = $codigo_ref->codigo_ref;
                             $curso->codigo_ref_id = $codigo_ref->id;
                             $curso->mostrar_curso = $codigo_ref->mostrar_curso;
+                            $modoPrecos = $codigo_ref->modo_precos ?? 'padrao';
+                            if (!in_array($modoPrecos, ['padrao', 'um_preco', 'dois_precos'], true)) {
+                                $modoPrecos = 'padrao';
+                            }
+                            $curso->modo_precos = $modoPrecos;
+                            $curso->cupom_principal_id = !empty($codigo_ref->cupom_principal_id) ? (int) $codigo_ref->cupom_principal_id : null;
+                            $curso->cupom_secundario_id = !empty($codigo_ref->cupom_secundario_id) ? (int) $codigo_ref->cupom_secundario_id : null;
+                            $curso->formulario_pre_checkout = isset($codigo_ref->formulario_pre_checkout)
+                                ? (bool) $codigo_ref->formulario_pre_checkout
+                                : true;
                             $cursoEncontrado = true;
                             break;
                         }
@@ -759,6 +888,10 @@ class Home_e_cursosController extends Controller
                 $curso->codigo_ref = false;
                 $curso->codigo_ref_id = false;
                 $curso->mostrar_curso = false;
+                $curso->modo_precos = 'padrao';
+                $curso->cupom_principal_id = null;
+                $curso->cupom_secundario_id = null;
+                $curso->formulario_pre_checkout = true;
             }
             
             //DETERMINAR SE CADA CURSO IRÁ APARECER NA PÁGINA OU NÃO
@@ -812,72 +945,26 @@ class Home_e_cursosController extends Controller
                         <img src=\"$src\" alt=\"$curso->titulo\" class=\"img-fluid rounded-4 border border-1\">
                     </a>";
                 }*/
-            }elseif($pagina == 'w3' OR $pagina == 'w4'){ //PÁGINAS QUE VÃO PARA O WHATSAPP
-                $src = asset('storage/'.$curso->capa_vertical);
-                $curso->headline = str_replace('"','', $curso->headline);
-                $curso->headline = $this->limitar_string($curso->headline);
-                
-                $imagem_curso = "
-                <div class=\" my-2 pb-3 border-bottom\">
-                    <div class=\"row\">
-                        <div class=\"col-4\">
-                            <img class=\"align-self-top w-100 rounded-start\" src=\"$src\" alt=\"$curso->titulo\">
-                        </div>
+            }elseif($pagina == 'w3' OR $pagina == 'w4'){
+                $curso->card_image = asset('storage/' . $curso->capa_vertical);
+                $curso->card_headline = $this->limitar_string(str_replace('"', '', (string) $curso->headline));
+                $curso->card_vagas = $vaga;
 
-                        <div class=\"col-8 align-self-top mb-0 pb-0\">
-                            <h6 class=\"tituloCurso mb-0 pb-0 text-dark\" style=\"line-height: 1.1;\">$curso->titulo</h6>
-                            <p class=\"my-0 text-dark\" style=\"font-size: 0.7rem;;line-height: 1.1;\">$curso->headline</p>
-                            <div class=\"my-0\">
-                                <p class=\"text-info my-0 d-flex align-items-center\" style=\"font-size: 0.7rem;;\"><span class=\"ri-time-fill mr-1\" style=\"font-size: 0.7rem;;\"></span>Até $curso->horas_completo horas</p>
-                                <p class=\"text-info my-0 d-flex align-items-center\" style=\"font-size: 0.7rem;;\"><span class=\"ri-team-fill mr-1\" style=\"font-size: 0.7rem;;\"></span>$curso->numero_alunos Alunos</p>
-                            </div>
-                            <div class=\"my-0\">
-                                <div class=\"rating\" style=\"font-size: x0.7rem;;\">
-                                    <span class=\"ri-star-s-fill text-warning\" style=\"font-size: x0.7rem;;\"></span>
-                                    <span class=\"ri-star-s-fill text-warning\" style=\"font-size: x0.7rem;;\"></span>
-                                    <span class=\"ri-star-s-fill text-warning\" style=\"font-size: x0.7rem;;\"></span>
-                                    <span class=\"ri-star-s-fill text-warning\" style=\"font-size: x0.7rem;;\"></span>
-                                    <span class=\"ri-star-s-fill text-warning\" style=\"font-size: x0.7rem;;\"></span>
-                                    <span class=\"rating-count text-warning\" style=\"font-size: 0.7rem;;\"><strong>$curso->nota_avaliacao/5</strong></span>
-                                </div>
-                            </div>
-                            <div class=\"my-0\">
-                                <span class=\"badge bg-danger rounded-pill px-2 py-1 text-white vaga\" style=\"font-size: xx-small;\">$vaga vagas restantes</span>
-                            </div>
-                            <p class=\"btn pt-0 mb-0 pb-0 text-white rounded rounded-3\" style=\"font-size:0.8rem; background-color:#0d6efd;\"><strong>Saiba mais</strong></p>
-                        </div>
-                    </div>
-                </div>
-                    
-                ";
-
-                $curso->tag_a = "
-                    <a class='lead_navegador' data-bs-toggle=\"modal\" data-bs-target=\"#modal_lead\" role=\"button\"
-                    data-link=\"https://wa.me/$whatsApp?text=Olá, meu nome é {nome} e quero saber mais sobre o curso de $curso->titulo\" 
-                    data-curso=\"$curso->id\" 
-                    data-user=\"$data_user\"
-                    data-origem=\"whatsapp\"
-                    data-whatsapp-atendimento-id=\"$whatsAppAtendimentoId\"
-                    style='text-decoration: none;'>
-                        $imagem_curso                    
-                    </a>";
-
-                /*if($formulario_whatsapp){                    
-                    $curso->tag_a = "
-                    <a class='lead_navegador' data-bs-toggle=\"modal\" data-bs-target=\"#modal_lead\" role=\"button\"
-                    data-link=\"https://wa.me/$whatsApp?text=Olá, meu nome é {nome} e quero saber mais sobre o curso de $curso->titulo\" 
-                    data-curso=\"$curso->id\" 
-                    data-user=\"$data_user\"
-                    data-origem=\"whatsapp\"
-                    style='text-decoration: none;'>
-                        $imagem_curso                    
-                    </a>";
-                }else{
-                    $curso->tag_a = "
-                    <a class='lead'  target=\"_blanck\" data-href=\"https://wa.me/$whatsApp?text=Olá, quero saber mais sobre o curso de $curso->titulo\" style='text-decoration: none;'>
-                        $imagem_curso    
-                    </a>";
-                }*/
+                if ($modoCardsW3 === 'whatsapp') {
+                    if ($usarFormularioWhatsapp) {
+                        $curso->card_link = "https://wa.me/$whatsApp?text=Olá, meu nome é {nome} e quero saber mais sobre o curso de $curso->titulo";
+                    } else {
+                        $curso->card_link = "https://wa.me/$whatsApp?text=Olá, quero saber mais sobre o curso de $curso->titulo";
+                    }
+                    $curso->card_user_id = $data_user;
+                    $curso->card_origem = 'whatsapp';
+                    $curso->card_whatsapp_atendimento_id = $whatsAppAtendimentoId;
+                } else {
+                    $curso->card_link = $this->montarLinkCursoCardW3($request, $curso);
+                    $curso->card_user_id = null;
+                    $curso->card_origem = 'curso';
+                    $curso->card_whatsapp_atendimento_id = null;
+                }
             }else{ //PÁGINAS QUE VÃO PARA A PÁGINA DO CURSO
                 $curso->tag_a = "
                     <a class='view_content' href=\"$curso->url$parametros\">
@@ -1039,6 +1126,34 @@ class Home_e_cursosController extends Controller
         
     }
 
+    private function resolverModoCardsW3(Request $request, ?string $cidade = null, string $defaultDestination = 'curso'): string
+    {
+        if (!empty($cidade)) {
+            return 'whatsapp';
+        }
+
+        if ((string) $request->query('w') === '1') {
+            return 'whatsapp';
+        }
+
+        return in_array($defaultDestination, ['curso', 'whatsapp'], true) ? $defaultDestination : 'curso';
+    }
+
+    private function montarLinkCursoCardW3(Request $request, Curso $curso): string
+    {
+        $query = $request->query();
+        unset($query['w'], $query['t']);
+
+        $url = 'https://' . $request->getHost() . '/' . ltrim((string) $curso->url, '/');
+        $queryString = http_build_query($query);
+
+        if ($queryString !== '') {
+            return $url . '?' . $queryString;
+        }
+
+        return $url;
+    }
+
     private function selecionarWhatsappAtendimento(?User $user): array
     {
         if (!$user) {
@@ -1128,6 +1243,190 @@ class Home_e_cursosController extends Controller
 
     }
 
+    private function aplicarConfiguracaoDePrecosPorCupom(Curso $curso, array $dados, bool $descontoBannerAtivo): void
+    {
+        $modoPrecos = $dados['modo_precos'] ?? 'padrao';
+        if (!in_array($modoPrecos, ['padrao', 'um_preco', 'dois_precos'], true)) {
+            $modoPrecos = 'padrao';
+        }
+
+        $cupomPrincipalId = !empty($dados['cupom_principal_id']) ? (int) $dados['cupom_principal_id'] : null;
+        $cupomSecundarioId = !empty($dados['cupom_secundario_id']) ? (int) $dados['cupom_secundario_id'] : null;
+
+        if ($descontoBannerAtivo || !Schema::hasTable('cupons')) {
+            $this->forcarConfiguracaoPadraoDePrecos($curso);
+            return;
+        }
+
+        $cupons = Cupom::query()->get()->keyBy('id');
+        if ($cupons->isEmpty()) {
+            $this->forcarConfiguracaoPadraoDePrecos($curso);
+            return;
+        }
+
+        $cupomPrincipal = $cupomPrincipalId ? $cupons->get($cupomPrincipalId) : null;
+        $cupomSecundario = $cupomSecundarioId ? $cupons->get($cupomSecundarioId) : null;
+
+        if ($modoPrecos === 'um_preco' && $cupomPrincipalId && !$cupomPrincipal) {
+            $this->forcarConfiguracaoPadraoDePrecos($curso);
+            return;
+        }
+
+        if (
+            $modoPrecos === 'dois_precos' &&
+            (
+                !$cupomSecundario ||
+                ($cupomPrincipalId && !$cupomPrincipal) ||
+                ($cupomPrincipalId && $cupomSecundarioId && $cupomPrincipalId === $cupomSecundarioId)
+            )
+        ) {
+            $this->forcarConfiguracaoPadraoDePrecos($curso);
+            return;
+        }
+
+        if ($modoPrecos === 'padrao') {
+            $curso->modo_precos = 'padrao';
+            $curso->cupom_principal_id = null;
+            $curso->cupom_secundario_id = null;
+            $curso->cupom_principal_codigo = null;
+            $curso->cupom_secundario_codigo = null;
+            return;
+        }
+
+        $precoCheioCompleto = $this->extrairValorMonetario($curso->preco_cheio_completo);
+        $precoParcelaCompleto = $this->extrairValorMonetario($curso->preco_parcelado_completo);
+
+        $curso->modo_precos = $modoPrecos;
+        $curso->cupom_principal_id = $cupomPrincipal?->id;
+        $curso->cupom_secundario_id = $cupomSecundario?->id;
+        $curso->cupom_principal_codigo = $cupomPrincipal?->codigo;
+        $curso->cupom_secundario_codigo = $cupomSecundario?->codigo;
+
+        if ($cupomPrincipal) {
+            $curso->link_checkout_completo = $this->aplicarCupomNoCheckoutUrl($curso->link_checkout_completo, $cupomPrincipal->codigo);
+
+            if ($precoCheioCompleto !== null) {
+                $curso->preco_cheio_completo = $this->formatarValorMonetario(
+                    $this->aplicarDescontoPercentual($precoCheioCompleto, (float) $cupomPrincipal->desconto)
+                );
+            }
+
+            if ($precoParcelaCompleto !== null) {
+                $curso->preco_parcelado_completo = $this->formatarPrecoParcelado(
+                    $this->aplicarDescontoPercentual($precoParcelaCompleto, (float) $cupomPrincipal->desconto),
+                    $curso->parcelamento
+                );
+            }
+        }
+
+        if ($modoPrecos === 'dois_precos' && $cupomSecundario) {
+            $curso->link_checkout_basico = $this->aplicarCupomNoCheckoutUrl($curso->link_checkout_basico, $cupomSecundario->codigo);
+
+            if ($precoCheioCompleto !== null) {
+                $curso->preco_cheio_basico = $this->formatarValorMonetario(
+                    $this->aplicarDescontoPercentual($precoCheioCompleto, (float) $cupomSecundario->desconto)
+                );
+            }
+
+            if ($precoParcelaCompleto !== null) {
+                $curso->preco_parcelado_basico = $this->formatarPrecoParcelado(
+                    $this->aplicarDescontoPercentual($precoParcelaCompleto, (float) $cupomSecundario->desconto),
+                    $curso->parcelamento
+                );
+            }
+        }
+    }
+
+    private function forcarConfiguracaoPadraoDePrecos(Curso $curso): void
+    {
+        $curso->modo_precos = 'padrao';
+        $curso->cupom_principal_id = null;
+        $curso->cupom_secundario_id = null;
+        $curso->cupom_principal_codigo = null;
+        $curso->cupom_secundario_codigo = null;
+    }
+
+    private function extrairValorMonetario(?string $valor): ?float
+    {
+        if (!$valor) {
+            return null;
+        }
+
+        // Remove prefixos de parcelamento (ex.: "12x" ou "12x de ") antes do parse monetario.
+        $valorNormalizado = preg_replace('/^\s*\d+\s*x(?:\s*de)?\s*/i', '', trim($valor)) ?? trim($valor);
+        $somenteNumeros = preg_replace('/[^\d,.]/', '', $valorNormalizado);
+        if (!$somenteNumeros) {
+            return null;
+        }
+
+        if (str_contains($somenteNumeros, ',') && str_contains($somenteNumeros, '.')) {
+            $ultimaVirgula = strrpos($somenteNumeros, ',');
+            $ultimoPonto = strrpos($somenteNumeros, '.');
+
+            if ($ultimaVirgula !== false && $ultimoPonto !== false && $ultimaVirgula > $ultimoPonto) {
+                $somenteNumeros = str_replace('.', '', $somenteNumeros);
+                $somenteNumeros = str_replace(',', '.', $somenteNumeros);
+            } else {
+                $somenteNumeros = str_replace(',', '', $somenteNumeros);
+            }
+        } elseif (str_contains($somenteNumeros, ',')) {
+            $somenteNumeros = str_replace('.', '', $somenteNumeros);
+            $somenteNumeros = str_replace(',', '.', $somenteNumeros);
+        } elseif (substr_count($somenteNumeros, '.') > 1) {
+            $partes = explode('.', $somenteNumeros);
+            $decimal = array_pop($partes);
+            $somenteNumeros = implode('', $partes) . '.' . $decimal;
+        }
+
+        if (!is_numeric($somenteNumeros)) {
+            return null;
+        }
+
+        return (float) $somenteNumeros;
+    }
+
+    private function formatarValorMonetario(?float $valor): ?string
+    {
+        if ($valor === null) {
+            return null;
+        }
+
+        return 'R$' . number_format($valor, 2, ',', '.');
+    }
+
+    private function formatarPrecoParcelado(?float $valorParcela, $parcelamento): ?string
+    {
+        if ($valorParcela === null) {
+            return null;
+        }
+
+        $preco = $this->formatar_preco_parcelado($valorParcela, $parcelamento);
+        return $preco['parcelamento'] . "xR$" . $preco['preco'];
+    }
+
+    private function aplicarDescontoPercentual(?float $valor, float $desconto): ?float
+    {
+        if ($valor === null) {
+            return null;
+        }
+
+        return $valor * (1 - ($desconto / 100));
+    }
+
+    private function aplicarCupomNoCheckoutUrl(?string $url, ?string $codigoCupom): ?string
+    {
+        if (!$url || !$codigoCupom) {
+            return $url;
+        }
+
+        if (preg_match('/([?&])offDiscount=[^&]*/', $url)) {
+            return preg_replace('/([?&])offDiscount=[^&]*/', '$1offDiscount=' . $codigoCupom, $url, 1) ?? $url;
+        }
+
+        $separador = str_contains($url, '?') ? '&' : '?';
+        return $url . $separador . 'offDiscount=' . $codigoCupom;
+    }
+
     public function lista_conteudo($html){
 
         $html = mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8');
@@ -1194,7 +1493,13 @@ class Home_e_cursosController extends Controller
             $dados['preco'] = "9,60";
         }
 
-        if($dados['preco']=='5,76' AND $dados['parcelamento']==12){
+        if($dados['preco']=='6,53' AND (int) $dados['parcelamento']===12){
+            $dados['preco'] = "7,04";
+            $dados['parcelamento'] = "11";
+        }elseif($dados['preco']=='2,91' AND (int) $dados['parcelamento']===12){
+            $dados['preco'] = "7,95";
+            $dados['parcelamento'] = "4";
+        }elseif($dados['preco']=='5,76' AND $dados['parcelamento']==12){
             $dados['preco'] = "7,41";
             $dados['parcelamento'] = "9";
         }elseif($dados['preco']=='3,84'){

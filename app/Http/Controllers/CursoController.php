@@ -10,7 +10,10 @@ use App\Http\Controllers\Home_e_cursosController;
 use App\Models\Codigo_ref;
 use App\Models\Curso;
 use App\Models\AulasDemonstrativa;
+use App\Models\Cupom;
 use App\Models\User;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Validator;
 
 class CursoController extends Controller 
 {
@@ -18,8 +21,9 @@ class CursoController extends Controller
         $user = Auth::user();
         $home_e_cursosController = new Home_e_cursosController();
         $cursos = $home_e_cursosController->listar_cursos($request, $user);
+        $cupons = Cupom::orderBy('desconto')->orderBy('codigo')->get();
 
-        return view('dashboard.cursos.index', compact('cursos')); 
+        return view('dashboard.cursos.index', compact('cursos', 'cupons')); 
         //return view('adm.cursos.afiliados_cadastrar_curso', compact('cursos')); 
     }
  
@@ -45,8 +49,9 @@ class CursoController extends Controller
 
 
     public function afiliados_cadastrar_curso_ref(Request $request){
+        $temCupons = Schema::hasTable('cupons') && Cupom::query()->exists();
 
-        $request->validate([
+        $rules = [
             'user_id' => 'required',
             'codigo_ref' => [
                 'required',
@@ -55,22 +60,79 @@ class CursoController extends Controller
             ],
             'curso_id' => 'required',
             'mostrar_curso' => 'nullable',
-        ], [
+            'formulario_pre_checkout' => 'nullable|boolean',
+            'modo_precos' => 'nullable|string|in:padrao,um_preco,dois_precos',
+            'cupom_principal_id' => ['nullable', 'integer'],
+            'cupom_secundario_id' => ['nullable', 'integer'],
+        ];
+
+        if ($temCupons) {
+            $rules['cupom_principal_id'][] = 'exists:cupons,id';
+            $rules['cupom_secundario_id'][] = 'exists:cupons,id';
+        }
+
+        $validator = Validator::make($request->all(), $rules, [
             'codigo_ref.regex' => 'O campo Código REF não pode conter os caracteres ".", "/", ou ":".',
             'codigo_ref.max' => 'O campo Código REF deve ter no máximo 15 caracteres.',
+            'cupom_secundario_id.required' => 'Selecione o cupom do segundo preço.',
+            'cupom_secundario_id.different' => 'O cupom do segundo preço deve ser diferente do principal.',
         ]);
-        
 
-      // printf($request->input('mostrar_curso'));
-      // exit;
+      $validator->after(function ($validator) use ($request, $temCupons) {
+          if (!$temCupons) {
+              return;
+          }
 
-       
-        
+          $modoPrecos = $request->input('modo_precos', 'padrao');
+          $cupomPrincipalId = $request->filled('cupom_principal_id') ? (int) $request->input('cupom_principal_id') : null;
+          $cupomSecundarioId = $request->filled('cupom_secundario_id') ? (int) $request->input('cupom_secundario_id') : null;
+
+          if ($modoPrecos === 'dois_precos' && empty($cupomSecundarioId)) {
+              $validator->errors()->add('cupom_secundario_id', 'Selecione o cupom do segundo preço.');
+          }
+
+          if (
+              $modoPrecos === 'dois_precos' &&
+              !empty($cupomPrincipalId) &&
+              !empty($cupomSecundarioId) &&
+              $cupomPrincipalId === $cupomSecundarioId
+          ) {
+              $validator->errors()->add('cupom_secundario_id', 'O cupom do segundo preço deve ser diferente do principal.');
+          }
+      });
+
+      $validator->validate();
+
+      $formularioPreCheckout = $request->has('formulario_pre_checkout')
+          ? $request->boolean('formulario_pre_checkout')
+          : true;
+
+      $modoPrecos = $request->input('modo_precos', 'padrao');
+      if (!in_array($modoPrecos, ['padrao', 'um_preco', 'dois_precos'], true)) {
+          $modoPrecos = 'padrao';
+      }
+
+      $cupomPrincipalId = $request->filled('cupom_principal_id') ? (int) $request->input('cupom_principal_id') : null;
+      $cupomSecundarioId = $request->filled('cupom_secundario_id') ? (int) $request->input('cupom_secundario_id') : null;
+
+      if (!$temCupons) {
+          $modoPrecos = 'padrao';
+          $cupomPrincipalId = null;
+          $cupomSecundarioId = null;
+      } elseif ($modoPrecos === 'padrao') {
+          $cupomPrincipalId = null;
+          $cupomSecundarioId = null;
+      } elseif ($modoPrecos === 'um_preco') {
+          $cupomSecundarioId = null;
+      }
+
+      $userId = (int) $request->input('user_id');
+
       if ($request->filled('id')) {
           $codigo_ref = Codigo_ref::firstOrNew(['id' => $request->input('id')]);
       } else {
           $codigo_ref = Codigo_ref::firstOrNew([
-              'user_id' => $request->input('user_id'),
+              'user_id' => $userId,
               'curso_id' => $request->input('curso_id'),
           ]);
       }
@@ -78,19 +140,27 @@ class CursoController extends Controller
       if ($codigo_ref->exists) {
           // Registro já existe
           $codigo_ref->update([
-              'user_id' => $request->input('user_id'),
+              'user_id' => $userId,
               'curso_id' => $request->input('curso_id'),
               'codigo_ref' => $request->input('codigo_ref'),
               'mostrar_curso' =>  $request->input('mostrar_curso') ?? 0,
+              'formulario_pre_checkout' => $formularioPreCheckout,
+              'modo_precos' => $modoPrecos,
+              'cupom_principal_id' => $cupomPrincipalId,
+              'cupom_secundario_id' => $cupomSecundarioId,
           ]);
           $registroExistente = true;
       } else {
           // Registro não existe, vamos criar um novo
           $codigo_ref->fill([
-              'user_id' => $request->input('user_id'),
+              'user_id' => $userId,
               'curso_id' => $request->input('curso_id'),
               'codigo_ref' => $request->input('codigo_ref'),
               'mostrar_curso' =>  $request->input('mostrar_curso') ?? 0,
+              'formulario_pre_checkout' => $formularioPreCheckout,
+              'modo_precos' => $modoPrecos,
+              'cupom_principal_id' => $cupomPrincipalId,
+              'cupom_secundario_id' => $cupomSecundarioId,
           ]);
           $codigo_ref->save();
           $registroExistente = false;
@@ -111,7 +181,11 @@ class CursoController extends Controller
               'codigo_ref_id' => $codigo_ref->id,
               'codigo_ref' => $codigo_ref->codigo_ref,
               'mostrar_curso' => (bool) $codigo_ref->mostrar_curso,
+              'formulario_pre_checkout' => (bool) ($codigo_ref->formulario_pre_checkout ?? true),
               'curso_id' => (int) $codigo_ref->curso_id,
+              'modo_precos' => $codigo_ref->modo_precos ?? 'padrao',
+              'cupom_principal_id' => $codigo_ref->cupom_principal_id ? (int) $codigo_ref->cupom_principal_id : null,
+              'cupom_secundario_id' => $codigo_ref->cupom_secundario_id ? (int) $codigo_ref->cupom_secundario_id : null,
               'base_checkout_url' => $baseCheckoutUrl,
           ]);
       }

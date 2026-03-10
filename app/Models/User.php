@@ -41,8 +41,13 @@ class User extends Authenticatable implements MustVerifyEmail
         'google_ads',
         'whatsapp_atendimento',
         'whatsapp_atendimento_tempo',
+        'w3_whatsapp_float_enabled',
+        'w3_whatsapp_float_delay_seconds',
         'dominio',
         'dominio_externo',
+        'home_page_layout',
+        'home_page_destination',
+        'home_page_whatsapp_flow',
         'meta_conta_anuncios_id',
         'meta_pagina_id',
         'meta_instagram_id',
@@ -64,6 +69,10 @@ class User extends Authenticatable implements MustVerifyEmail
     protected $casts = [
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
+        'w3_whatsapp_float_enabled' => 'boolean',
+        'w3_whatsapp_float_delay_seconds' => 'integer',
+        'home_page_destination' => 'string',
+        'home_page_whatsapp_flow' => 'string',
     ];
 
     public function codigo_ref()
