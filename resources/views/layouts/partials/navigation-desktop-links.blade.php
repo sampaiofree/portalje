@@ -80,6 +80,7 @@
                 <x-dropdown-link :href="route('aulas_gratuitas_index')">Aulas Gratuitas</x-dropdown-link>
                 <x-dropdown-link :href="route('combo.index')">Combos</x-dropdown-link>
                 <x-dropdown-link :href="route('admin.cupons.index')">Cupons</x-dropdown-link>
+                <x-dropdown-link :href="route('admin.logs.index')">Logs</x-dropdown-link>
                 <x-dropdown-link :href="route('admin.purchase_events')">Purchase Events</x-dropdown-link>
             </x-slot>
         </x-dropdown>

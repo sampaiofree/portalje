@@ -336,12 +336,8 @@
 
                         /**LINK PARA WHATSAPP**/
                         if($info['whatsapp']){
-
-                            if($info['whatsapp']!=1){
-                                $nome = $info['formulario']?"Olá meu nome é {nome}, ":null;
-                                $curso->link_checkout_completo = "https://wa.me/".$info['whatsapp_atendimento']."?text=$nome Quero tirar minhas dúvidas sobre o curso $curso->titulo";
-                            }
-                            
+                            $nome = $info['formulario']?"Olá meu nome é {nome}, ":null;
+                            $curso->link_checkout_completo = "https://wa.me/".$info['whatsapp_atendimento']."?text=$nome Quero tirar minhas dúvidas sobre o curso $curso->titulo";
                         }
 
                         /**DEFINIR SE PÁGINA SERÁ MOSTRAR OU NÃO**/

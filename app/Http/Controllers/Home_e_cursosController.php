@@ -231,9 +231,6 @@ class Home_e_cursosController extends Controller
         }elseif(request()->get('test')=='2'){
             //PAGINA TESTE
             return view('cursos.3ofertas', compact('curso', 'desconto_banner')); 
-        }elseif(request()->getHost() === 'jovemempreendedor.org'){
-            //PÁGINA DO DOMINIO JOVEMEMPREENDEDOR.ORG
-            return view($lpView, compact('curso', 'desconto_banner'));
         }elseif(request()->get('ga')=='1'){ 
             //PAGINA DAS AULAS GRATUITAS PAGINA TESTE
             return view('cursos.curso_gratuito_a', compact('curso', 'desconto_banner'));
@@ -464,6 +461,29 @@ class Home_e_cursosController extends Controller
 
                 return view('home_e_cursos.w3', compact('cursos', 'pagina'));
             }
+        }
+
+        $host = strtolower($request->getHost());
+        $pathInfo = rtrim($request->getPathInfo(), '/');
+        if ($pathInfo === '') {
+            $pathInfo = '/';
+        }
+        $isRootPortalDomain = in_array($host, ['portalje.org', 'jovemempreendedor.org'], true);
+        $isHomeOrCursosPath = in_array($pathInfo, ['/', '/cursos'], true);
+        $hasPageOverride = $request->has('edital')
+            || $request->has('test')
+            || $request->has('lista')
+            || $request->has('gratuito');
+
+        if ($isRootPortalDomain && $isHomeOrCursosPath && !$hasPageOverride) {
+            $cidadeLayout = $cidade_desconto ?? $request->get('c') ?? null;
+            $pagina = $this->dados_da_pagina(null, $cidadeLayout);
+            $modoCardsW3 = $this->resolverModoCardsW3($request, null, 'curso');
+            $pagina['cards_destino'] = $modoCardsW3;
+            $pagina['whatsapp_requires_form'] = true;
+            $cursos = $this->listar_cursos($request, null, 'w3', $modoCardsW3, true);
+
+            return view('home_e_cursos.w3', compact('cursos', 'pagina'));
         }
 
         //PEGAR TODOS OS PARAMETROS PARA COLOCAR NA URL    

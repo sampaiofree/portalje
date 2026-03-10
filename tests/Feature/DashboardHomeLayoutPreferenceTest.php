@@ -432,6 +432,32 @@ class DashboardHomeLayoutPreferenceTest extends TestCase
         $response->assertSee("window.modal = new bootstrap.Modal(document.getElementById('inscricaoModal'));", false);
     }
 
+    public function test_root_home_model1_whatsapp_destination_sets_course_cta_to_whatsapp_link(): void
+    {
+        [$user, $curso] = $this->createAffiliateWithConfiguredCurso(
+            'afiliado-home-whatsapp-cta.test',
+            'padrao',
+            'curso-home-whatsapp-cta',
+            'whatsapp',
+            'formulario'
+        );
+
+        $response = $this->get('http://afiliado-home-whatsapp-cta.test/');
+
+        $response->assertOk();
+        $response->assertViewIs('home1');
+
+        $html = $response->getContent();
+        $matches = [];
+        preg_match('/<a[^>]*href="([^"]+)"[^>]*class="[^"]*btn-inscricao[^"]*"/', $html, $matches);
+        $firstCourseCtaLink = html_entity_decode($matches[1] ?? '');
+
+        $this->assertNotSame('', $firstCourseCtaLink, 'Não foi encontrado link CTA de curso na home.');
+        $this->assertStringContainsString('https://wa.me/5511999999999', $firstCourseCtaLink);
+        $this->assertStringContainsString('{nome}', $firstCourseCtaLink);
+        $this->assertStringNotContainsString('/curso-home-whatsapp-cta', $firstCourseCtaLink);
+    }
+
     public function test_root_home_whatsapp_with_direto_skips_pre_whatsapp_modal(): void
     {
         [$user, $curso] = $this->createAffiliateWithConfiguredCurso('afiliado-home-whatsapp-direto.test', 'padrao', 'curso-home-whatsapp-direto', 'whatsapp', 'direto');
@@ -525,6 +551,54 @@ class DashboardHomeLayoutPreferenceTest extends TestCase
         $cursosResponse->assertSee('"whatsapp_delay_seconds":30', false);
     }
 
+    public function test_portal_and_jovem_domains_render_w3_on_root_and_cursos_paths(): void
+    {
+        $this->createPublishedCourse('curso-raiz-w3');
+
+        $portalRoot = $this->get('http://portalje.org/');
+        $portalRoot->assertOk();
+        $portalRoot->assertViewIs('home_e_cursos.w3');
+
+        $portalCursos = $this->get('http://portalje.org/cursos');
+        $portalCursos->assertOk();
+        $portalCursos->assertViewIs('home_e_cursos.w3');
+
+        $jovemRoot = $this->get('http://jovemempreendedor.org/');
+        $jovemRoot->assertOk();
+        $jovemRoot->assertViewIs('home_e_cursos.w3');
+
+        $jovemCursos = $this->get('http://jovemempreendedor.org/cursos');
+        $jovemCursos->assertOk();
+        $jovemCursos->assertViewIs('home_e_cursos.w3');
+    }
+
+    public function test_jovem_domain_page_overrides_are_preserved_without_forcing_w3(): void
+    {
+        $this->createPublishedCourse('curso-jovem-override');
+
+        $listaResponse = $this->get('http://jovemempreendedor.org/?lista=1');
+        $listaResponse->assertOk();
+        $listaResponse->assertViewIs('home');
+
+        $testResponse = $this->get('http://jovemempreendedor.org/?test=1');
+        $testResponse->assertOk();
+        $testResponse->assertViewIs('home');
+    }
+
+    public function test_portal_and_jovem_course_pages_use_lp_course_view_config(): void
+    {
+        $curso = $this->createPublishedCourse('curso-lp-config');
+        config(['lp.course_view' => 'novapagina2']);
+
+        $portalResponse = $this->get('http://portalje.org/' . $curso->url);
+        $portalResponse->assertOk();
+        $portalResponse->assertViewIs('novapagina2');
+
+        $jovemResponse = $this->get('http://jovemempreendedor.org/' . $curso->url);
+        $jovemResponse->assertOk();
+        $jovemResponse->assertViewIs('novapagina2');
+    }
+
     /**
      * @return array{0: User, 1: Curso}
      */
@@ -577,5 +651,28 @@ class DashboardHomeLayoutPreferenceTest extends TestCase
         ]);
 
         return [$user, $curso];
+    }
+
+    private function createPublishedCourse(string $url, int $ordem = 1): Curso
+    {
+        return Curso::create([
+            'ordem' => $ordem,
+            'url' => $url,
+            'publicado' => true,
+            'permitir_afiliacao' => true,
+            'mostrar_na_pagina' => true,
+            'titulo' => 'Curso Teste Host Root',
+            'headline' => 'Curso de teste para domínio raiz.',
+            'capa_vertical' => 'img/home_page/cartaestagio.webp',
+            'capa_quadrada' => 'img/home_page/cartaestagio.webp',
+            'capa_horizontal' => 'img/home_page/certificadoNovo2.webp',
+            'horas_completo' => 40,
+            'numero_alunos' => 1200,
+            'nota_avaliacao' => 4.8,
+            'codigo_afiliado_plano_completo' => 'abc123',
+            'link_checkout_completo' => 'https://go.hotmart.com/abc123?ap=abc123',
+            'preco_cheio_completo' => 'R$197,00',
+            'preco_parcelado_completo' => '12xR$19,70',
+        ]);
     }
 }
