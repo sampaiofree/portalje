@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
@@ -46,6 +47,70 @@ class AdminController extends Controller
         ];
     
         return view('adm.dashboard_adm', compact('meses', 'totalCadastros', 'totalComDominio', 'afiliados'));
+    }
+
+    public function logsIndex()
+    {
+        $logDirectory = storage_path('logs');
+        $logFiles = [];
+
+        if (is_dir($logDirectory)) {
+            foreach (File::files($logDirectory) as $file) {
+                if (!$file->isFile()) {
+                    continue;
+                }
+
+                $sizeBytes = $file->getSize();
+                $modifiedTimestamp = $file->getMTime();
+                $logFiles[] = [
+                    'name' => $file->getFilename(),
+                    'size_bytes' => $sizeBytes,
+                    'size_human' => $this->formatBytes($sizeBytes),
+                    'modified_timestamp' => $modifiedTimestamp,
+                    'modified_at' => date('d/m/Y H:i:s', $modifiedTimestamp),
+                ];
+            }
+        }
+
+        usort($logFiles, static function (array $a, array $b): int {
+            return $b['modified_timestamp'] <=> $a['modified_timestamp'];
+        });
+
+        return view('adm.logs.index', compact('logFiles'));
+    }
+
+    public function logsView(string $logFile)
+    {
+        $path = $this->resolveLogFilePath($logFile);
+        if (!$path) {
+            abort(404);
+        }
+
+        $maxBytes = 500 * 1024;
+        $fileSize = filesize($path) ?: 0;
+        $isPartial = $fileSize > $maxBytes;
+        $previewContent = $this->readLastBytesFromFile($path, $maxBytes);
+
+        if ($isPartial) {
+            $previewContent = "[Conteúdo parcial: exibindo os últimos 500KB]\n\n" . $previewContent;
+        }
+
+        return view('adm.logs.view', [
+            'logFile' => basename($path),
+            'previewContent' => $previewContent,
+            'maxBytes' => $maxBytes,
+            'fileSize' => $fileSize,
+        ]);
+    }
+
+    public function logsDownload(string $logFile)
+    {
+        $path = $this->resolveLogFilePath($logFile);
+        if (!$path) {
+            abort(404);
+        }
+
+        return response()->download($path, basename($path));
     }
 
     public function adm_cursos_lista() 
@@ -225,6 +290,60 @@ class AdminController extends Controller
         // Retorna a view com os leads paginados
         
         return view('adm.leads.leads', compact('hotmart_leads', 'titulo_pagina'));
+    }
+
+    private function resolveLogFilePath(string $logFile): ?string
+    {
+        $safeName = basename($logFile);
+        if ($safeName === '' || $safeName !== $logFile) {
+            return null;
+        }
+
+        $path = storage_path('logs/' . $safeName);
+
+        if (!is_file($path)) {
+            return null;
+        }
+
+        return $path;
+    }
+
+    private function readLastBytesFromFile(string $path, int $maxBytes): string
+    {
+        $size = filesize($path);
+        if ($size === false || $size <= 0) {
+            return '';
+        }
+
+        $start = max(0, $size - $maxBytes);
+        $handle = fopen($path, 'rb');
+        if ($handle === false) {
+            return '';
+        }
+
+        fseek($handle, $start);
+        $content = stream_get_contents($handle);
+        fclose($handle);
+
+        return $content !== false ? $content : '';
+    }
+
+    private function formatBytes(int $bytes): string
+    {
+        if ($bytes < 1024) {
+            return $bytes . ' B';
+        }
+
+        $units = ['KB', 'MB', 'GB', 'TB'];
+        $size = $bytes / 1024;
+        $unitIndex = 0;
+
+        while ($size >= 1024 && $unitIndex < count($units) - 1) {
+            $size /= 1024;
+            $unitIndex++;
+        }
+
+        return number_format($size, 2, ',', '.') . ' ' . $units[$unitIndex];
     }
 
     public function purchase_events(Request $request)

@@ -22,7 +22,7 @@ return new class extends Migration
         }
 
         Schema::table('cupons', function (Blueprint $table) {
-            $table->unsignedDecimal('desconto', 5, 2)->change();
+            $table->decimal('desconto', 5, 2)->change();
         });
     }
 
@@ -41,7 +41,7 @@ return new class extends Migration
         }
 
         Schema::table('cupons', function (Blueprint $table) {
-            $table->unsignedTinyInteger('desconto')->change();
+            $table->tinyInteger('desconto', false, true)->change();
         });
     }
 
@@ -60,4 +60,3 @@ return new class extends Migration
         }
     }
 };
-

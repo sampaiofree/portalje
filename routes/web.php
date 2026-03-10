@@ -220,6 +220,9 @@ Route::prefix('administrador')->group(function () {
         Route::post('/cupons', [CupomController::class, 'store'])->name('admin.cupons.store');
         Route::put('/cupons/{cupom}', [CupomController::class, 'update'])->name('admin.cupons.update');
         Route::delete('/cupons/{cupom}', [CupomController::class, 'destroy'])->name('admin.cupons.destroy');
+        Route::get('/logs', [AdminController::class, 'logsIndex'])->name('admin.logs.index');
+        Route::get('/logs/{logFile}/view', [AdminController::class, 'logsView'])->name('admin.logs.view');
+        Route::get('/logs/{logFile}/download', [AdminController::class, 'logsDownload'])->name('admin.logs.download');
     });
 
     //AULAS GRATUITAS
