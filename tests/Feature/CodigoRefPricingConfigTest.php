@@ -276,6 +276,36 @@ class CodigoRefPricingConfigTest extends TestCase
         ]);
     }
 
+    public function test_store_forces_mostrar_curso_to_true_on_first_creation_even_when_zero_is_sent(): void
+    {
+        $this->withoutMiddleware(MinhaJornada::class);
+
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+        ]);
+
+        $curso = $this->createCurso('curso-mostrar-force', 'Curso Mostrar Force');
+
+        $response = $this->actingAs($user)->postJson(route('cadastrar_codigo_ref'), [
+            'user_id' => $user->id,
+            'curso_id' => $curso->id,
+            'codigo_ref' => 'AFILIADO9',
+            'mostrar_curso' => '0',
+            'modo_precos' => 'padrao',
+            'titulo' => $curso->titulo,
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('mostrar_curso', true);
+
+        $this->assertDatabaseHas('codigo_ref', [
+            'user_id' => $user->id,
+            'curso_id' => $curso->id,
+            'codigo_ref' => 'AFILIADO9',
+            'mostrar_curso' => 1,
+        ]);
+    }
+
     public function test_store_rejects_codigo_ref_when_hotmart_returns_invalid_status(): void
     {
         $this->withoutMiddleware(MinhaJornada::class);

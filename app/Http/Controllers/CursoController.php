@@ -175,10 +175,10 @@ class CursoController extends Controller
       }
 
       $isNewCodigoRef = !$codigo_ref->exists;
-      if ($request->has('mostrar_curso')) {
-          $mostrarCurso = $request->boolean('mostrar_curso');
-      } elseif ($isNewCodigoRef) {
+      if ($isNewCodigoRef) {
           $mostrarCurso = true;
+      } elseif ($request->has('mostrar_curso')) {
+          $mostrarCurso = $request->boolean('mostrar_curso');
       } else {
           $mostrarCurso = (bool) ($codigo_ref->mostrar_curso ?? false);
       }
