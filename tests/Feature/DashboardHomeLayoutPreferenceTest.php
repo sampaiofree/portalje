@@ -420,6 +420,38 @@ class DashboardHomeLayoutPreferenceTest extends TestCase
         $response->assertSee('Escolha Sua Nova Profissão');
     }
 
+    public function test_root_home_uses_affiliate_whatsapp_when_custom_domain_is_accessed_with_www(): void
+    {
+        [$user, $curso] = $this->createAffiliateWithConfiguredCurso('afiliado-www-home.test', 'padrao', 'curso-www-home');
+
+        $user->update([
+            'whatsapp_atendimento' => '5511912345678',
+        ]);
+
+        $response = $this->get('http://www.afiliado-www-home.test/');
+
+        $response->assertOk();
+        $response->assertViewIs('home1');
+        $response->assertSee('https://api.whatsapp.com/send/?phone=5511912345678', false);
+        $response->assertDontSee('https://api.whatsapp.com/send/?phone=5511982671533', false);
+    }
+
+    public function test_root_w3_uses_affiliate_whatsapp_when_custom_domain_is_accessed_with_www(): void
+    {
+        [$user, $curso] = $this->createAffiliateWithConfiguredCurso('afiliado-www-w3.test', 'w3', 'curso-www-w3');
+
+        $user->update([
+            'whatsapp_atendimento' => '5511912345678',
+        ]);
+
+        $response = $this->get('http://www.afiliado-www-w3.test/');
+
+        $response->assertOk();
+        $response->assertViewIs('home_e_cursos.w3');
+        $response->assertSee('https://api.whatsapp.com/send/?phone=5511912345678', false);
+        $response->assertDontSee('https://api.whatsapp.com/send/?phone=5511982671533', false);
+    }
+
     public function test_root_home_whatsapp_with_formulario_keeps_pre_whatsapp_modal(): void
     {
         [$user, $curso] = $this->createAffiliateWithConfiguredCurso('afiliado-home-whatsapp-form.test', 'padrao', 'curso-home-whatsapp-form', 'whatsapp', 'formulario');

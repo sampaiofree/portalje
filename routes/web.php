@@ -163,6 +163,7 @@ Route::middleware(['auth', 'verified', 'minha_jornada'])->group(function () {
         Route::post('/home_page_layout', [UserController::class, 'update_home_page_layout'])->name('alterar_home_page_layout');
         Route::delete('/whatsapp_atendimento/{id}', [UserController::class, 'destroy_whatsapp_atendimento'])->name('excluir_whatsapp_atendimento');
         Route::post('/afiliados_cadastrar_curso', [CursoController::class, 'afiliados_cadastrar_curso_ref'])->name('cadastrar_codigo_ref'); //MENU > MINHA ESTRUTURA > CURSOS || ENVIO DO FORMULÁRIO
+        Route::post('/afiliados_cadastrar_curso/acoes', [CursoController::class, 'afiliados_cadastrar_curso_bulk_actions'])->name('cadastrar_cursos_bulk_actions');
         Route::post('/configurar_site', [UserController::class, 'afiliado_configurar_site'])->name('afiliado_configurar_site_post'); //MENU > MINHA ESTRUTURA > CONFIGURAÇÕES DO SITE || SUBMETENDO O FORMULÁRIO
         Route::post('/testar_pixel', [Meta_apiController::class, 'testar_pixel'])->name('afiliado_testar_pixel'); //MENU > MINHA ESTRUTURA > CONFIGURAÇÕES DO SITE || TESTAR PIXEL DO META FACEBOOK
 

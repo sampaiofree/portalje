@@ -245,8 +245,27 @@ class Home_e_cursosController extends Controller
         
     }
 
+    private function normalizarHost(string $dominio): string
+    {
+        $dominio = strtolower(trim($dominio));
+        if ($dominio === '') {
+            return '';
+        }
+
+        if (!str_contains($dominio, '://')) {
+            $dominio = 'https://' . $dominio;
+        }
+
+        $host = (string) (parse_url($dominio, PHP_URL_HOST) ?? '');
+        $host = preg_replace('/^www\./', '', strtolower(trim($host)));
+
+        return $host ?? '';
+    }
+
     //DADOS DO USUARIO - AFILIADO OU PRODUTOR
     private function dadosusuario($dominio, $curso = null, $ref = null){
+        $dominio = $this->normalizarHost((string) $dominio);
+
         //VERIFICAR SE É UM SOBDOMINIO OU DOMINIO COMPRADO
         if(
             Schema::hasTable('users') AND
@@ -545,6 +564,8 @@ class Home_e_cursosController extends Controller
 
     //DADOS DO USUARIO - AFILIADO OU PRODUTOR - PARA HOME PAGE
     private function dadosusuario_home($dominio, $afiliadoID = null){
+        $dominio = $this->normalizarHost((string) $dominio);
+
         //VERIFICAR SE É UM SOBDOMINIO OU DOMINIO COMPRADO
         if(
             Schema::hasTable('users') &&
@@ -1218,6 +1239,7 @@ class Home_e_cursosController extends Controller
     }
 
     public function listar_user_pelo_dominio($dominio){
+        $dominio = $this->normalizarHost((string) $dominio);
 
         //VERIFICAR SE É UM SOBDOMINIO OU DOMINIO COMPRADO
         if($dominio!='portalje.org' AND $dominio!='dns.portalje.org' AND $dominio!='jemp.me' AND $dominio!='jovemempreendedor.org' AND $dominio!='dns.jovemempreendedor.org'){            

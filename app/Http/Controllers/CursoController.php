@@ -28,6 +28,145 @@ class CursoController extends Controller
         return view('dashboard.cursos.index', compact('cursos', 'cupons')); 
         //return view('adm.cursos.afiliados_cadastrar_curso', compact('cursos')); 
     }
+
+    public function afiliados_cadastrar_curso_bulk_actions(Request $request)
+    {
+        $validated = $request->validate([
+            'action' => 'required|string|in:ativar_todos,desativar_todos,configurar_pagina_publica_todos',
+        ]);
+
+        $action = $validated['action'];
+
+        $baseQuery = $this->codigoRefComCodigoPreenchidoQueryForAuthUser();
+
+        $updatedCourseIds = (clone $baseQuery)
+            ->pluck('curso_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($action === 'configurar_pagina_publica_todos') {
+            $temCupons = Schema::hasTable('cupons') && Cupom::query()->exists();
+            $configuracao = $this->validateAndNormalizeBulkPublicPageConfig($request, $temCupons);
+
+            $updatedCount = (clone $baseQuery)->update([
+                'formulario_pre_checkout' => $configuracao['formulario_pre_checkout'],
+                'modo_precos' => $configuracao['modo_precos'],
+                'cupom_principal_id' => $configuracao['cupom_principal_id'],
+                'cupom_secundario_id' => $configuracao['cupom_secundario_id'],
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'action' => $action,
+                'message' => 'Configurações da página pública aplicadas em todos os cursos com Código REF preenchido.',
+                'updated_count' => $updatedCount,
+                'updated_course_ids' => $updatedCourseIds,
+                'formulario_pre_checkout' => $configuracao['formulario_pre_checkout'],
+                'modo_precos' => $configuracao['modo_precos'],
+                'cupom_principal_id' => $configuracao['cupom_principal_id'],
+                'cupom_secundario_id' => $configuracao['cupom_secundario_id'],
+            ]);
+        }
+
+        $mostrarCurso = $action === 'ativar_todos';
+
+        $updatedCount = (clone $baseQuery)->update([
+            'mostrar_curso' => $mostrarCurso,
+        ]);
+
+        $message = $action === 'ativar_todos'
+            ? 'Cursos com Código REF ativados com sucesso.'
+            : 'Cursos com Código REF desativados com sucesso.';
+
+        return response()->json([
+            'success' => true,
+            'action' => $action,
+            'message' => $message,
+            'updated_count' => $updatedCount,
+            'updated_course_ids' => $updatedCourseIds,
+        ]);
+    }
+
+    private function codigoRefComCodigoPreenchidoQueryForAuthUser()
+    {
+        return Codigo_ref::query()
+            ->where('user_id', Auth::id())
+            ->whereNotNull('codigo_ref')
+            ->whereRaw("TRIM(codigo_ref) <> ''");
+    }
+
+    private function validateAndNormalizeBulkPublicPageConfig(Request $request, bool $temCupons): array
+    {
+        $rules = [
+            'formulario_pre_checkout' => ['required', 'boolean'],
+            'modo_precos' => ['required', 'string', 'in:padrao,um_preco,dois_precos'],
+            'cupom_principal_id' => ['nullable', 'integer'],
+            'cupom_secundario_id' => ['nullable', 'integer'],
+        ];
+
+        if ($temCupons) {
+            $rules['cupom_principal_id'][] = 'exists:cupons,id';
+            $rules['cupom_secundario_id'][] = 'exists:cupons,id';
+        }
+
+        $validator = Validator::make($request->all(), $rules, [
+            'cupom_secundario_id.required' => 'Selecione o cupom do segundo preço.',
+            'cupom_secundario_id.different' => 'O cupom do segundo preço deve ser diferente do principal.',
+        ]);
+
+        $validator->after(function ($validator) use ($request, $temCupons) {
+            if (!$temCupons) {
+                return;
+            }
+
+            $modoPrecos = $request->input('modo_precos', 'padrao');
+            $cupomPrincipalId = $request->filled('cupom_principal_id') ? (int) $request->input('cupom_principal_id') : null;
+            $cupomSecundarioId = $request->filled('cupom_secundario_id') ? (int) $request->input('cupom_secundario_id') : null;
+
+            if ($modoPrecos === 'dois_precos' && empty($cupomSecundarioId)) {
+                $validator->errors()->add('cupom_secundario_id', 'Selecione o cupom do segundo preço.');
+            }
+
+            if (
+                $modoPrecos === 'dois_precos' &&
+                !empty($cupomPrincipalId) &&
+                !empty($cupomSecundarioId) &&
+                $cupomPrincipalId === $cupomSecundarioId
+            ) {
+                $validator->errors()->add('cupom_secundario_id', 'O cupom do segundo preço deve ser diferente do principal.');
+            }
+        });
+
+        $validated = $validator->validate();
+
+        $modoPrecos = $validated['modo_precos'] ?? 'padrao';
+        if (!in_array($modoPrecos, ['padrao', 'um_preco', 'dois_precos'], true)) {
+            $modoPrecos = 'padrao';
+        }
+
+        $cupomPrincipalId = !empty($validated['cupom_principal_id']) ? (int) $validated['cupom_principal_id'] : null;
+        $cupomSecundarioId = !empty($validated['cupom_secundario_id']) ? (int) $validated['cupom_secundario_id'] : null;
+
+        if (!$temCupons) {
+            $modoPrecos = 'padrao';
+            $cupomPrincipalId = null;
+            $cupomSecundarioId = null;
+        } elseif ($modoPrecos === 'padrao') {
+            $cupomPrincipalId = null;
+            $cupomSecundarioId = null;
+        } elseif ($modoPrecos === 'um_preco') {
+            $cupomSecundarioId = null;
+        }
+
+        return [
+            'formulario_pre_checkout' => $request->boolean('formulario_pre_checkout'),
+            'modo_precos' => $modoPrecos,
+            'cupom_principal_id' => $cupomPrincipalId,
+            'cupom_secundario_id' => $cupomSecundarioId,
+        ];
+    }
  
     public function updateOrder(Request $request)
     {

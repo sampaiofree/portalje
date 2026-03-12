@@ -79,4 +79,36 @@ class AfiliadosCupomSelectTest extends TestCase
         $response->assertSee('@click="publicPageConfigExpanded = !publicPageConfigExpanded"', false);
         $response->assertSee(':class="publicPageConfigExpanded ? \'rotate-180\' : \'\'"', false);
     }
+
+    public function test_afiliados_cadastrar_curso_renders_bulk_actions_dropdown(): void
+    {
+        $this->withoutMiddleware(MinhaJornada::class);
+
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+        ]);
+
+        Curso::create([
+            'titulo' => 'Curso Com Ações',
+            'url' => 'curso-com-acoes',
+            'publicado' => true,
+            'permitir_afiliacao' => true,
+            'preco_cheio_completo' => 'R$197',
+            'codigo_afiliado_plano_completo' => 'abc123',
+            'link_checkout_completo' => 'https://go.hotmart.com/T99999999A?ap=abc123',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('cadastrar_cursos'));
+
+        $response->assertOk();
+        $response->assertSee('Ações');
+        $response->assertSee('Ativar todos');
+        $response->assertSee('Desativar todos');
+        $response->assertSee('Configurar página pública em massa');
+        $response->assertSee('Configurações da página pública em massa');
+        $response->assertSee('Aplicar em todos');
+        $response->assertSee('configurar_pagina_publica_todos');
+        $response->assertSee('bulkPublicConfigModalOpen', false);
+        $response->assertSee('bulkActionsUrl', false);
+    }
 }
