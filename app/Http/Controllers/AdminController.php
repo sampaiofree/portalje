@@ -8,45 +8,576 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 use App\Models\User;
 use App\Models\Curso;
 use App\Models\PurchaseEvent;
+use App\Services\AdminAffiliateHealthService;
 
 class AdminController extends Controller
 {
 
-    public function dashboard(){
-        $afiliados = User::getMonthlyRegistrationsLastSixMonths();
-    
-        // Extrair os dados do mês, total e total com domínio
+    public function dashboard(Request $request, AdminAffiliateHealthService $healthService)
+    {
+        $filters = $this->parseDashboardFilters($request);
+        $baseQuery = $this->buildDashboardUsersQuery($filters);
+        $metrics = $this->calculateDashboardMetrics($baseQuery);
+        $healthSnapshot = $healthService->buildSnapshot($baseQuery, $filters);
+
+        $usuarios = (clone $baseQuery)
+            ->select('users.*')
+            ->with(['whatsappAtendimentos' => function ($query) {
+                $query->orderByDesc('is_active')->orderByDesc('updated_at');
+            }])
+            ->orderByDesc('users.created_at')
+            ->paginate(50)
+            ->appends($request->query());
+
+        $queueSetupRows = collect($healthSnapshot['queue_setup_rows'] ?? []);
+        $queueLeadRows = collect($healthSnapshot['queue_lead_rows'] ?? []);
+
+        $queueSetupPaginator = $this->paginateCollection(
+            $queueSetupRows,
+            20,
+            $request,
+            'setup_page'
+        );
+
+        $queueLeadPaginator = $this->paginateCollection(
+            $queueLeadRows,
+            20,
+            $request,
+            'lead_page'
+        );
+
+        $series = $this->affiliateMonthlyRegistrationsLastFiveMonths();
         $meses = [];
         $totalCadastros = [];
         $totalComDominio = [];
 
-        $tot_cadastros = 0;
-        $tot_dominio = 0;
-    
-        foreach ($afiliados as $afiliado) {
-            $meses[] = "{$afiliado['month']}/{$afiliado['year']}";
-            $totalCadastros[] = $afiliado['total'];
-            $totalComDominio[] = $afiliado['total_with_dominio'];
-
-            $tot_cadastros+=$afiliado['total'];
-            $tot_dominio += $afiliado['total_with_dominio'];
+        foreach ($series as $row) {
+            $meses[] = sprintf('%02d/%04d', (int) $row['month'], (int) $row['year']);
+            $totalCadastros[] = (int) $row['total'];
+            $totalComDominio[] = (int) $row['total_with_dominio'];
         }
 
-        $aproveitamento = $tot_cadastros > 0
-            ? number_format(($tot_dominio / $tot_cadastros) * 100, 2, ",", "")
-            : "0,00";
+        return view('adm.dashboard_adm', [
+            'filters' => $filters,
+            'metrics' => $metrics,
+            'usuarios' => $usuarios,
+            'healthMetrics' => $healthSnapshot['health_metrics'] ?? [],
+            'queueSetupRows' => $queueSetupPaginator,
+            'queueLeadRows' => $queueLeadPaginator,
+            'queueCounts' => [
+                'setup_sem_lead' => $queueSetupRows->count(),
+                'lead_sem_venda' => $queueLeadRows->count(),
+            ],
+            'meses' => $meses,
+            'totalCadastros' => $totalCadastros,
+            'totalComDominio' => $totalComDominio,
+        ]);
+    }
 
-        $afiliados = [
-            "tot_cadastros" =>  $tot_cadastros,
-            "tot_dominio" => $tot_dominio,
-            "aproveitamento" => $aproveitamento
+    public function dashboard_export_csv(Request $request, AdminAffiliateHealthService $healthService)
+    {
+        $filters = $this->parseDashboardFilters($request);
+        $baseQuery = $this->buildDashboardUsersQuery($filters);
+        $healthSnapshot = $healthService->buildSnapshot($baseQuery, $filters);
+
+        $queueRows = $this->selectQueueRowsForFilter(
+            collect($healthSnapshot['queue_setup_rows'] ?? []),
+            collect($healthSnapshot['queue_lead_rows'] ?? []),
+            (string) ($filters['fila'] ?? 'all')
+        )->values();
+
+        $fileName = 'dashboard_usuarios_' . now()->format('Ymd_His') . '.csv';
+
+        return response()->streamDownload(function () use ($queueRows) {
+            $output = fopen('php://output', 'w');
+            if ($output === false) {
+                return;
+            }
+
+            fwrite($output, "\xEF\xBB\xBF");
+            fputcsv($output, [
+                'Nome',
+                'Telefone de contato',
+                'Email',
+                'Telefone de atendimento',
+                'Data cadastro',
+                'Dias desde cadastro',
+                'Total leads',
+                'Total vendas',
+                'Fila',
+            ], ';');
+
+            foreach ($queueRows as $row) {
+                fputcsv($output, [
+                    (string) ($row['name'] ?? ''),
+                    (string) ($row['telefone_contato'] ?? ''),
+                    (string) ($row['email'] ?? ''),
+                    (string) ($row['telefone_atendimento'] ?? ''),
+                    (string) ($row['data_cadastro'] ?? ''),
+                    $this->normalizeCsvNumericValue($row['dias_desde_cadastro'] ?? null),
+                    $this->normalizeCsvNumericValue($row['total_leads'] ?? 0),
+                    $this->normalizeCsvNumericValue($row['total_vendas'] ?? 0),
+                    (string) ($row['fila'] ?? ''),
+                ], ';');
+            }
+
+            fclose($output);
+        }, $fileName, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Cache-Control' => 'no-store, no-cache, must-revalidate',
+        ]);
+    }
+
+    private function dashboardFilterDefaults(): array
+    {
+        return [
+            'period_scope' => 'last_90_days',
+            'date_start' => '',
+            'date_end' => '',
+            'tem_dominio' => 'all',
+            'tem_lead' => 'all',
+            'tem_venda' => 'all',
+            'tem_produto' => 'all',
+            'tem_whatsapp' => 'all',
+            'dias_sem_lead' => 7,
+            'dias_sem_venda' => 7,
+            'fila' => 'all',
         ];
-    
-        return view('adm.dashboard_adm', compact('meses', 'totalCadastros', 'totalComDominio', 'afiliados'));
+    }
+
+    private function parseDashboardFilters(Request $request): array
+    {
+        $filters = $this->dashboardFilterDefaults();
+
+        $periodScope = strtolower(trim((string) $request->query('period_scope', 'last_90_days')));
+        if (!in_array($periodScope, ['last_90_days', 'all'], true)) {
+            $periodScope = 'last_90_days';
+        }
+        $filters['period_scope'] = $periodScope;
+
+        $dateStart = trim((string) $request->query('date_start', ''));
+        $dateEnd = trim((string) $request->query('date_end', ''));
+
+        if ($periodScope === 'all') {
+            $filters['date_start'] = '';
+            $filters['date_end'] = '';
+        } else {
+            $parsedDateStart = $this->isValidDate($dateStart) ? $dateStart : '';
+            $parsedDateEnd = $this->isValidDate($dateEnd) ? $dateEnd : '';
+
+            if ($parsedDateStart === '' && $parsedDateEnd === '') {
+                $filters['date_start'] = now()->subDays(90)->toDateString();
+                $filters['date_end'] = now()->toDateString();
+            } else {
+                $filters['date_start'] = $parsedDateStart;
+                $filters['date_end'] = $parsedDateEnd;
+            }
+
+            if ($filters['date_start'] !== '' && $filters['date_end'] !== '' && $filters['date_start'] > $filters['date_end']) {
+                $tmp = $filters['date_start'];
+                $filters['date_start'] = $filters['date_end'];
+                $filters['date_end'] = $tmp;
+            }
+        }
+
+        foreach (['tem_dominio', 'tem_lead', 'tem_venda', 'tem_produto', 'tem_whatsapp'] as $field) {
+            $value = strtolower(trim((string) $request->query($field, 'all')));
+            $filters[$field] = in_array($value, ['all', 'yes', 'no'], true) ? $value : 'all';
+        }
+
+        $filters['dias_sem_lead'] = $this->sanitizeDaysFilter($request->query('dias_sem_lead', 7));
+        $filters['dias_sem_venda'] = $this->sanitizeDaysFilter($request->query('dias_sem_venda', 7));
+
+        $fila = strtolower(trim((string) $request->query('fila', 'all')));
+        $filters['fila'] = in_array($fila, ['all', 'setup_sem_lead', 'lead_sem_venda'], true) ? $fila : 'all';
+
+        return $filters;
+    }
+
+    private function isValidDate(string $value): bool
+    {
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
+            return false;
+        }
+
+        $date = \DateTime::createFromFormat('Y-m-d', $value);
+        return $date instanceof \DateTime && $date->format('Y-m-d') === $value;
+    }
+
+    private function sanitizeDaysFilter($value): int
+    {
+        $days = (int) $value;
+        if ($days < 0) {
+            return 0;
+        }
+
+        if ($days > 3650) {
+            return 3650;
+        }
+
+        return $days;
+    }
+
+    private function paginateCollection(Collection $rows, int $perPage, Request $request, string $pageName): LengthAwarePaginator
+    {
+        $page = max((int) $request->query($pageName, 1), 1);
+        $offset = ($page - 1) * $perPage;
+        $items = $rows->slice($offset, $perPage)->values();
+
+        return new LengthAwarePaginator(
+            $items,
+            $rows->count(),
+            $perPage,
+            $page,
+            [
+                'path' => $request->url(),
+                'pageName' => $pageName,
+                'query' => $request->query(),
+            ]
+        );
+    }
+
+    private function selectQueueRowsForFilter(Collection $setupRows, Collection $leadRows, string $queueFilter): Collection
+    {
+        if ($queueFilter === 'setup_sem_lead') {
+            return $setupRows;
+        }
+
+        if ($queueFilter === 'lead_sem_venda') {
+            return $leadRows;
+        }
+
+        return $setupRows
+            ->concat($leadRows)
+            ->values();
+    }
+
+    private function normalizeCsvNumericValue($value): string
+    {
+        if ($value === null || $value === '') {
+            return '';
+        }
+
+        return (string) ((int) $value);
+    }
+
+    private function buildDashboardUsersQuery(array $filters): Builder
+    {
+        $query = User::query()
+            ->where('users.nivel_acesso', User::NIVEL_ACESSO_USER);
+
+        if (($filters['date_start'] ?? '') !== '') {
+            $query->whereDate('users.created_at', '>=', $filters['date_start']);
+        }
+
+        if (($filters['date_end'] ?? '') !== '') {
+            $query->whereDate('users.created_at', '<=', $filters['date_end']);
+        }
+
+        $this->applyTriStateFilter(
+            $query,
+            $filters['tem_dominio'] ?? 'all',
+            fn (Builder $q) => $this->applyHasDomainCondition($q, true),
+            fn (Builder $q) => $this->applyHasDomainCondition($q, false)
+        );
+
+        $this->applyTriStateFilter(
+            $query,
+            $filters['tem_lead'] ?? 'all',
+            fn (Builder $q) => $this->applyHasLeadCondition($q, true),
+            fn (Builder $q) => $this->applyHasLeadCondition($q, false)
+        );
+
+        $this->applyTriStateFilter(
+            $query,
+            $filters['tem_venda'] ?? 'all',
+            fn (Builder $q) => $this->applyHasSaleLeadCondition($q, true),
+            fn (Builder $q) => $this->applyHasSaleLeadCondition($q, false)
+        );
+
+        $this->applyTriStateFilter(
+            $query,
+            $filters['tem_produto'] ?? 'all',
+            fn (Builder $q) => $this->applyHasProductCondition($q, true),
+            fn (Builder $q) => $this->applyHasProductCondition($q, false)
+        );
+
+        $this->applyTriStateFilter(
+            $query,
+            $filters['tem_whatsapp'] ?? 'all',
+            fn (Builder $q) => $this->applyHasWhatsappCondition($q, true),
+            fn (Builder $q) => $this->applyHasWhatsappCondition($q, false)
+        );
+
+        return $query;
+    }
+
+    private function applyTriStateFilter(Builder $query, string $value, callable $yesCallback, callable $noCallback): void
+    {
+        if ($value === 'yes') {
+            $yesCallback($query);
+            return;
+        }
+
+        if ($value === 'no') {
+            $noCallback($query);
+        }
+    }
+
+    private function calculateDashboardMetrics(Builder $baseQuery): array
+    {
+        $hasCodigoRef = Schema::hasTable('codigo_ref');
+        $hasPurchaseEvents = Schema::hasTable('purchase_events');
+        $hasWhatsappTable = Schema::hasTable('whatsapp_atendimento');
+
+        $domainCondition = "((users.dominio IS NOT NULL AND TRIM(users.dominio) <> '') OR (users.dominio_externo IS NOT NULL AND TRIM(users.dominio_externo) <> ''))";
+
+        $productExistsCondition = $hasCodigoRef
+            ? "EXISTS (SELECT 1 FROM codigo_ref cr WHERE cr.user_id = users.id)"
+            : '0 = 1';
+
+        $leadExistsCondition = ($hasCodigoRef && $hasPurchaseEvents)
+            ? "EXISTS (SELECT 1 FROM codigo_ref cr JOIN purchase_events pe ON pe.affiliate_code = cr.codigo_ref WHERE cr.user_id = users.id AND cr.codigo_ref IS NOT NULL AND TRIM(cr.codigo_ref) <> '')"
+            : '0 = 1';
+
+        $saleLeadExistsCondition = ($hasCodigoRef && $hasPurchaseEvents)
+            ? "EXISTS (SELECT 1 FROM codigo_ref cr JOIN purchase_events pe ON pe.affiliate_code = cr.codigo_ref WHERE cr.user_id = users.id AND cr.codigo_ref IS NOT NULL AND TRIM(cr.codigo_ref) <> '' AND UPPER(TRIM(COALESCE(pe.purchase_status, ''))) IN ('APPROVED', 'COMPLETED'))"
+            : '0 = 1';
+
+        $whatsappCondition = $hasWhatsappTable
+            ? "((users.whatsapp_atendimento IS NOT NULL AND TRIM(users.whatsapp_atendimento) <> '') OR EXISTS (SELECT 1 FROM whatsapp_atendimento wa WHERE wa.user_id = users.id))"
+            : "(users.whatsapp_atendimento IS NOT NULL AND TRIM(users.whatsapp_atendimento) <> '')";
+
+        $row = (clone $baseQuery)
+            ->selectRaw('COUNT(users.id) as total_cadastros')
+            ->selectRaw("SUM(CASE WHEN {$domainCondition} THEN 1 ELSE 0 END) as com_dominio")
+            ->selectRaw("SUM(CASE WHEN {$leadExistsCondition} THEN 1 ELSE 0 END) as com_lead")
+            ->selectRaw("SUM(CASE WHEN {$saleLeadExistsCondition} THEN 1 ELSE 0 END) as com_lead_venda")
+            ->selectRaw("SUM(CASE WHEN {$productExistsCondition} THEN 1 ELSE 0 END) as com_produto")
+            ->selectRaw("SUM(CASE WHEN {$whatsappCondition} THEN 1 ELSE 0 END) as com_whatsapp")
+            ->first();
+
+        return [
+            'total_cadastros' => (int) ($row->total_cadastros ?? 0),
+            'com_dominio' => (int) ($row->com_dominio ?? 0),
+            'com_lead' => (int) ($row->com_lead ?? 0),
+            'com_lead_venda' => (int) ($row->com_lead_venda ?? 0),
+            'com_produto' => (int) ($row->com_produto ?? 0),
+            'com_whatsapp' => (int) ($row->com_whatsapp ?? 0),
+        ];
+    }
+
+    private function applyHasDomainCondition(Builder $query, bool $has): void
+    {
+        if ($has) {
+            $query->where(function (Builder $subQuery) {
+                $subQuery
+                    ->where(function (Builder $domainQuery) {
+                        $domainQuery
+                            ->whereNotNull('users.dominio')
+                            ->whereRaw("TRIM(users.dominio) <> ''");
+                    })
+                    ->orWhere(function (Builder $externalQuery) {
+                        $externalQuery
+                            ->whereNotNull('users.dominio_externo')
+                            ->whereRaw("TRIM(users.dominio_externo) <> ''");
+                    });
+            });
+
+            return;
+        }
+
+        $query->where(function (Builder $subQuery) {
+            $subQuery
+                ->where(function (Builder $domainQuery) {
+                    $domainQuery
+                        ->whereNull('users.dominio')
+                        ->orWhereRaw("TRIM(users.dominio) = ''");
+                })
+                ->where(function (Builder $externalQuery) {
+                    $externalQuery
+                        ->whereNull('users.dominio_externo')
+                        ->orWhereRaw("TRIM(users.dominio_externo) = ''");
+                });
+        });
+    }
+
+    private function applyHasProductCondition(Builder $query, bool $has): void
+    {
+        if (!Schema::hasTable('codigo_ref')) {
+            if ($has) {
+                $query->whereRaw('1 = 0');
+            }
+            return;
+        }
+
+        $method = $has ? 'whereExists' : 'whereNotExists';
+        $query->{$method}(function ($subQuery) {
+            $subQuery
+                ->selectRaw('1')
+                ->from('codigo_ref as cr')
+                ->whereColumn('cr.user_id', 'users.id');
+        });
+    }
+
+    private function applyHasLeadCondition(Builder $query, bool $has): void
+    {
+        if (!Schema::hasTable('codigo_ref') || !Schema::hasTable('purchase_events')) {
+            if ($has) {
+                $query->whereRaw('1 = 0');
+            }
+            return;
+        }
+
+        $method = $has ? 'whereExists' : 'whereNotExists';
+        $query->{$method}(function ($subQuery) {
+            $subQuery
+                ->selectRaw('1')
+                ->from('codigo_ref as cr')
+                ->join('purchase_events as pe', 'pe.affiliate_code', '=', 'cr.codigo_ref')
+                ->whereColumn('cr.user_id', 'users.id')
+                ->whereNotNull('cr.codigo_ref')
+                ->whereRaw("TRIM(cr.codigo_ref) <> ''");
+        });
+    }
+
+    private function applyHasSaleLeadCondition(Builder $query, bool $has): void
+    {
+        if (!Schema::hasTable('codigo_ref') || !Schema::hasTable('purchase_events')) {
+            if ($has) {
+                $query->whereRaw('1 = 0');
+            }
+            return;
+        }
+
+        $method = $has ? 'whereExists' : 'whereNotExists';
+        $query->{$method}(function ($subQuery) {
+            $subQuery
+                ->selectRaw('1')
+                ->from('codigo_ref as cr')
+                ->join('purchase_events as pe', 'pe.affiliate_code', '=', 'cr.codigo_ref')
+                ->whereColumn('cr.user_id', 'users.id')
+                ->whereNotNull('cr.codigo_ref')
+                ->whereRaw("TRIM(cr.codigo_ref) <> ''")
+                ->whereRaw("UPPER(TRIM(COALESCE(pe.purchase_status, ''))) IN ('APPROVED', 'COMPLETED')");
+        });
+    }
+
+    private function applyHasWhatsappCondition(Builder $query, bool $has): void
+    {
+        $hasWhatsappTable = Schema::hasTable('whatsapp_atendimento');
+
+        if ($has) {
+            $query->where(function (Builder $subQuery) use ($hasWhatsappTable) {
+                $subQuery->where(function (Builder $legacyQuery) {
+                    $legacyQuery
+                        ->whereNotNull('users.whatsapp_atendimento')
+                        ->whereRaw("TRIM(users.whatsapp_atendimento) <> ''");
+                });
+
+                if ($hasWhatsappTable) {
+                    $subQuery->orWhereExists(function ($existsQuery) {
+                        $existsQuery
+                            ->selectRaw('1')
+                            ->from('whatsapp_atendimento as wa')
+                            ->whereColumn('wa.user_id', 'users.id');
+                    });
+                }
+            });
+
+            return;
+        }
+
+        $query->where(function (Builder $subQuery) use ($hasWhatsappTable) {
+            $subQuery->where(function (Builder $legacyQuery) {
+                $legacyQuery
+                    ->whereNull('users.whatsapp_atendimento')
+                    ->orWhereRaw("TRIM(users.whatsapp_atendimento) = ''");
+            });
+
+            if ($hasWhatsappTable) {
+                $subQuery->whereNotExists(function ($existsQuery) {
+                    $existsQuery
+                        ->selectRaw('1')
+                        ->from('whatsapp_atendimento as wa')
+                        ->whereColumn('wa.user_id', 'users.id');
+                });
+            }
+        });
+    }
+
+    private function resolveContatoTelefone(User $user): string
+    {
+        $telefone = trim((string) ($user->telefone_pessoal_1 ?? ''));
+        if ($telefone !== '') {
+            return $telefone;
+        }
+
+        $fallback = trim((string) ($user->telefone_pessoal_2 ?? ''));
+        return $fallback;
+    }
+
+    private function resolveAtendimentoTelefone(User $user): string
+    {
+        $legacy = trim((string) ($user->whatsapp_atendimento ?? ''));
+        if ($legacy !== '') {
+            return $legacy;
+        }
+
+        if (!$user->relationLoaded('whatsappAtendimentos')) {
+            return '';
+        }
+
+        $registro = $user->whatsappAtendimentos->first();
+        if (!$registro) {
+            return '';
+        }
+
+        return trim((string) ($registro->whatsapp ?? ''));
+    }
+
+    private function affiliateMonthlyRegistrationsLastFiveMonths(): array
+    {
+        $now = now();
+        $startDate = $now->copy()->subMonths(4)->startOfMonth();
+        $endDate = $now->copy()->endOfMonth();
+
+        $driver = DB::connection()->getDriverName();
+        $yearExpression = $driver === 'sqlite'
+            ? "CAST(strftime('%Y', users.created_at) AS INTEGER)"
+            : "YEAR(users.created_at)";
+        $monthExpression = $driver === 'sqlite'
+            ? "CAST(strftime('%m', users.created_at) AS INTEGER)"
+            : "MONTH(users.created_at)";
+
+        return User::query()
+            ->where('users.nivel_acesso', User::NIVEL_ACESSO_USER)
+            ->whereBetween('users.created_at', [$startDate, $endDate])
+            ->selectRaw("$yearExpression as year")
+            ->selectRaw("$monthExpression as month")
+            ->selectRaw('COUNT(*) as total')
+            ->selectRaw("COUNT(CASE WHEN ((users.dominio IS NOT NULL AND TRIM(users.dominio) <> '') OR (users.dominio_externo IS NOT NULL AND TRIM(users.dominio_externo) <> '')) THEN 1 END) as total_with_dominio")
+            ->groupByRaw("$yearExpression, $monthExpression")
+            ->orderBy('year')
+            ->orderBy('month')
+            ->get()
+            ->map(function ($row) {
+                return [
+                    'year' => (int) $row->year,
+                    'month' => (int) $row->month,
+                    'total' => (int) $row->total,
+                    'total_with_dominio' => (int) $row->total_with_dominio,
+                ];
+            })
+            ->toArray();
     }
 
     public function logsIndex()

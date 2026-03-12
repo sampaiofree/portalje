@@ -208,15 +208,9 @@ Route::prefix('administrador')->group(function () {
         return app(App\Http\Controllers\AdminController::class)->adm_cursos_lista();  
     })->name('adm_cursos_lista');
 
-    Route::get('/dashboard', function () { //CURSOS
-        if (!Auth::check() || Auth::user()->nivel_acesso !== 'admin') {
-            return redirect('dashboard')->with('error', 'Você não tem permissão para acessar esta página.');
-        }
-        // Chame seu controlador ou lógica aqui
-        return app(App\Http\Controllers\AdminController::class)->dashboard();
-    })->name('dashboard_adm');
-
     Route::middleware(['auth', 'check.admin'])->group(function () {
+        Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('dashboard_adm');
+        Route::get('/dashboard/export-csv', [AdminController::class, 'dashboard_export_csv'])->name('dashboard_adm_export_csv');
         Route::get('/cupons', [CupomController::class, 'index'])->name('admin.cupons.index');
         Route::post('/cupons', [CupomController::class, 'store'])->name('admin.cupons.store');
         Route::put('/cupons/{cupom}', [CupomController::class, 'update'])->name('admin.cupons.update');
