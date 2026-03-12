@@ -160,6 +160,64 @@ class AdminDashboardActivationFunnelTest extends TestCase
         $response->assertDontSee($users['com_venda_approved']->name);
     }
 
+    public function test_dashboard_provides_daily_registration_series_with_zero_filled_days(): void
+    {
+        [$admin] = $this->seedHealthScenario();
+
+        $response = $this->actingAs($admin)->get(route('dashboard_adm', [
+            'period_scope' => 'last_90_days',
+            'date_start' => '2026-03-01',
+            'date_end' => '2026-03-05',
+            'tem_dominio' => 'no',
+            'tem_whatsapp' => 'no',
+        ]));
+
+        $response->assertOk();
+        $this->assertSame(
+            ['2026-03-01', '2026-03-02', '2026-03-03', '2026-03-04', '2026-03-05'],
+            $response->viewData('dailyLabels')
+        );
+        $this->assertSame([1, 0, 0, 0, 1], $response->viewData('dailyCadastros'));
+        $this->assertTrue($response->viewData('showDailyChart'));
+        $response->assertSee('id="dash-daily-chart"', false);
+    }
+
+    public function test_dashboard_hides_daily_chart_when_period_scope_is_all(): void
+    {
+        [$admin] = $this->seedHealthScenario();
+
+        $response = $this->actingAs($admin)->get(route('dashboard_adm', [
+            'period_scope' => 'all',
+        ]));
+
+        $response->assertOk();
+        $this->assertFalse($response->viewData('showDailyChart'));
+        $this->assertSame(
+            'Selecione um intervalo de datas para visualizar os cadastros por dia.',
+            $response->viewData('dailyChartMessage')
+        );
+        $response->assertSee('Selecione um intervalo de datas para visualizar os cadastros por dia.');
+        $response->assertDontSee('id="dash-daily-chart"', false);
+    }
+
+    public function test_dashboard_keeps_monthly_chart_block_and_uses_valid_apexcharts_source(): void
+    {
+        [$admin] = $this->seedHealthScenario();
+
+        $response = $this->actingAs($admin)->get(route('dashboard_adm', [
+            'period_scope' => 'last_90_days',
+            'date_start' => '2026-03-01',
+            'date_end' => '2026-03-31',
+        ]));
+
+        $response->assertOk();
+        $response->assertSee('id="dash-revenue-chart"', false);
+        $response->assertSee('https://cdn.jsdelivr.net/npm/apexcharts', false);
+        $this->assertIsArray($response->viewData('meses'));
+        $this->assertIsArray($response->viewData('totalCadastros'));
+        $this->assertIsArray($response->viewData('totalComDominio'));
+    }
+
     /**
      * @return array{0: User, 1: array<string, User>}
      */

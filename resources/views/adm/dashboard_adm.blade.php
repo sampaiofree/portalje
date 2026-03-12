@@ -42,6 +42,11 @@
             'mediana_dias_primeira_venda' => null,
         ];
 
+        $dailyLabels = $dailyLabels ?? [];
+        $dailyCadastros = $dailyCadastros ?? [];
+        $showDailyChart = $showDailyChart ?? false;
+        $dailyChartMessage = $dailyChartMessage ?? 'Selecione um intervalo de datas para visualizar os cadastros por dia.';
+
         $queueCounts = $queueCounts ?? [
             'setup_sem_lead' => 0,
             'lead_sem_venda' => 0,
@@ -455,6 +460,17 @@
             </div>
 
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
+                <div class="mb-2 text-sm text-gray-500">Cadastros por dia (período filtrado)</div>
+                @if ($showDailyChart)
+                    <div id="dash-daily-chart" class="w-full" style="min-height: 320px;"></div>
+                @else
+                    <div class="rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+                        {{ $dailyChartMessage }}
+                    </div>
+                @endif
+            </div>
+
+            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
                 <div class="mb-2 text-sm text-gray-500">Cadastros mensais (últimos 5 meses)</div>
                 <div id="dash-revenue-chart" class="w-full" style="min-height: 350px;"></div>
             </div>
@@ -462,53 +478,123 @@
     </div>
 
     @push('scripts')
-        <script src="{{ asset('Hyper_v5.4/Admin/dist/saas/assets/vendor/apexcharts/apexcharts.min.js') }}"></script>
+        <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
         <script>
             (function () {
+                const hasApex = typeof ApexCharts !== 'undefined';
                 const chartElement = document.querySelector('#dash-revenue-chart');
-                if (chartElement && typeof ApexCharts !== 'undefined') {
-                    const options = {
-                        series: [{
-                            name: 'Total de Cadastros',
-                            data: @json($totalCadastros)
-                        }, {
-                            name: 'Cadastros com Domínio',
-                            data: @json($totalComDominio)
-                        }],
-                        chart: {
-                            type: 'bar',
-                            height: 350
-                        },
-                        plotOptions: {
-                            bar: {
-                                horizontal: false,
-                                columnWidth: '45%',
-                                endingShape: 'rounded'
-                            }
-                        },
-                        dataLabels: {
-                            enabled: false
-                        },
-                        stroke: {
-                            show: true,
-                            width: 2,
-                            colors: ['transparent']
-                        },
-                        xaxis: {
-                            categories: @json($meses)
-                        },
-                        yaxis: {
-                            title: {
-                                text: 'Número de Cadastros'
-                            }
-                        },
-                        fill: {
-                            opacity: 1
-                        }
-                    };
+                if (chartElement) {
+                    const monthlyLabels = @json($meses);
+                    const monthlyCadastros = @json($totalCadastros);
+                    const monthlyComDominio = @json($totalComDominio);
 
-                    const chart = new ApexCharts(chartElement, options);
-                    chart.render();
+                    if (!hasApex) {
+                        chartElement.innerHTML = '<p class="text-sm text-gray-500">Não foi possível carregar a biblioteca de gráfico.</p>';
+                    } else if (monthlyLabels.length === 0) {
+                        chartElement.innerHTML = '<p class="text-sm text-gray-500">Sem dados de cadastros para os últimos 5 meses.</p>';
+                    } else {
+                        const options = {
+                            series: [{
+                                name: 'Total de Cadastros',
+                                data: monthlyCadastros
+                            }, {
+                                name: 'Cadastros com Domínio',
+                                data: monthlyComDominio
+                            }],
+                            chart: {
+                                type: 'bar',
+                                height: 350
+                            },
+                            plotOptions: {
+                                bar: {
+                                    horizontal: false,
+                                    columnWidth: '45%',
+                                    endingShape: 'rounded'
+                                }
+                            },
+                            dataLabels: {
+                                enabled: false
+                            },
+                            stroke: {
+                                show: true,
+                                width: 2,
+                                colors: ['transparent']
+                            },
+                            xaxis: {
+                                categories: monthlyLabels
+                            },
+                            yaxis: {
+                                title: {
+                                    text: 'Número de Cadastros'
+                                }
+                            },
+                            fill: {
+                                opacity: 1
+                            }
+                        };
+
+                        const chart = new ApexCharts(chartElement, options);
+                        chart.render();
+                    }
+                }
+
+                const dailyChartElement = document.querySelector('#dash-daily-chart');
+                if (dailyChartElement) {
+                    const dailyLabels = @json($dailyLabels);
+                    const dailyCadastros = @json($dailyCadastros);
+
+                    if (!hasApex) {
+                        dailyChartElement.innerHTML = '<p class="text-sm text-gray-500">Não foi possível carregar a biblioteca de gráfico.</p>';
+                    } else if (dailyLabels.length === 0) {
+                        dailyChartElement.innerHTML = '<p class="text-sm text-gray-500">Sem dados de cadastros para o período selecionado.</p>';
+                    } else {
+                        const dailyOptions = {
+                            series: [{
+                                name: 'Cadastros por dia',
+                                data: dailyCadastros
+                            }],
+                            chart: {
+                                type: 'line',
+                                height: 320,
+                                toolbar: {
+                                    show: false
+                                }
+                            },
+                            stroke: {
+                                curve: 'smooth',
+                                width: 3
+                            },
+                            dataLabels: {
+                                enabled: false
+                            },
+                            markers: {
+                                size: 3
+                            },
+                            xaxis: {
+                                categories: dailyLabels,
+                                labels: {
+                                    rotate: -45
+                                }
+                            },
+                            yaxis: {
+                                title: {
+                                    text: 'Cadastros'
+                                },
+                                min: 0,
+                                forceNiceScale: true
+                            },
+                            tooltip: {
+                                y: {
+                                    formatter: function (value) {
+                                        return String(value);
+                                    }
+                                }
+                            }
+                        };
+
+                        const dailyChart = new ApexCharts(dailyChartElement, dailyOptions);
+                        dailyChart.render();
+                    }
                 }
 
                 const tabRoot = document.querySelector('[data-tab-root]');

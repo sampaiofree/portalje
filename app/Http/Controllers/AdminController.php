@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 
 use App\Models\User;
 use App\Models\Curso;
@@ -65,6 +66,24 @@ class AdminController extends Controller
             $totalComDominio[] = (int) $row['total_with_dominio'];
         }
 
+        $dailySeries = $this->affiliateDailyRegistrationsForDateRange(
+            (string) ($filters['date_start'] ?? ''),
+            (string) ($filters['date_end'] ?? '')
+        );
+
+        $dailyLabels = [];
+        $dailyCadastros = [];
+        foreach ($dailySeries as $row) {
+            $dailyLabels[] = (string) $row['date'];
+            $dailyCadastros[] = (int) $row['total'];
+        }
+
+        $isPeriodAll = ($filters['period_scope'] ?? 'last_90_days') === 'all';
+        $showDailyChart = !$isPeriodAll && ($filters['date_start'] ?? '') !== '' && ($filters['date_end'] ?? '') !== '';
+        $dailyChartMessage = $isPeriodAll
+            ? 'Selecione um intervalo de datas para visualizar os cadastros por dia.'
+            : 'Sem dados de cadastros para o intervalo selecionado.';
+
         return view('adm.dashboard_adm', [
             'filters' => $filters,
             'metrics' => $metrics,
@@ -79,6 +98,10 @@ class AdminController extends Controller
             'meses' => $meses,
             'totalCadastros' => $totalCadastros,
             'totalComDominio' => $totalComDominio,
+            'dailyLabels' => $dailyLabels,
+            'dailyCadastros' => $dailyCadastros,
+            'showDailyChart' => $showDailyChart,
+            'dailyChartMessage' => $dailyChartMessage,
         ]);
     }
 
@@ -578,6 +601,62 @@ class AdminController extends Controller
                 ];
             })
             ->toArray();
+    }
+
+    private function affiliateDailyRegistrationsForDateRange(string $dateStart, string $dateEnd): array
+    {
+        if ($dateStart === '' || $dateEnd === '') {
+            return [];
+        }
+
+        try {
+            $start = Carbon::createFromFormat('Y-m-d', $dateStart)->startOfDay();
+            $end = Carbon::createFromFormat('Y-m-d', $dateEnd)->endOfDay();
+        } catch (\Throwable $e) {
+            return [];
+        }
+
+        if ($start->greaterThan($end)) {
+            [$start, $end] = [$end->copy()->startOfDay(), $start->copy()->endOfDay()];
+        }
+
+        $driver = DB::connection()->getDriverName();
+        $dateExpression = $driver === 'sqlite'
+            ? "strftime('%Y-%m-%d', users.created_at)"
+            : "DATE(users.created_at)";
+
+        $rows = User::query()
+            ->where('users.nivel_acesso', User::NIVEL_ACESSO_USER)
+            ->whereBetween('users.created_at', [$start, $end])
+            ->selectRaw("$dateExpression as day_date")
+            ->selectRaw('COUNT(*) as total')
+            ->groupByRaw($dateExpression)
+            ->orderBy('day_date')
+            ->get();
+
+        $totalsByDate = [];
+        foreach ($rows as $row) {
+            $dayDate = trim((string) ($row->day_date ?? ''));
+            if ($dayDate === '') {
+                continue;
+            }
+            $totalsByDate[$dayDate] = (int) ($row->total ?? 0);
+        }
+
+        $series = [];
+        $cursor = $start->copy()->startOfDay();
+        $lastDay = $end->copy()->startOfDay();
+
+        while ($cursor->lessThanOrEqualTo($lastDay)) {
+            $date = $cursor->format('Y-m-d');
+            $series[] = [
+                'date' => $date,
+                'total' => (int) ($totalsByDate[$date] ?? 0),
+            ];
+            $cursor->addDay();
+        }
+
+        return $series;
     }
 
     public function logsIndex()
