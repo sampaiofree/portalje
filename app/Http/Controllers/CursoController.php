@@ -111,22 +111,7 @@ class CursoController extends Controller
             ? $request->boolean('mostrar_curso')
             : (bool) ($curso->mostrar_na_pagina ?? false);
 
-        $config = RootDomainCourseConfig::query()->firstOrNew([
-            'curso_id' => $curso->id,
-        ]);
-
-        $config->fill([
-            'mostrar_curso' => $mostrarCurso,
-            'formulario_pre_checkout' => $configuracao['formulario_pre_checkout'],
-            'modo_precos' => $configuracao['modo_precos'],
-            'cupom_principal_id' => $configuracao['cupom_principal_id'],
-            'cupom_secundario_id' => $configuracao['cupom_secundario_id'],
-            'usar_contador' => $configuracao['usar_contador'],
-            'contador_minutos' => $configuracao['contador_minutos'],
-            'contador_acao' => $configuracao['contador_acao'],
-            'contador_destino_oferta' => $configuracao['contador_destino_oferta'],
-        ]);
-        $config->save();
+        $config = $this->saveRootDomainCourseConfig($curso, $configuracao, $mostrarCurso);
 
         $message = 'Configurações da página pública do curso ' . $curso->titulo . ' salvas com sucesso.';
 
@@ -150,6 +135,76 @@ class CursoController extends Controller
         return redirect()
             ->route('admin.root_domain_course_pages')
             ->with('success', $message);
+    }
+
+    public function admin_root_domain_course_pages_bulk_actions(Request $request)
+    {
+        if (!Schema::hasTable('root_domain_course_configs')) {
+            return response()->json([
+                'message' => 'A configuração dos domínios raiz ainda não está disponível. Rode as migrations pendentes.',
+            ], 503);
+        }
+
+        $validated = $request->validate([
+            'action' => ['required', 'string', 'in:configurar_pagina_publica_todos'],
+        ]);
+
+        $temCupons = Schema::hasTable('cupons') && Cupom::query()->exists();
+        $configuracao = $this->validateAndNormalizeRootDomainPublicPageConfig($request, $temCupons);
+        $cursosPublicados = Curso::query()
+            ->where('publicado', true)
+            ->orderBy('ordem')
+            ->orderBy('id')
+            ->get(['id', 'mostrar_na_pagina']);
+
+        $updatedCourseIds = $cursosPublicados
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+
+        $configIdsByCourse = [];
+
+        DB::transaction(function () use ($cursosPublicados, $configuracao, &$configIdsByCourse) {
+            $configsExistentes = RootDomainCourseConfig::query()
+                ->whereIn('curso_id', $cursosPublicados->pluck('id')->all())
+                ->get()
+                ->keyBy('curso_id');
+
+            foreach ($cursosPublicados as $curso) {
+                /** @var \App\Models\RootDomainCourseConfig|null $configExistente */
+                $configExistente = $configsExistentes->get($curso->id);
+                $mostrarCursoAtual = $configExistente
+                    ? (bool) $configExistente->mostrar_curso
+                    : (bool) ($curso->mostrar_na_pagina ?? false);
+
+                $config = $this->saveRootDomainCourseConfig(
+                    $curso,
+                    $configuracao,
+                    $mostrarCursoAtual,
+                    $configExistente
+                );
+
+                $configIdsByCourse[(string) $curso->id] = (int) $config->id;
+            }
+        });
+
+        return response()->json([
+            'success' => true,
+            'action' => $validated['action'],
+            'message' => 'Configurações da página pública aplicadas em todos os cursos publicados.',
+            'updated_count' => count($updatedCourseIds),
+            'updated_course_ids' => $updatedCourseIds,
+            'config_ids_by_course' => $configIdsByCourse,
+            'formulario_pre_checkout' => $configuracao['formulario_pre_checkout'],
+            'modo_precos' => $configuracao['modo_precos'],
+            'cupom_principal_id' => $configuracao['cupom_principal_id'],
+            'cupom_secundario_id' => $configuracao['cupom_secundario_id'],
+            'usar_contador' => $configuracao['usar_contador'],
+            'contador_minutos' => $configuracao['contador_minutos'],
+            'contador_acao' => $configuracao['contador_acao'],
+            'contador_destino_oferta' => $configuracao['contador_destino_oferta'],
+        ]);
     }
 
     public function afiliados_cadastrar_curso_bulk_actions(Request $request)
@@ -478,6 +533,32 @@ class CursoController extends Controller
             'contador_acao' => $countdownConfig['contador_acao'],
             'contador_destino_oferta' => $countdownConfig['contador_destino_oferta'],
         ];
+    }
+
+    private function saveRootDomainCourseConfig(
+        Curso $curso,
+        array $configuracao,
+        bool $mostrarCurso,
+        ?RootDomainCourseConfig $config = null
+    ): RootDomainCourseConfig {
+        $config = $config ?: RootDomainCourseConfig::query()->firstOrNew([
+            'curso_id' => $curso->id,
+        ]);
+
+        $config->fill([
+            'mostrar_curso' => $mostrarCurso,
+            'formulario_pre_checkout' => $configuracao['formulario_pre_checkout'],
+            'modo_precos' => $configuracao['modo_precos'],
+            'cupom_principal_id' => $configuracao['cupom_principal_id'],
+            'cupom_secundario_id' => $configuracao['cupom_secundario_id'],
+            'usar_contador' => $configuracao['usar_contador'],
+            'contador_minutos' => $configuracao['contador_minutos'],
+            'contador_acao' => $configuracao['contador_acao'],
+            'contador_destino_oferta' => $configuracao['contador_destino_oferta'],
+        ]);
+        $config->save();
+
+        return $config;
     }
 
     private function portalFormularioPreCheckoutDefault(): bool

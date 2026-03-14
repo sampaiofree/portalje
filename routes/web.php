@@ -213,6 +213,7 @@ Route::prefix('administrador')->group(function () {
         Route::get('/dashboard/export-csv', [AdminController::class, 'dashboard_export_csv'])->name('dashboard_adm_export_csv');
         Route::get('/cursos/paginas-dominios', [CursoController::class, 'admin_root_domain_course_pages'])->name('admin.root_domain_course_pages');
         Route::post('/cursos/paginas-dominios', [CursoController::class, 'admin_root_domain_course_pages_save'])->name('admin.root_domain_course_pages.save');
+        Route::post('/cursos/paginas-dominios/acoes', [CursoController::class, 'admin_root_domain_course_pages_bulk_actions'])->name('admin.root_domain_course_pages.bulk_actions');
         Route::get('/cupons', [CupomController::class, 'index'])->name('admin.cupons.index');
         Route::post('/cupons', [CupomController::class, 'store'])->name('admin.cupons.store');
         Route::put('/cupons/{cupom}', [CupomController::class, 'update'])->name('admin.cupons.update');

@@ -30,8 +30,13 @@ class AdminRootDomainCourseConfigTest extends TestCase
         $response->assertSee('dns.portalje.org e dns.jovemempreendedor.org');
         $response->assertSee('Curso Admin Root');
         $response->assertSee('Mostrar curso nos domínios raiz?');
+        $response->assertSee('Configurar página pública em massa');
+        $response->assertSee('Configurações da página pública em massa');
+        $response->assertSee('Aplicar em todos');
         $response->assertSee('Configurações da página pública');
         $response->assertSee('Usar contador?');
+        $response->assertSee('rootDomainBulkPublicConfigModalOpen', false);
+        $response->assertSee('root-domain-bulk-public-page-config-updated', false);
         $response->assertDontSee('Código REF');
         $response->assertDontSee('Gerador da Página de Vendas');
         $response->assertDontSee('Gerador do Checkout');
@@ -160,6 +165,156 @@ class AdminRootDomainCourseConfigTest extends TestCase
         $destinoInvalidoResponse = $this->actingAs($admin)->postJson(route('admin.root_domain_course_pages.save'), [
             'curso_id' => $curso->id,
             'mostrar_curso' => '1',
+            'formulario_pre_checkout' => '1',
+            'modo_precos' => 'um_preco',
+            'cupom_principal_id' => (string) $cupom->id,
+            'usar_contador' => '1',
+            'contador_minutos' => '5',
+            'contador_acao' => 'alterar_preco',
+            'contador_destino_oferta' => 'basico_padrao',
+        ]);
+
+        $destinoInvalidoResponse
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['contador_destino_oferta']);
+    }
+
+    public function test_admin_can_bulk_configure_root_domain_public_page_for_all_published_courses(): void
+    {
+        $admin = $this->createAdmin();
+        $curso1 = $this->createPublishedCourse('curso-admin-root-bulk-1', [
+            'mostrar_na_pagina' => true,
+        ]);
+        $curso2 = $this->createPublishedCourse('curso-admin-root-bulk-2', [
+            'mostrar_na_pagina' => true,
+        ]);
+        $curso3 = $this->createPublishedCourse('curso-admin-root-bulk-3', [
+            'mostrar_na_pagina' => false,
+        ]);
+        $cursoNaoPublicado = $this->createPublishedCourse('curso-admin-root-bulk-unpublished', [
+            'publicado' => false,
+            'mostrar_na_pagina' => true,
+        ]);
+
+        $cupomPrincipal = Cupom::create(['codigo' => 'ROOT12', 'desconto' => 12]);
+        $cupomSecundario = Cupom::create(['codigo' => 'ROOT42', 'desconto' => 42]);
+
+        $configExistenteCurso2 = RootDomainCourseConfig::create([
+            'curso_id' => $curso2->id,
+            'mostrar_curso' => false,
+            'formulario_pre_checkout' => true,
+            'modo_precos' => 'padrao',
+            'usar_contador' => false,
+        ]);
+
+        RootDomainCourseConfig::create([
+            'curso_id' => $curso3->id,
+            'mostrar_curso' => true,
+            'formulario_pre_checkout' => true,
+            'modo_precos' => 'padrao',
+            'usar_contador' => false,
+        ]);
+
+        $response = $this->actingAs($admin)->postJson(route('admin.root_domain_course_pages.bulk_actions'), [
+            'action' => 'configurar_pagina_publica_todos',
+            'formulario_pre_checkout' => '0',
+            'modo_precos' => 'dois_precos',
+            'cupom_principal_id' => (string) $cupomPrincipal->id,
+            'cupom_secundario_id' => (string) $cupomSecundario->id,
+            'usar_contador' => '1',
+            'contador_minutos' => '10',
+            'contador_acao' => 'alterar_preco',
+            'contador_destino_oferta' => 'basico_cupom:' . $cupomSecundario->id,
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('success', true);
+        $response->assertJsonPath('action', 'configurar_pagina_publica_todos');
+        $response->assertJsonPath('updated_count', 3);
+        $response->assertJsonPath('formulario_pre_checkout', false);
+        $response->assertJsonPath('modo_precos', 'dois_precos');
+        $response->assertJsonPath('cupom_principal_id', $cupomPrincipal->id);
+        $response->assertJsonPath('cupom_secundario_id', $cupomSecundario->id);
+        $response->assertJsonPath('usar_contador', true);
+        $response->assertJsonPath('contador_minutos', 10);
+        $response->assertJsonPath('contador_acao', 'alterar_preco');
+        $response->assertJsonPath('contador_destino_oferta', 'basico_cupom:' . $cupomSecundario->id);
+        $this->assertEqualsCanonicalizing(
+            [$curso1->id, $curso2->id, $curso3->id],
+            $response->json('updated_course_ids')
+        );
+
+        $configIdsByCourse = $response->json('config_ids_by_course');
+        $this->assertIsArray($configIdsByCourse);
+        $this->assertArrayHasKey((string) $curso1->id, $configIdsByCourse);
+        $this->assertArrayHasKey((string) $curso2->id, $configIdsByCourse);
+        $this->assertArrayHasKey((string) $curso3->id, $configIdsByCourse);
+        $this->assertSame($configExistenteCurso2->id, $configIdsByCourse[(string) $curso2->id]);
+
+        $this->assertDatabaseCount('root_domain_course_configs', 3);
+        $this->assertDatabaseHas('root_domain_course_configs', [
+            'curso_id' => $curso1->id,
+            'mostrar_curso' => 1,
+            'formulario_pre_checkout' => 0,
+            'modo_precos' => 'dois_precos',
+            'cupom_principal_id' => $cupomPrincipal->id,
+            'cupom_secundario_id' => $cupomSecundario->id,
+            'usar_contador' => 1,
+            'contador_minutos' => 10,
+            'contador_acao' => 'alterar_preco',
+            'contador_destino_oferta' => 'basico_cupom:' . $cupomSecundario->id,
+        ]);
+        $this->assertDatabaseHas('root_domain_course_configs', [
+            'curso_id' => $curso2->id,
+            'mostrar_curso' => 0,
+            'formulario_pre_checkout' => 0,
+            'modo_precos' => 'dois_precos',
+            'cupom_principal_id' => $cupomPrincipal->id,
+            'cupom_secundario_id' => $cupomSecundario->id,
+            'usar_contador' => 1,
+            'contador_minutos' => 10,
+            'contador_acao' => 'alterar_preco',
+            'contador_destino_oferta' => 'basico_cupom:' . $cupomSecundario->id,
+        ]);
+        $this->assertDatabaseHas('root_domain_course_configs', [
+            'curso_id' => $curso3->id,
+            'mostrar_curso' => 1,
+            'formulario_pre_checkout' => 0,
+            'modo_precos' => 'dois_precos',
+            'cupom_principal_id' => $cupomPrincipal->id,
+            'cupom_secundario_id' => $cupomSecundario->id,
+            'usar_contador' => 1,
+            'contador_minutos' => 10,
+            'contador_acao' => 'alterar_preco',
+            'contador_destino_oferta' => 'basico_cupom:' . $cupomSecundario->id,
+        ]);
+        $this->assertDatabaseMissing('root_domain_course_configs', [
+            'curso_id' => $cursoNaoPublicado->id,
+        ]);
+    }
+
+    public function test_admin_root_domain_bulk_config_rejects_invalid_countdown_combinations(): void
+    {
+        $admin = $this->createAdmin();
+        $curso = $this->createPublishedCourse('curso-admin-root-bulk-invalid');
+        $cupom = Cupom::create(['codigo' => 'ROOT18', 'desconto' => 18]);
+
+        $encerrarBasicoResponse = $this->actingAs($admin)->postJson(route('admin.root_domain_course_pages.bulk_actions'), [
+            'action' => 'configurar_pagina_publica_todos',
+            'formulario_pre_checkout' => '1',
+            'modo_precos' => 'um_preco',
+            'cupom_principal_id' => (string) $cupom->id,
+            'usar_contador' => '1',
+            'contador_minutos' => '5',
+            'contador_acao' => 'encerrar_basico',
+        ]);
+
+        $encerrarBasicoResponse
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['contador_acao']);
+
+        $destinoInvalidoResponse = $this->actingAs($admin)->postJson(route('admin.root_domain_course_pages.bulk_actions'), [
+            'action' => 'configurar_pagina_publica_todos',
             'formulario_pre_checkout' => '1',
             'modo_precos' => 'um_preco',
             'cupom_principal_id' => (string) $cupom->id,

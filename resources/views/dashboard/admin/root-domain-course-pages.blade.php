@@ -5,6 +5,37 @@
         </h2>
     </x-slot>
 
+    @php
+        $hasCuponsDisponiveis = ($cupons ?? collect())->isNotEmpty();
+        $bulkCountdownDestinationOptions = [
+            'padrao' => [
+                ['value' => 'completo_padrao', 'label' => 'Plano completo - Sem cupom'],
+                ['value' => 'basico_padrao', 'label' => 'Plano básico - Sem cupom'],
+            ],
+            'um_preco' => [
+                ['value' => 'completo_padrao', 'label' => 'Plano completo - Sem cupom'],
+            ],
+            'dois_precos' => [
+                ['value' => 'completo_padrao', 'label' => 'Plano completo - Sem cupom'],
+            ],
+        ];
+
+        foreach (($cupons ?? collect()) as $cupomDestino) {
+            $bulkCountdownDestinationOptions['um_preco'][] = [
+                'value' => 'completo_cupom:' . $cupomDestino->id,
+                'label' => 'Plano completo - ' . $cupomDestino->desconto . '% OFF (' . $cupomDestino->codigo . ')',
+            ];
+            $bulkCountdownDestinationOptions['dois_precos'][] = [
+                'value' => 'completo_cupom:' . $cupomDestino->id,
+                'label' => 'Plano completo - ' . $cupomDestino->desconto . '% OFF (' . $cupomDestino->codigo . ')',
+            ];
+            $bulkCountdownDestinationOptions['dois_precos'][] = [
+                'value' => 'basico_cupom:' . $cupomDestino->id,
+                'label' => 'Plano básico - ' . $cupomDestino->desconto . '% OFF (' . $cupomDestino->codigo . ')',
+            ];
+        }
+    @endphp
+
     <div class="py-12">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             <div
@@ -13,8 +44,215 @@
                     showSuccessMessage: false,
                     successMessage: '',
                     showTutorial: false,
+                    rootDomainBulkPublicConfigModalOpen: false,
+                    isBulkPublicConfigLoading: false,
+                    rootDomainBulkPublicConfigError: '',
+                    bulkPublicConfigFormularioPreCheckout: '1',
+                    bulkPublicConfigModoPrecos: 'padrao',
+                    bulkPublicConfigCupomPrincipalId: '',
+                    bulkPublicConfigCupomSecundarioId: '',
+                    bulkPublicConfigUsarContador: '0',
+                    bulkPublicConfigContadorMinutos: '',
+                    bulkPublicConfigContadorAcao: '',
+                    bulkPublicConfigContadorDestinoOferta: '',
+                    bulkCountdownDestinationOptions: @js($bulkCountdownDestinationOptions),
+                    hasCuponsDisponiveis: {{ $hasCuponsDisponiveis ? 'true' : 'false' }},
+                    bulkActionsUrl: @js(route('admin.root_domain_course_pages.bulk_actions', [], false)),
+                    getCsrfToken() {
+                        const csrfTokenEl = document.querySelector('meta[name=csrf-token]');
+                        return csrfTokenEl ? csrfTokenEl.getAttribute('content') : '';
+                    },
+                    parseBulkActionError(payload, fallbackMessage) {
+                        if (payload && payload.errors) {
+                            const errors = Object.values(payload.errors);
+                            return errors?.[0]?.[0] ?? fallbackMessage;
+                        }
+
+                        if (payload && payload.message) {
+                            return payload.message;
+                        }
+
+                        return fallbackMessage;
+                    },
+                    openRootDomainBulkPublicConfigModal() {
+                        this.normalizeBulkPublicConfigSelections();
+                        this.rootDomainBulkPublicConfigError = '';
+                        this.rootDomainBulkPublicConfigModalOpen = true;
+                    },
+                    closeRootDomainBulkPublicConfigModal() {
+                        if (this.isBulkPublicConfigLoading) return;
+                        this.rootDomainBulkPublicConfigModalOpen = false;
+                        this.rootDomainBulkPublicConfigError = '';
+                    },
+                    get bulkCountdownActionOptions() {
+                        if (this.bulkPublicConfigModoPrecos === 'um_preco') {
+                            return [
+                                { value: 'nada', label: 'Nada' },
+                                { value: 'alterar_preco', label: 'Alterar o preço para' },
+                            ];
+                        }
+
+                        return [
+                            { value: 'nada', label: 'Nada' },
+                            { value: 'encerrar_basico', label: 'Encerrar o plano básico' },
+                            { value: 'alterar_preco', label: 'Alterar o preço para' },
+                        ];
+                    },
+                    get activeBulkCountdownDestinationOptions() {
+                        return this.bulkCountdownDestinationOptions[this.bulkPublicConfigModoPrecos] || [];
+                    },
+                    normalizeBulkPublicConfigSelections() {
+                        if (this.bulkPublicConfigUsarContador !== '1') {
+                            this.bulkPublicConfigContadorMinutos = '';
+                            this.bulkPublicConfigContadorAcao = '';
+                            this.bulkPublicConfigContadorDestinoOferta = '';
+                            return;
+                        }
+
+                        const actionValues = this.bulkCountdownActionOptions.map(option => option.value);
+                        if (this.bulkPublicConfigContadorAcao && !actionValues.includes(this.bulkPublicConfigContadorAcao)) {
+                            this.bulkPublicConfigContadorAcao = '';
+                        }
+
+                        if (this.bulkPublicConfigContadorAcao !== 'alterar_preco') {
+                            this.bulkPublicConfigContadorDestinoOferta = '';
+                            return;
+                        }
+
+                        const destinationValues = this.activeBulkCountdownDestinationOptions.map(option => option.value);
+                        if (
+                            this.bulkPublicConfigContadorDestinoOferta &&
+                            !destinationValues.includes(this.bulkPublicConfigContadorDestinoOferta)
+                        ) {
+                            this.bulkPublicConfigContadorDestinoOferta = '';
+                        }
+                    },
+                    isBulkPublicConfigReady() {
+                        if (this.bulkPublicConfigUsarContador !== '1') {
+                            return true;
+                        }
+
+                        if (!['1', '5', '10', '20', '30', '50'].includes(String(this.bulkPublicConfigContadorMinutos || ''))) {
+                            return false;
+                        }
+
+                        const actionValues = this.bulkCountdownActionOptions.map(option => option.value);
+                        if (!actionValues.includes(this.bulkPublicConfigContadorAcao)) {
+                            return false;
+                        }
+
+                        if (this.bulkPublicConfigContadorAcao === 'alterar_preco') {
+                            return this.activeBulkCountdownDestinationOptions.some(
+                                option => option.value === this.bulkPublicConfigContadorDestinoOferta
+                            );
+                        }
+
+                        return true;
+                    },
+                    applyRootDomainBulkPublicPageConfig() {
+                        if (this.isBulkPublicConfigLoading) return;
+
+                        const csrfToken = this.getCsrfToken();
+                        if (!csrfToken) {
+                            this.rootDomainBulkPublicConfigError = 'Token de segurança não encontrado.';
+                            return;
+                        }
+
+                        this.normalizeBulkPublicConfigSelections();
+                        if (!this.isBulkPublicConfigReady()) {
+                            this.rootDomainBulkPublicConfigError = 'Preencha corretamente a configuração do contador antes de aplicar em massa.';
+                            return;
+                        }
+
+                        this.isBulkPublicConfigLoading = true;
+                        this.rootDomainBulkPublicConfigError = '';
+
+                        const payload = {
+                            action: 'configurar_pagina_publica_todos',
+                            formulario_pre_checkout: this.bulkPublicConfigFormularioPreCheckout,
+                            modo_precos: this.bulkPublicConfigModoPrecos,
+                            cupom_principal_id: this.bulkPublicConfigCupomPrincipalId || null,
+                            cupom_secundario_id: this.bulkPublicConfigCupomSecundarioId || null,
+                            usar_contador: this.bulkPublicConfigUsarContador,
+                            contador_minutos: this.bulkPublicConfigContadorMinutos || null,
+                            contador_acao: this.bulkPublicConfigContadorAcao || null,
+                            contador_destino_oferta: this.bulkPublicConfigContadorDestinoOferta || null,
+                        };
+
+                        if (!this.hasCuponsDisponiveis) {
+                            payload.modo_precos = 'padrao';
+                            payload.cupom_principal_id = null;
+                            payload.cupom_secundario_id = null;
+                        } else if (payload.modo_precos === 'padrao') {
+                            payload.cupom_principal_id = null;
+                            payload.cupom_secundario_id = null;
+                        } else if (payload.modo_precos === 'um_preco') {
+                            payload.cupom_secundario_id = null;
+                        }
+
+                        if (payload.usar_contador !== '1') {
+                            payload.contador_minutos = null;
+                            payload.contador_acao = null;
+                            payload.contador_destino_oferta = null;
+                        } else if (payload.contador_acao !== 'alterar_preco') {
+                            payload.contador_destino_oferta = null;
+                        }
+
+                        const self = this;
+                        fetch(this.bulkActionsUrl, {
+                            method: 'POST',
+                            credentials: 'same-origin',
+                            headers: {
+                                'X-CSRF-TOKEN': csrfToken,
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'Accept': 'application/json',
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify(payload),
+                        })
+                        .then(async function (response) {
+                            const contentType = response.headers.get('content-type') || '';
+                            const data = contentType.includes('application/json')
+                                ? await response.json()
+                                : {};
+
+                            if (!response.ok || !data.success) {
+                                throw data;
+                            }
+
+                            window.dispatchEvent(new CustomEvent('root-domain-bulk-public-page-config-updated', {
+                                detail: {
+                                    updatedCourseIds: Array.isArray(data.updated_course_ids) ? data.updated_course_ids : [],
+                                    configIdsByCourse: data.config_ids_by_course || {},
+                                    formularioPreCheckout: !!data.formulario_pre_checkout,
+                                    modoPrecos: data.modo_precos || 'padrao',
+                                    cupomPrincipalId: data.cupom_principal_id || '',
+                                    cupomSecundarioId: data.cupom_secundario_id || '',
+                                    usarContador: !!data.usar_contador,
+                                    contadorMinutos: data.contador_minutos || '',
+                                    contadorAcao: data.contador_acao || '',
+                                    contadorDestinoOferta: data.contador_destino_oferta || '',
+                                }
+                            }));
+
+                            self.rootDomainBulkPublicConfigModalOpen = false;
+                            window.dispatchEvent(new CustomEvent('show-success', {
+                                detail: data.message || 'Configurações em massa aplicadas com sucesso.',
+                            }));
+                        })
+                        .catch(function (error) {
+                            self.rootDomainBulkPublicConfigError = self.parseBulkActionError(
+                                error,
+                                'Não foi possível aplicar as configurações em massa.'
+                            );
+                        })
+                        .finally(function () {
+                            self.isBulkPublicConfigLoading = false;
+                        });
+                    },
                 }"
                 @show-success.window="showSuccessMessage = true; successMessage = $event.detail; setTimeout(() => showSuccessMessage = false, 3000)"
+                @keydown.escape.window="if (rootDomainBulkPublicConfigModalOpen && !isBulkPublicConfigLoading) closeRootDomainBulkPublicConfigModal()"
             >
                 <div x-show="showSuccessMessage" x-transition class="mb-6 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
                     <span x-text="successMessage"></span>
@@ -71,6 +309,280 @@
                                     </button>
                                 </div>
                             </div>
+
+                            <div class="flex items-center gap-2 sm:flex-shrink-0">
+                                <button
+                                    type="button"
+                                    @click="openRootDomainBulkPublicConfigModal()"
+                                    :disabled="isBulkPublicConfigLoading"
+                                    class="inline-flex items-center justify-center rounded-md border border-blue-300 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 shadow-sm transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    <i class="ri-sliders-line mr-2"></i>
+                                    <span x-text="isBulkPublicConfigLoading ? 'Aplicando...' : 'Configurar página pública em massa'"></span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div
+                    x-show="rootDomainBulkPublicConfigModalOpen"
+                    x-transition.opacity
+                    class="fixed inset-0 z-40 bg-slate-900/50"
+                    @click="closeRootDomainBulkPublicConfigModal()"
+                ></div>
+
+                <div
+                    x-show="rootDomainBulkPublicConfigModalOpen"
+                    x-transition
+                    class="fixed inset-0 z-50 flex items-center justify-center p-4"
+                >
+                    <div @click.stop class="je-dark-surface w-full max-w-2xl overflow-hidden rounded-xl border shadow-xl">
+                        <div class="je-dark-divider flex items-center justify-between border-b px-6 py-4">
+                            <h3 class="text-lg font-semibold text-white">Configurações da página pública em massa</h3>
+                            <button
+                                type="button"
+                                @click="closeRootDomainBulkPublicConfigModal()"
+                                :disabled="isBulkPublicConfigLoading"
+                                class="rounded-md p-1 text-slate-300 transition hover:bg-slate-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                                <i class="ri-close-line text-xl"></i>
+                            </button>
+                        </div>
+
+                        <div class="space-y-5 px-6 py-5">
+                            <p class="je-dark-muted text-sm">
+                                Esta configuração será aplicada a todos os cursos publicados dos domínios raiz.
+                            </p>
+
+                            <p
+                                x-show="rootDomainBulkPublicConfigError"
+                                x-text="rootDomainBulkPublicConfigError"
+                                class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+                            ></p>
+
+                            <div>
+                                <x-input-label for="root_bulk_formulario_pre_checkout" value="Formulário antes de continuar" class="je-dark-label text-sm font-medium" />
+                                <div class="relative mt-1">
+                                    <select
+                                        id="root_bulk_formulario_pre_checkout"
+                                        x-model="bulkPublicConfigFormularioPreCheckout"
+                                        :disabled="isBulkPublicConfigLoading"
+                                        class="je-dark-field block w-full appearance-none rounded-lg px-3 py-2.5 pr-10 text-sm shadow-sm transition"
+                                    >
+                                        <option value="1">Com formulário antes de continuar</option>
+                                        <option value="0">Sem formulário (ir direto)</option>
+                                    </select>
+                                    <i class="ri-arrow-down-s-line pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                </div>
+                            </div>
+
+                            <div>
+                                <p class="text-sm font-medium text-white">Preços na página pública</p>
+                                <p class="je-dark-muted text-xs">Defina se as páginas terão o modelo padrão, 1 plano ou 2 planos com cupons.</p>
+                            </div>
+
+                            <template x-if="!hasCuponsDisponiveis">
+                                <div class="rounded-md border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs text-yellow-800">
+                                    Nenhum cupom disponível. A configuração de preço será aplicada no modo padrão.
+                                </div>
+                            </template>
+
+                            <template x-if="hasCuponsDisponiveis">
+                                <div class="space-y-4">
+                                    <div>
+                                        <x-input-label for="root_bulk_modo_precos" value="Tipo de página" class="je-dark-label text-sm font-medium" />
+                                        <div class="relative mt-1">
+                                            <select
+                                                id="root_bulk_modo_precos"
+                                                x-model="bulkPublicConfigModoPrecos"
+                                                @change="
+                                                    if (bulkPublicConfigModoPrecos === 'padrao') {
+                                                        bulkPublicConfigCupomPrincipalId = '';
+                                                        bulkPublicConfigCupomSecundarioId = '';
+                                                    } else if (bulkPublicConfigModoPrecos === 'um_preco') {
+                                                        bulkPublicConfigCupomSecundarioId = '';
+                                                    }
+                                                    normalizeBulkPublicConfigSelections();
+                                                "
+                                                :disabled="isBulkPublicConfigLoading"
+                                                class="je-dark-field block w-full appearance-none rounded-lg px-3 py-2.5 pr-10 text-sm shadow-sm transition"
+                                            >
+                                                <option value="padrao">Página padrão</option>
+                                                <option value="um_preco">Página com um plano</option>
+                                                <option value="dois_precos">Página com dois planos</option>
+                                            </select>
+                                            <i class="ri-arrow-down-s-line pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                        </div>
+                                    </div>
+
+                                    <div x-show="bulkPublicConfigModoPrecos === 'um_preco'" x-transition>
+                                        <x-input-label for="root_bulk_cupom_principal_id_um_preco" value="Preço do plano" class="je-dark-label text-sm font-medium" />
+                                        <div class="relative mt-1">
+                                            <select
+                                                id="root_bulk_cupom_principal_id_um_preco"
+                                                x-model="bulkPublicConfigCupomPrincipalId"
+                                                :disabled="isBulkPublicConfigLoading || bulkPublicConfigModoPrecos !== 'um_preco'"
+                                                class="je-dark-field block w-full appearance-none rounded-lg px-3 py-2.5 pr-10 text-sm shadow-sm transition"
+                                            >
+                                                <option value="">Padrão (sem cupom)</option>
+                                                @foreach(($cupons ?? collect()) as $cupom)
+                                                    <option value="{{ $cupom->id }}">{{ $cupom->desconto }}% OFF ({{ $cupom->codigo }})</option>
+                                                @endforeach
+                                            </select>
+                                            <i class="ri-arrow-down-s-line pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                        </div>
+                                    </div>
+
+                                    <div x-show="bulkPublicConfigModoPrecos === 'dois_precos'" x-transition class="space-y-3">
+                                        <div>
+                                            <x-input-label for="root_bulk_cupom_principal_id_dois_precos" value="Preço do plano completo" class="je-dark-label text-sm font-medium" />
+                                            <div class="relative mt-1">
+                                                <select
+                                                    id="root_bulk_cupom_principal_id_dois_precos"
+                                                    x-model="bulkPublicConfigCupomPrincipalId"
+                                                    @change="if (bulkPublicConfigCupomSecundarioId && bulkPublicConfigCupomSecundarioId === bulkPublicConfigCupomPrincipalId) bulkPublicConfigCupomSecundarioId = '';"
+                                                    :disabled="isBulkPublicConfigLoading || bulkPublicConfigModoPrecos !== 'dois_precos'"
+                                                    class="je-dark-field block w-full appearance-none rounded-lg px-3 py-2.5 pr-10 text-sm shadow-sm transition"
+                                                >
+                                                    <option value="">Padrão (sem cupom)</option>
+                                                    @foreach(($cupons ?? collect()) as $cupom)
+                                                        <option value="{{ $cupom->id }}">{{ $cupom->desconto }}% OFF ({{ $cupom->codigo }})</option>
+                                                    @endforeach
+                                                </select>
+                                                <i class="ri-arrow-down-s-line pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <x-input-label for="root_bulk_cupom_secundario_id_dois_precos" value="Preço do plano básico" class="je-dark-label text-sm font-medium" />
+                                            <div class="relative mt-1">
+                                                <select
+                                                    id="root_bulk_cupom_secundario_id_dois_precos"
+                                                    x-model="bulkPublicConfigCupomSecundarioId"
+                                                    :disabled="isBulkPublicConfigLoading || bulkPublicConfigModoPrecos !== 'dois_precos'"
+                                                    class="je-dark-field block w-full appearance-none rounded-lg px-3 py-2.5 pr-10 text-sm shadow-sm transition"
+                                                >
+                                                    <option value="">Selecione um cupom</option>
+                                                    @foreach(($cupons ?? collect()) as $cupom)
+                                                        <option
+                                                            value="{{ $cupom->id }}"
+                                                            :disabled="bulkPublicConfigCupomPrincipalId === '{{ $cupom->id }}'"
+                                                        >
+                                                            {{ $cupom->desconto }}% OFF ({{ $cupom->codigo }})
+                                                        </option>
+                                                    @endforeach
+                                                </select>
+                                                <i class="ri-arrow-down-s-line pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <div class="rounded-md border border-blue-100 bg-white/10 p-4 space-y-4">
+                                <div>
+                                    <p class="text-sm font-medium text-white">Contador na página pública</p>
+                                    <p class="je-dark-muted text-xs">O contador começa ao carregar a página e continua de onde parou no mesmo navegador.</p>
+                                </div>
+
+                                <div>
+                                    <x-input-label for="root_bulk_usar_contador" value="Usar contador?" class="je-dark-label text-sm font-medium" />
+                                    <div class="relative mt-1">
+                                        <select
+                                            id="root_bulk_usar_contador"
+                                            x-model="bulkPublicConfigUsarContador"
+                                            @change="normalizeBulkPublicConfigSelections()"
+                                            :disabled="isBulkPublicConfigLoading"
+                                            class="je-dark-field block w-full appearance-none rounded-lg px-3 py-2.5 pr-10 text-sm shadow-sm transition"
+                                        >
+                                            <option value="0">Não</option>
+                                            <option value="1">Sim</option>
+                                        </select>
+                                        <i class="ri-arrow-down-s-line pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                    </div>
+                                </div>
+
+                                <div x-show="bulkPublicConfigUsarContador === '1'" x-transition class="space-y-4">
+                                    <div>
+                                        <x-input-label for="root_bulk_contador_minutos" value="Minutos" class="je-dark-label text-sm font-medium" />
+                                        <div class="relative mt-1">
+                                            <select
+                                                id="root_bulk_contador_minutos"
+                                                x-model="bulkPublicConfigContadorMinutos"
+                                                :disabled="isBulkPublicConfigLoading"
+                                                class="je-dark-field block w-full appearance-none rounded-lg px-3 py-2.5 pr-10 text-sm shadow-sm transition"
+                                            >
+                                                <option value="">Selecione</option>
+                                                <option value="1">1 minuto</option>
+                                                <option value="5">5 minutos</option>
+                                                <option value="10">10 minutos</option>
+                                                <option value="20">20 minutos</option>
+                                                <option value="30">30 minutos</option>
+                                                <option value="50">50 minutos</option>
+                                            </select>
+                                            <i class="ri-arrow-down-s-line pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <x-input-label for="root_bulk_contador_acao" value="Após o contador" class="je-dark-label text-sm font-medium" />
+                                        <div class="relative mt-1">
+                                            <select
+                                                id="root_bulk_contador_acao"
+                                                x-model="bulkPublicConfigContadorAcao"
+                                                @change="normalizeBulkPublicConfigSelections()"
+                                                :disabled="isBulkPublicConfigLoading"
+                                                class="je-dark-field block w-full appearance-none rounded-lg px-3 py-2.5 pr-10 text-sm shadow-sm transition"
+                                            >
+                                                <option value="">Selecione</option>
+                                                <template x-for="option in bulkCountdownActionOptions" :key="option.value">
+                                                    <option :value="option.value" x-text="option.label"></option>
+                                                </template>
+                                            </select>
+                                            <i class="ri-arrow-down-s-line pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                        </div>
+                                    </div>
+
+                                    <div x-show="bulkPublicConfigContadorAcao === 'alterar_preco'" x-transition>
+                                        <x-input-label for="root_bulk_contador_destino_oferta" value="Alterar o preço para" class="je-dark-label text-sm font-medium" />
+                                        <div class="relative mt-1">
+                                            <select
+                                                id="root_bulk_contador_destino_oferta"
+                                                x-model="bulkPublicConfigContadorDestinoOferta"
+                                                :disabled="isBulkPublicConfigLoading"
+                                                class="je-dark-field block w-full appearance-none rounded-lg px-3 py-2.5 pr-10 text-sm shadow-sm transition"
+                                            >
+                                                <option value="">Selecione um preço</option>
+                                                <template x-for="option in activeBulkCountdownDestinationOptions" :key="option.value">
+                                                    <option :value="option.value" x-text="option.label"></option>
+                                                </template>
+                                            </select>
+                                            <i class="ri-arrow-down-s-line pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="je-dark-divider flex items-center justify-end gap-3 border-t px-6 py-4">
+                            <button
+                                type="button"
+                                @click="closeRootDomainBulkPublicConfigModal()"
+                                :disabled="isBulkPublicConfigLoading"
+                                class="inline-flex items-center justify-center rounded-md border border-slate-500 bg-slate-700 px-4 py-2 text-sm font-medium text-slate-100 transition hover:bg-slate-600 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                @click="applyRootDomainBulkPublicPageConfig()"
+                                :disabled="isBulkPublicConfigLoading"
+                                class="inline-flex items-center justify-center rounded-md border border-blue-600 bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                                <i class="ri-save-line mr-2"></i>
+                                <span x-text="isBulkPublicConfigLoading ? 'Aplicando...' : 'Aplicar em todos'"></span>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -299,6 +811,27 @@
                                             pricingSaveMessage = '';
                                             pricingSaveError = $event.detail.message || 'Não foi possível salvar.';
                                         }
+                                    }
+                                "
+                                @root-domain-bulk-public-page-config-updated.window="
+                                    const ids = Array.isArray($event.detail.updatedCourseIds) ? $event.detail.updatedCourseIds.map(Number) : [];
+                                    if (ids.includes({{ $curso->id }})) {
+                                        const configIdsByCourse = $event.detail.configIdsByCourse || {};
+                                        if (typeof configIdsByCourse['{{ $curso->id }}'] !== 'undefined') {
+                                            configId = configIdsByCourse['{{ $curso->id }}'];
+                                        }
+                                        formularioPreCheckout = $event.detail.formularioPreCheckout ? '1' : '0';
+                                        modoPrecos = $event.detail.modoPrecos || 'padrao';
+                                        cupomPrincipalId = String($event.detail.cupomPrincipalId || '');
+                                        cupomSecundarioId = String($event.detail.cupomSecundarioId || '');
+                                        usarContador = $event.detail.usarContador ? '1' : '0';
+                                        contadorMinutos = String($event.detail.contadorMinutos || '');
+                                        contadorAcao = $event.detail.contadorAcao || '';
+                                        contadorDestinoOferta = $event.detail.contadorDestinoOferta || '';
+                                        normalizeCountdownSelections();
+                                        pricingSaveError = '';
+                                        pricingSaveMessage = 'Salvo';
+                                        setTimeout(() => { pricingSaveMessage = ''; }, 1400);
                                     }
                                 "
                                 x-show="search === '' || @js($searchTitle).includes(search.toLowerCase())"
@@ -627,6 +1160,24 @@
 
     @push('styles')
         <style>
+            .je-dark-surface {
+                background-color: #181b1e !important;
+                border-color: #303030 !important;
+                color: #f5f5f5 !important;
+            }
+
+            .je-dark-divider {
+                border-color: #303030 !important;
+            }
+
+            .je-dark-muted {
+                color: #a0a0a0 !important;
+            }
+
+            .je-dark-label {
+                color: #f5f5f5 !important;
+            }
+
             .je-dark-field {
                 background-color: #333 !important;
                 border: 1px solid #555 !important;
