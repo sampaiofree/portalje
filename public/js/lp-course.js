@@ -629,7 +629,7 @@
         function tick() {
             var remaining = parsedTimestamp - Date.now();
 
-            if (remaining <= 0) {
+            if (remaining < 1000) {
                 applyCountdownExpiration();
                 return;
             }
