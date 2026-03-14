@@ -203,6 +203,10 @@ img {
     box-shadow: 0 12px 30px rgba(153, 27, 27, 0.22);
 }
 
+.lp-countdown[hidden] {
+    display: none !important;
+}
+
 .lp-countdown--plans {
     margin: 0 0 18px;
 }
