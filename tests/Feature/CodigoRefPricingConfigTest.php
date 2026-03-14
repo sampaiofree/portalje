@@ -287,6 +287,47 @@ class CodigoRefPricingConfigTest extends TestCase
         ]);
     }
 
+    public function test_store_accepts_whatsapp_countdown_action_and_clears_destination_offer(): void
+    {
+        $this->withoutMiddleware(MinhaJornada::class);
+
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+        ]);
+
+        $curso = $this->createCurso('curso-contador-whatsapp', 'Curso Contador WhatsApp');
+        $cupom = Cupom::create(['codigo' => 'WAIT15', 'desconto' => 15]);
+
+        $response = $this->actingAs($user)->postJson(route('cadastrar_codigo_ref'), [
+            'user_id' => $user->id,
+            'curso_id' => $curso->id,
+            'codigo_ref' => 'AFILIADOWAIT1',
+            'mostrar_curso' => '1',
+            'modo_precos' => 'um_preco',
+            'cupom_principal_id' => $cupom->id,
+            'usar_contador' => '1',
+            'contador_minutos' => '5',
+            'contador_acao' => 'whatsapp',
+            'contador_destino_oferta' => 'completo_cupom:' . $cupom->id,
+            'titulo' => $curso->titulo,
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('usar_contador', true);
+        $response->assertJsonPath('contador_minutos', 5);
+        $response->assertJsonPath('contador_acao', 'whatsapp');
+        $response->assertJsonPath('contador_destino_oferta', null);
+
+        $this->assertDatabaseHas('codigo_ref', [
+            'user_id' => $user->id,
+            'curso_id' => $curso->id,
+            'usar_contador' => 1,
+            'contador_minutos' => 5,
+            'contador_acao' => 'whatsapp',
+            'contador_destino_oferta' => null,
+        ]);
+    }
+
     public function test_store_clears_countdown_fields_when_disabled(): void
     {
         $this->withoutMiddleware(MinhaJornada::class);

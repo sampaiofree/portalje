@@ -172,6 +172,10 @@ img {
     box-shadow: 0 12px 30px rgba(8, 26, 66, 0.07);
 }
 
+.lp-price-highlight[hidden] {
+    display: none !important;
+}
+
 .lp-price-highlight__label {
     color: var(--lp-text-soft);
     font-size: 12px;
@@ -262,6 +266,13 @@ img {
 
 .lp-proof-inline__item .lp-icon {
     color: var(--lp-icon-light);
+}
+
+.lp-hero__waitlist {
+    margin: 16px 0 0;
+    max-width: 520px;
+    color: #2f3f63;
+    font-weight: 600;
 }
 
 .lp-hero__media {
@@ -634,6 +645,10 @@ img {
     gap: 16px;
 }
 
+.lp-pricing[hidden] {
+    display: none !important;
+}
+
 .lp-pricing--two {
     grid-template-columns: 1fr 1fr;
 }
@@ -650,6 +665,10 @@ img {
     background: rgba(255, 255, 255, 0.07);
     display: flex;
     flex-direction: column;
+}
+
+.lp-price-card[hidden] {
+    display: none !important;
 }
 
 .lp-price-card--primary {
@@ -731,6 +750,49 @@ img {
     opacity: 0.55;
     cursor: not-allowed;
     pointer-events: none;
+}
+
+.lp-waitlist-card {
+    margin: 0 auto;
+    max-width: 720px;
+    padding: 28px;
+    border: 1px solid rgba(173, 204, 255, 0.38);
+    border-radius: 18px;
+    background: linear-gradient(180deg, rgba(17, 49, 109, 0.95), rgba(9, 28, 68, 0.95));
+    box-shadow: 0 20px 40px rgba(6, 20, 47, 0.35);
+    text-align: center;
+}
+
+.lp-waitlist-card[hidden] {
+    display: none !important;
+}
+
+.lp-waitlist-card__tag {
+    margin: 0 auto 12px;
+    width: fit-content;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.14);
+    color: #dbeafe;
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.lp-waitlist-card h3 {
+    margin: 0;
+    font-size: clamp(1.5rem, 1.3rem + 0.8vw, 2rem);
+}
+
+.lp-waitlist-card > p:not(.lp-waitlist-card__tag) {
+    margin: 14px auto 0;
+    max-width: 540px;
+    color: #d5e0fb;
+}
+
+.lp-waitlist-card .lp-btn {
+    margin-top: 22px;
 }
 
 .lp-price-card ul {

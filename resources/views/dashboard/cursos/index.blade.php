@@ -7,6 +7,35 @@
 
     <div class="py-12">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+            @php
+                $bulkCountdownDestinationOptions = [
+                    'padrao' => [
+                        ['value' => 'completo_padrao', 'label' => 'Plano completo - Sem cupom'],
+                        ['value' => 'basico_padrao', 'label' => 'Plano básico - Sem cupom'],
+                    ],
+                    'um_preco' => [
+                        ['value' => 'completo_padrao', 'label' => 'Plano completo - Sem cupom'],
+                    ],
+                    'dois_precos' => [
+                        ['value' => 'completo_padrao', 'label' => 'Plano completo - Sem cupom'],
+                    ],
+                ];
+
+                foreach (($cupons ?? collect()) as $cupomDestino) {
+                    $bulkCountdownDestinationOptions['um_preco'][] = [
+                        'value' => 'completo_cupom:' . $cupomDestino->id,
+                        'label' => 'Plano completo - ' . $cupomDestino->desconto . '% OFF (' . $cupomDestino->codigo . ')',
+                    ];
+                    $bulkCountdownDestinationOptions['dois_precos'][] = [
+                        'value' => 'completo_cupom:' . $cupomDestino->id,
+                        'label' => 'Plano completo - ' . $cupomDestino->desconto . '% OFF (' . $cupomDestino->codigo . ')',
+                    ];
+                    $bulkCountdownDestinationOptions['dois_precos'][] = [
+                        'value' => 'basico_cupom:' . $cupomDestino->id,
+                        'label' => 'Plano básico - ' . $cupomDestino->desconto . '% OFF (' . $cupomDestino->codigo . ')',
+                    ];
+                }
+            @endphp
 
             <div x-data="{ 
                 search: '',
@@ -23,6 +52,11 @@
                 bulkPublicConfigModoPrecos: 'padrao',
                 bulkPublicConfigCupomPrincipalId: '',
                 bulkPublicConfigCupomSecundarioId: '',
+                bulkPublicConfigUsarContador: '0',
+                bulkPublicConfigContadorMinutos: '',
+                bulkPublicConfigContadorAcao: '',
+                bulkPublicConfigContadorDestinoOferta: '',
+                bulkCountdownDestinationOptions: @js($bulkCountdownDestinationOptions),
                 hasCuponsDisponiveis: {{ ($cupons ?? collect())->isNotEmpty() ? 'true' : 'false' }},
                 bulkActionsUrl: @js(route('cadastrar_cursos_bulk_actions', [], false)),
                 getCsrfToken() {
@@ -107,6 +141,7 @@
                         });
                 },
                 openBulkPublicConfigModal() {
+                    this.normalizeBulkPublicConfigSelections();
                     this.bulkPublicConfigError = '';
                     this.bulkPublicConfigModalOpen = true;
                 },
@@ -114,6 +149,51 @@
                     if (this.isBulkPublicConfigLoading) return;
                     this.bulkPublicConfigModalOpen = false;
                     this.bulkPublicConfigError = '';
+                },
+                get bulkCountdownActionOptions() {
+                    if (this.bulkPublicConfigModoPrecos === 'um_preco') {
+                        return [
+                            { value: 'nada', label: 'Nada' },
+                            { value: 'alterar_preco', label: 'Alterar o preço para' },
+                            { value: 'whatsapp', label: 'WhatsApp' },
+                        ];
+                    }
+
+                    return [
+                        { value: 'nada', label: 'Nada' },
+                        { value: 'encerrar_basico', label: 'Encerrar o plano básico' },
+                        { value: 'alterar_preco', label: 'Alterar o preço para' },
+                        { value: 'whatsapp', label: 'WhatsApp' },
+                    ];
+                },
+                get activeBulkCountdownDestinationOptions() {
+                    return this.bulkCountdownDestinationOptions[this.bulkPublicConfigModoPrecos] || [];
+                },
+                normalizeBulkPublicConfigSelections() {
+                    if (this.bulkPublicConfigUsarContador !== '1') {
+                        this.bulkPublicConfigContadorMinutos = '';
+                        this.bulkPublicConfigContadorAcao = '';
+                        this.bulkPublicConfigContadorDestinoOferta = '';
+                        return;
+                    }
+
+                    const actionValues = this.bulkCountdownActionOptions.map(option => option.value);
+                    if (this.bulkPublicConfigContadorAcao && !actionValues.includes(this.bulkPublicConfigContadorAcao)) {
+                        this.bulkPublicConfigContadorAcao = '';
+                    }
+
+                    if (this.bulkPublicConfigContadorAcao !== 'alterar_preco') {
+                        this.bulkPublicConfigContadorDestinoOferta = '';
+                        return;
+                    }
+
+                    const destinationValues = this.activeBulkCountdownDestinationOptions.map(option => option.value);
+                    if (
+                        this.bulkPublicConfigContadorDestinoOferta &&
+                        !destinationValues.includes(this.bulkPublicConfigContadorDestinoOferta)
+                    ) {
+                        this.bulkPublicConfigContadorDestinoOferta = '';
+                    }
                 },
                 applyBulkPublicPageConfig() {
                     if (this.isBulkPublicConfigLoading) return;
@@ -124,8 +204,8 @@
                         return;
                     }
 
-                    this.isBulkPublicConfigLoading = true;
                     this.bulkPublicConfigError = '';
+                    this.normalizeBulkPublicConfigSelections();
 
                     const payload = {
                         action: 'configurar_pagina_publica_todos',
@@ -133,6 +213,10 @@
                         modo_precos: this.bulkPublicConfigModoPrecos,
                         cupom_principal_id: this.bulkPublicConfigCupomPrincipalId || null,
                         cupom_secundario_id: this.bulkPublicConfigCupomSecundarioId || null,
+                        usar_contador: this.bulkPublicConfigUsarContador,
+                        contador_minutos: this.bulkPublicConfigContadorMinutos || null,
+                        contador_acao: this.bulkPublicConfigContadorAcao || null,
+                        contador_destino_oferta: this.bulkPublicConfigContadorDestinoOferta || null,
                     };
 
                     if (!this.hasCuponsDisponiveis) {
@@ -145,6 +229,37 @@
                     } else if (payload.modo_precos === 'um_preco') {
                         payload.cupom_secundario_id = null;
                     }
+
+                    let countdownValidationMessage = '';
+                    if (payload.usar_contador === '1') {
+                        if (!['1', '5', '10', '20', '30', '50'].includes(String(payload.contador_minutos || ''))) {
+                            countdownValidationMessage = 'Selecione os minutos do contador.';
+                        } else if (!this.bulkCountdownActionOptions.some(option => option.value === payload.contador_acao)) {
+                            countdownValidationMessage = 'Selecione a ação do contador.';
+                        } else if (payload.contador_acao === 'encerrar_basico' && payload.modo_precos === 'um_preco') {
+                            countdownValidationMessage = 'A ação de encerrar o plano básico só pode ser usada quando a página exibe o plano básico.';
+                        } else if (
+                            payload.contador_acao === 'alterar_preco' &&
+                            !this.activeBulkCountdownDestinationOptions.some(option => option.value === payload.contador_destino_oferta)
+                        ) {
+                            countdownValidationMessage = 'Selecione o preço que será mostrado após o contador.';
+                        }
+                    }
+
+                    if (countdownValidationMessage) {
+                        this.bulkPublicConfigError = countdownValidationMessage;
+                        return;
+                    }
+
+                    if (payload.usar_contador !== '1') {
+                        payload.contador_minutos = null;
+                        payload.contador_acao = null;
+                        payload.contador_destino_oferta = null;
+                    } else if (payload.contador_acao !== 'alterar_preco') {
+                        payload.contador_destino_oferta = null;
+                    }
+
+                    this.isBulkPublicConfigLoading = true;
 
                     const self = this;
                     fetch(this.bulkActionsUrl, {
@@ -175,6 +290,10 @@
                                     modoPrecos: data.modo_precos || 'padrao',
                                     cupomPrincipalId: data.cupom_principal_id || '',
                                     cupomSecundarioId: data.cupom_secundario_id || '',
+                                    usarContador: !!data.usar_contador,
+                                    contadorMinutos: data.contador_minutos || '',
+                                    contadorAcao: data.contador_acao || '',
+                                    contadorDestinoOferta: data.contador_destino_oferta || '',
                                 }
                             }));
 
@@ -397,6 +516,7 @@
                                                     } else if (bulkPublicConfigModoPrecos === 'um_preco') {
                                                         bulkPublicConfigCupomSecundarioId = '';
                                                     }
+                                                    normalizeBulkPublicConfigSelections();
                                                 "
                                                 :disabled="isBulkPublicConfigLoading"
                                                 class="je-dark-field block w-full appearance-none rounded-lg px-3 py-2.5 pr-10 text-sm shadow-sm transition"
@@ -472,6 +592,96 @@
                                     </div>
                                 </div>
                             </template>
+
+                            <div class="space-y-4">
+                                <div>
+                                    <p class="text-sm font-medium text-white">Contador da página pública</p>
+                                    <p class="je-dark-muted text-xs">O contador começa ao carregar a página e continua de onde parou no mesmo navegador.</p>
+                                </div>
+
+                                <div>
+                                    <x-input-label for="bulk_usar_contador" value="Usar contador?" class="je-dark-label text-sm font-medium" />
+                                    <div class="relative mt-1">
+                                        <select
+                                            id="bulk_usar_contador"
+                                            x-model="bulkPublicConfigUsarContador"
+                                            @change="
+                                                if (bulkPublicConfigUsarContador !== '1') {
+                                                    bulkPublicConfigContadorMinutos = '';
+                                                    bulkPublicConfigContadorAcao = '';
+                                                    bulkPublicConfigContadorDestinoOferta = '';
+                                                }
+                                            "
+                                            :disabled="isBulkPublicConfigLoading"
+                                            class="je-dark-field block w-full appearance-none rounded-lg px-3 py-2.5 pr-10 text-sm shadow-sm transition"
+                                        >
+                                            <option value="0">Não</option>
+                                            <option value="1">Sim</option>
+                                        </select>
+                                        <i class="ri-arrow-down-s-line pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                    </div>
+                                </div>
+
+                                <div x-show="bulkPublicConfigUsarContador === '1'" x-transition class="space-y-4">
+                                    <div>
+                                        <x-input-label for="bulk_contador_minutos" value="Minutos" class="je-dark-label text-sm font-medium" />
+                                        <div class="relative mt-1">
+                                            <select
+                                                id="bulk_contador_minutos"
+                                                x-model="bulkPublicConfigContadorMinutos"
+                                                :disabled="isBulkPublicConfigLoading"
+                                                class="je-dark-field block w-full appearance-none rounded-lg px-3 py-2.5 pr-10 text-sm shadow-sm transition"
+                                            >
+                                                <option value="">Selecione</option>
+                                                <option value="1">1 minuto</option>
+                                                <option value="5">5 minutos</option>
+                                                <option value="10">10 minutos</option>
+                                                <option value="20">20 minutos</option>
+                                                <option value="30">30 minutos</option>
+                                                <option value="50">50 minutos</option>
+                                            </select>
+                                            <i class="ri-arrow-down-s-line pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <x-input-label for="bulk_contador_acao" value="Após o contador" class="je-dark-label text-sm font-medium" />
+                                        <div class="relative mt-1">
+                                            <select
+                                                id="bulk_contador_acao"
+                                                x-model="bulkPublicConfigContadorAcao"
+                                                @change="normalizeBulkPublicConfigSelections()"
+                                                :disabled="isBulkPublicConfigLoading"
+                                                class="je-dark-field block w-full appearance-none rounded-lg px-3 py-2.5 pr-10 text-sm shadow-sm transition"
+                                            >
+                                                <option value="">Selecione</option>
+                                                <template x-for="option in bulkCountdownActionOptions" :key="option.value">
+                                                    <option :value="option.value" x-text="option.label"></option>
+                                                </template>
+                                            </select>
+                                            <i class="ri-arrow-down-s-line pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                        </div>
+                                    </div>
+
+                                    <div x-show="bulkPublicConfigContadorAcao === 'alterar_preco'" x-transition>
+                                        <x-input-label for="bulk_contador_destino_oferta" value="Alterar o preço para" class="je-dark-label text-sm font-medium" />
+                                        <div class="relative mt-1">
+                                            <select
+                                                id="bulk_contador_destino_oferta"
+                                                x-model="bulkPublicConfigContadorDestinoOferta"
+                                                :disabled="isBulkPublicConfigLoading"
+                                                class="je-dark-field block w-full appearance-none rounded-lg px-3 py-2.5 pr-10 text-sm shadow-sm transition"
+                                            >
+                                                <option value="">Selecione um preço</option>
+                                                <template x-for="option in activeBulkCountdownDestinationOptions" :key="option.value">
+                                                    <option :value="option.value" x-text="option.label"></option>
+                                                </template>
+                                            </select>
+                                            <i class="ri-arrow-down-s-line pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="je-dark-divider flex items-center justify-end gap-3 border-t px-6 py-4">
@@ -721,6 +931,7 @@
                                                 return [
                                                     { value: 'nada', label: 'Nada' },
                                                     { value: 'alterar_preco', label: 'Alterar o preço para' },
+                                                    { value: 'whatsapp', label: 'WhatsApp' },
                                                 ];
                                             }
 
@@ -728,6 +939,7 @@
                                                 { value: 'nada', label: 'Nada' },
                                                 { value: 'encerrar_basico', label: 'Encerrar o plano básico' },
                                                 { value: 'alterar_preco', label: 'Alterar o preço para' },
+                                                { value: 'whatsapp', label: 'WhatsApp' },
                                             ];
                                         },
 
@@ -843,6 +1055,10 @@
                                             modoPrecos = $event.detail.modoPrecos || 'padrao';
                                             cupomPrincipalId = String($event.detail.cupomPrincipalId || '');
                                             cupomSecundarioId = String($event.detail.cupomSecundarioId || '');
+                                            usarContador = $event.detail.usarContador ? '1' : '0';
+                                            contadorMinutos = String($event.detail.contadorMinutos || '');
+                                            contadorAcao = $event.detail.contadorAcao || '';
+                                            contadorDestinoOferta = $event.detail.contadorDestinoOferta || '';
                                             normalizeCountdownSelections();
                                             pricingSaveError = '';
                                             pricingSaveMessage = 'Salvo';
@@ -1529,7 +1745,7 @@
                     if (usarContador) {
                         if (!['1', '5', '10', '20', '30', '50'].includes(contadorMinutos)) {
                             countdownValidationMessage = 'Selecione os minutos do contador.';
-                        } else if (!['nada', 'encerrar_basico', 'alterar_preco'].includes(contadorAcao)) {
+                        } else if (!['nada', 'encerrar_basico', 'alterar_preco', 'whatsapp'].includes(contadorAcao)) {
                             countdownValidationMessage = 'Selecione a ação do contador.';
                         } else if (contadorAcao === 'encerrar_basico' && modoPrecosAtual === 'um_preco') {
                             countdownValidationMessage = 'A ação de encerrar o plano básico só pode ser usada quando a página exibe o plano básico.';

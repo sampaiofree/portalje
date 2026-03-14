@@ -22,10 +22,17 @@
     var selectedCheckoutInput = document.getElementById('selected_checkout_url');
     var testimonialsSection = document.getElementById('depoimentos');
     var testimonialsContainer = testimonialsSection ? testimonialsSection.querySelector('.lp-testimonials') : null;
+    var heroBadgeEl = document.querySelector('[data-lp-hero-badge]');
+    var heroPriceBlock = document.querySelector('[data-lp-hero-price]');
     var heroLabelEl = document.querySelector('[data-lp-hero-label]');
     var heroValueEl = document.querySelector('[data-lp-hero-value]');
     var heroCashEl = document.querySelector('[data-lp-hero-cash]');
+    var heroWaitlistEl = document.querySelector('[data-lp-hero-waitlist]');
+    var pricingTitleEl = document.querySelector('[data-lp-pricing-title]');
+    var pricingCopyEl = document.querySelector('[data-lp-pricing-copy]');
     var pricingGrid = document.getElementById('lp-pricing-grid');
+    var waitlistBlock = document.querySelector('[data-lp-waitlist-block]');
+    var primaryScrollCtas = document.querySelectorAll('[data-lp-primary-scroll-cta]');
     var countdownTimers = document.querySelectorAll('[data-lp-countdown-timer]');
     var countdownBlocks = document.querySelectorAll('[data-lp-countdown-block]');
 
@@ -419,6 +426,10 @@
             return;
         }
 
+        if (heroPriceBlock) {
+            heroPriceBlock.hidden = false;
+        }
+
         if (heroLabelEl) {
             heroLabelEl.textContent = offer.hero_label || '';
         }
@@ -436,6 +447,55 @@
                 heroCashEl.textContent = '';
             }
         }
+    }
+
+    function setElementText(el, text) {
+        if (!el) {
+            return;
+        }
+
+        el.textContent = text;
+    }
+
+    function setPrimaryScrollCtaText(text) {
+        primaryScrollCtas.forEach(function (ctaEl) {
+            setElementText(ctaEl, text);
+        });
+    }
+
+    function applyWhatsAppWaitlistState() {
+        if (heroPriceBlock) {
+            heroPriceBlock.hidden = true;
+        }
+
+        if (heroBadgeEl) {
+            setElementText(heroBadgeEl, 'Lista de espera');
+        }
+
+        if (heroWaitlistEl) {
+            heroWaitlistEl.hidden = false;
+        }
+
+        if (pricingTitleEl) {
+            setElementText(pricingTitleEl, 'Lista de espera');
+        }
+
+        if (pricingCopyEl) {
+            setElementText(
+                pricingCopyEl,
+                'Entre na lista de espera pelo WhatsApp e avisaremos quando novas vagas forem liberadas.'
+            );
+        }
+
+        if (pricingGrid) {
+            pricingGrid.hidden = true;
+        }
+
+        if (waitlistBlock) {
+            waitlistBlock.hidden = false;
+        }
+
+        setPrimaryScrollCtaText('Entrar na lista de espera');
     }
 
     function setPricingLayout(layout) {
@@ -549,6 +609,12 @@
         var endLabel = countdownConfig.end_label || 'Encerrado';
 
         setCountdownText(endLabel, true);
+
+        if (countdownConfig.action === 'whatsapp') {
+            clearGeneratedOfferCards();
+            applyWhatsAppWaitlistState();
+            return;
+        }
 
         if (countdownConfig.action === 'encerrar_basico') {
             var currentCompleteKey = pricingConfig.current_complete_offer_key || 'completo_padrao';

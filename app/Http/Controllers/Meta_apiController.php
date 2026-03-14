@@ -174,7 +174,7 @@ class Meta_apiController extends Controller
         }
 
         $user = Auth::user();
-        $cursos = new Home_e_cursosController();
+        $cursos = app(Home_e_cursosController::class);
         $cursos = $cursos->listar_cursos($request, $user);
         //return $cursos; 
         

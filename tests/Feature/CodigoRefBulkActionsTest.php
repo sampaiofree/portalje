@@ -211,6 +211,10 @@ class CodigoRefBulkActionsTest extends TestCase
             'modo_precos' => 'dois_precos',
             'cupom_principal_id' => (string) $cupomPrincipal->id,
             'cupom_secundario_id' => (string) $cupomSecundario->id,
+            'usar_contador' => '1',
+            'contador_minutos' => '1',
+            'contador_acao' => 'alterar_preco',
+            'contador_destino_oferta' => 'completo_cupom:' . $cupomSecundario->id,
         ]);
 
         $response->assertOk();
@@ -221,6 +225,10 @@ class CodigoRefBulkActionsTest extends TestCase
         $response->assertJsonPath('modo_precos', 'dois_precos');
         $response->assertJsonPath('cupom_principal_id', $cupomPrincipal->id);
         $response->assertJsonPath('cupom_secundario_id', $cupomSecundario->id);
+        $response->assertJsonPath('usar_contador', true);
+        $response->assertJsonPath('contador_minutos', 1);
+        $response->assertJsonPath('contador_acao', 'alterar_preco');
+        $response->assertJsonPath('contador_destino_oferta', 'completo_cupom:' . $cupomSecundario->id);
         $this->assertEqualsCanonicalizing([$curso1->id, $curso2->id], $response->json('updated_course_ids'));
 
         $this->assertSame($beforeCount, Codigo_ref::count());
@@ -231,6 +239,10 @@ class CodigoRefBulkActionsTest extends TestCase
             'modo_precos' => 'dois_precos',
             'cupom_principal_id' => $cupomPrincipal->id,
             'cupom_secundario_id' => $cupomSecundario->id,
+            'usar_contador' => 1,
+            'contador_minutos' => 1,
+            'contador_acao' => 'alterar_preco',
+            'contador_destino_oferta' => 'completo_cupom:' . $cupomSecundario->id,
         ]);
         $this->assertDatabaseHas('codigo_ref', [
             'user_id' => $user->id,
@@ -239,6 +251,10 @@ class CodigoRefBulkActionsTest extends TestCase
             'modo_precos' => 'dois_precos',
             'cupom_principal_id' => $cupomPrincipal->id,
             'cupom_secundario_id' => $cupomSecundario->id,
+            'usar_contador' => 1,
+            'contador_minutos' => 1,
+            'contador_acao' => 'alterar_preco',
+            'contador_destino_oferta' => 'completo_cupom:' . $cupomSecundario->id,
         ]);
         $this->assertDatabaseHas('codigo_ref', [
             'user_id' => $user->id,
@@ -247,6 +263,10 @@ class CodigoRefBulkActionsTest extends TestCase
             'modo_precos' => 'padrao',
             'cupom_principal_id' => null,
             'cupom_secundario_id' => null,
+            'usar_contador' => 0,
+            'contador_minutos' => null,
+            'contador_acao' => null,
+            'contador_destino_oferta' => null,
         ]);
         $this->assertDatabaseHas('codigo_ref', [
             'user_id' => $otherUser->id,
@@ -255,6 +275,103 @@ class CodigoRefBulkActionsTest extends TestCase
             'modo_precos' => 'padrao',
             'cupom_principal_id' => null,
             'cupom_secundario_id' => null,
+            'usar_contador' => 0,
+            'contador_minutos' => null,
+            'contador_acao' => null,
+            'contador_destino_oferta' => null,
+        ]);
+    }
+
+    public function test_bulk_public_page_config_accepts_whatsapp_and_clears_destination_offer(): void
+    {
+        $this->withoutMiddleware(MinhaJornada::class);
+
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+        ]);
+
+        $curso = $this->createCurso('curso-bulk-config-whatsapp', 'Curso Bulk Config WhatsApp');
+        $cupomPrincipal = Cupom::create(['codigo' => 'WAIT25', 'desconto' => 25]);
+
+        Codigo_ref::create([
+            'user_id' => $user->id,
+            'curso_id' => $curso->id,
+            'codigo_ref' => 'REFBULKWA1',
+            'formulario_pre_checkout' => true,
+            'modo_precos' => 'um_preco',
+            'cupom_principal_id' => $cupomPrincipal->id,
+            'usar_contador' => false,
+        ]);
+
+        $response = $this->actingAs($user)->postJson(route('cadastrar_cursos_bulk_actions'), [
+            'action' => 'configurar_pagina_publica_todos',
+            'formulario_pre_checkout' => '1',
+            'modo_precos' => 'um_preco',
+            'cupom_principal_id' => (string) $cupomPrincipal->id,
+            'usar_contador' => '1',
+            'contador_minutos' => '5',
+            'contador_acao' => 'whatsapp',
+            'contador_destino_oferta' => 'completo_cupom:' . $cupomPrincipal->id,
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('usar_contador', true);
+        $response->assertJsonPath('contador_minutos', 5);
+        $response->assertJsonPath('contador_acao', 'whatsapp');
+        $response->assertJsonPath('contador_destino_oferta', null);
+
+        $this->assertDatabaseHas('codigo_ref', [
+            'user_id' => $user->id,
+            'curso_id' => $curso->id,
+            'usar_contador' => 1,
+            'contador_minutos' => 5,
+            'contador_acao' => 'whatsapp',
+            'contador_destino_oferta' => null,
+        ]);
+    }
+
+    public function test_bulk_public_page_config_clears_countdown_fields_when_disabled(): void
+    {
+        $this->withoutMiddleware(MinhaJornada::class);
+
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+        ]);
+
+        $curso = $this->createCurso('curso-bulk-config-clear-countdown', 'Curso Bulk Config Clear Countdown');
+
+        Codigo_ref::create([
+            'user_id' => $user->id,
+            'curso_id' => $curso->id,
+            'codigo_ref' => 'REFBULKCLEAR1',
+            'formulario_pre_checkout' => true,
+            'modo_precos' => 'padrao',
+            'usar_contador' => true,
+            'contador_minutos' => 20,
+            'contador_acao' => 'whatsapp',
+            'contador_destino_oferta' => 'completo_padrao',
+        ]);
+
+        $response = $this->actingAs($user)->postJson(route('cadastrar_cursos_bulk_actions'), [
+            'action' => 'configurar_pagina_publica_todos',
+            'formulario_pre_checkout' => '1',
+            'modo_precos' => 'padrao',
+            'usar_contador' => '0',
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('usar_contador', false);
+        $response->assertJsonPath('contador_minutos', null);
+        $response->assertJsonPath('contador_acao', null);
+        $response->assertJsonPath('contador_destino_oferta', null);
+
+        $this->assertDatabaseHas('codigo_ref', [
+            'user_id' => $user->id,
+            'curso_id' => $curso->id,
+            'usar_contador' => 0,
+            'contador_minutos' => null,
+            'contador_acao' => null,
+            'contador_destino_oferta' => null,
         ]);
     }
 
@@ -366,6 +483,102 @@ class CodigoRefBulkActionsTest extends TestCase
 
         $response->assertUnprocessable();
         $response->assertJsonValidationErrors(['cupom_secundario_id']);
+    }
+
+    public function test_bulk_public_page_config_rejects_encerrar_basico_in_um_preco_mode(): void
+    {
+        $this->withoutMiddleware(MinhaJornada::class);
+
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+        ]);
+
+        $curso = $this->createCurso('curso-bulk-config-encerrar-basico', 'Curso Bulk Config Encerrar Básico');
+        Cupom::create(['codigo' => 'UM25', 'desconto' => 25]);
+
+        Codigo_ref::create([
+            'user_id' => $user->id,
+            'curso_id' => $curso->id,
+            'codigo_ref' => 'REFENCBULK1',
+            'formulario_pre_checkout' => true,
+            'modo_precos' => 'padrao',
+        ]);
+
+        $response = $this->actingAs($user)->postJson(route('cadastrar_cursos_bulk_actions'), [
+            'action' => 'configurar_pagina_publica_todos',
+            'formulario_pre_checkout' => '1',
+            'modo_precos' => 'um_preco',
+            'usar_contador' => '1',
+            'contador_minutos' => '5',
+            'contador_acao' => 'encerrar_basico',
+        ]);
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors(['contador_acao']);
+    }
+
+    public function test_bulk_public_page_config_rejects_alterar_preco_without_destination_offer(): void
+    {
+        $this->withoutMiddleware(MinhaJornada::class);
+
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+        ]);
+
+        $curso = $this->createCurso('curso-bulk-config-sem-destino', 'Curso Bulk Config Sem Destino');
+
+        Codigo_ref::create([
+            'user_id' => $user->id,
+            'curso_id' => $curso->id,
+            'codigo_ref' => 'REFSEMDST1',
+            'formulario_pre_checkout' => true,
+            'modo_precos' => 'padrao',
+        ]);
+
+        $response = $this->actingAs($user)->postJson(route('cadastrar_cursos_bulk_actions'), [
+            'action' => 'configurar_pagina_publica_todos',
+            'formulario_pre_checkout' => '1',
+            'modo_precos' => 'padrao',
+            'usar_contador' => '1',
+            'contador_minutos' => '5',
+            'contador_acao' => 'alterar_preco',
+        ]);
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors(['contador_destino_oferta']);
+    }
+
+    public function test_bulk_public_page_config_rejects_invalid_countdown_destination_for_current_mode(): void
+    {
+        $this->withoutMiddleware(MinhaJornada::class);
+
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+        ]);
+
+        $curso = $this->createCurso('curso-bulk-config-destino-invalido', 'Curso Bulk Config Destino Inválido');
+        Cupom::create(['codigo' => 'DST15', 'desconto' => 15]);
+
+        Codigo_ref::create([
+            'user_id' => $user->id,
+            'curso_id' => $curso->id,
+            'codigo_ref' => 'REFDSTINV1',
+            'formulario_pre_checkout' => true,
+            'modo_precos' => 'padrao',
+        ]);
+
+        $response = $this->actingAs($user)->postJson(route('cadastrar_cursos_bulk_actions'), [
+            'action' => 'configurar_pagina_publica_todos',
+            'formulario_pre_checkout' => '1',
+            'modo_precos' => 'um_preco',
+            'usar_contador' => '1',
+            'contador_minutos' => '5',
+            'contador_acao' => 'alterar_preco',
+            'contador_destino_oferta' => 'basico_padrao',
+        ]);
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors(['contador_destino_oferta']);
     }
 
     public function test_bulk_action_rejects_invalid_action(): void

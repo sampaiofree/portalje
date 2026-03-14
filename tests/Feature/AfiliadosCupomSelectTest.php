@@ -110,6 +110,16 @@ class AfiliadosCupomSelectTest extends TestCase
         $response->assertSee('configurar_pagina_publica_todos');
         $response->assertSee('bulkPublicConfigModalOpen', false);
         $response->assertSee('bulkActionsUrl', false);
+        $response->assertSee('bulkPublicConfigUsarContador', false);
+        $response->assertSee('bulkPublicConfigContadorMinutos', false);
+        $response->assertSee('bulkPublicConfigContadorAcao', false);
+        $response->assertSee('bulkPublicConfigContadorDestinoOferta', false);
+        $response->assertSee('bulkCountdownDestinationOptions', false);
+        $response->assertSee('Usar contador?');
+        $response->assertSee('Minutos');
+        $response->assertSee('Após o contador');
+        $response->assertSee('WhatsApp');
+        $response->assertSee('bulk_contador_destino_oferta', false);
         $response->assertSee('.je-dark-surface', false);
         $response->assertSee('background-color: #181b1e', false);
     }
@@ -152,6 +162,7 @@ class AfiliadosCupomSelectTest extends TestCase
         $response->assertSee('Após o contador');
         $response->assertSee('Encerrar o plano básico');
         $response->assertSee('Alterar o preço para');
+        $response->assertSee('WhatsApp');
         $response->assertSee('contador_destino_oferta_', false);
         $response->assertSee('completo_padrao');
         $response->assertSee('completo_cupom:1');

@@ -31,6 +31,21 @@ class PublicCoursePricingDisplayTest extends TestCase
         $response->assertSee('Plano Completo');
         $response->assertSee('Plano Básico');
         $response->assertSee('offDiscount=50OFF', false);
+        $this->assertSame(
+            $this->buildExpectedAffiliateCheckoutUrl('REFPADRAO', 'abc123', [
+                'src' => 'pagina_individual',
+                'sck' => 'plano_completo',
+            ]),
+            $this->extractPlanCheckoutUrl($response->getContent(), 'completo')
+        );
+        $this->assertSame(
+            $this->buildExpectedAffiliateCheckoutUrl('REFPADRAO', 'abc123', [
+                'src' => 'pagina_individual',
+                'offDiscount' => '50OFF',
+                'sck' => 'plano_basico',
+            ]),
+            $this->extractPlanCheckoutUrl($response->getContent(), 'basico')
+        );
     }
 
     public function test_um_preco_mode_renders_only_complete_with_selected_coupon(): void
@@ -53,6 +68,14 @@ class PublicCoursePricingDisplayTest extends TestCase
         $response->assertSee('Plano Completo');
         $response->assertDontSee('Plano Básico');
         $response->assertSee('offDiscount=MAIN25', false);
+        $this->assertSame(
+            $this->buildExpectedAffiliateCheckoutUrl('REFUMPRECO', 'abc123', [
+                'src' => 'pagina_individual',
+                'offDiscount' => 'MAIN25',
+                'sck' => 'plano_completo',
+            ]),
+            $this->extractPlanCheckoutUrl($response->getContent(), 'completo')
+        );
         $heroPriceHighlight = $this->extractHeroPriceHighlight($response->getContent());
         $this->assertStringContainsString('Investimento do plano completo', $heroPriceHighlight);
         $this->assertStringNotContainsString('Investimento único de', $heroPriceHighlight);
@@ -81,6 +104,22 @@ class PublicCoursePricingDisplayTest extends TestCase
         $response->assertSee('Plano Básico');
         $response->assertSee('offDiscount=MAIN10', false);
         $response->assertSee('offDiscount=BASIC35', false);
+        $this->assertSame(
+            $this->buildExpectedAffiliateCheckoutUrl('REFDOISPRECOS', 'abc123', [
+                'src' => 'pagina_individual',
+                'offDiscount' => 'MAIN10',
+                'sck' => 'plano_completo',
+            ]),
+            $this->extractPlanCheckoutUrl($response->getContent(), 'completo')
+        );
+        $this->assertSame(
+            $this->buildExpectedAffiliateCheckoutUrl('REFDOISPRECOS', 'abc123', [
+                'src' => 'pagina_individual',
+                'offDiscount' => 'BASIC35',
+                'sck' => 'plano_basico',
+            ]),
+            $this->extractPlanCheckoutUrl($response->getContent(), 'basico')
+        );
         $heroPriceHighlight = $this->extractHeroPriceHighlight($response->getContent());
         $this->assertStringContainsString('Investimento único de', $heroPriceHighlight);
         $this->assertStringNotContainsString('Investimento do plano completo', $heroPriceHighlight);
@@ -188,6 +227,20 @@ class PublicCoursePricingDisplayTest extends TestCase
         $this->assertIsString(data_get($config, 'countdown.storage_key'));
         $this->assertArrayHasKey('completo_cupom:' . $cupomDestino->id, data_get($config, 'pricing.offer_variants', []));
         $this->assertSame('completo', data_get($config, 'pricing.offer_variants.completo_cupom:' . $cupomDestino->id . '.plan'));
+        $this->assertSame(
+            $this->buildExpectedAffiliateCheckoutUrl('REFCOUNTDOWN1', 'abc123', [
+                'src' => 'pagina_individual',
+                'offDiscount' => 'UP40',
+            ]),
+            data_get($config, 'pricing.offer_variants.completo_cupom:' . $cupomDestino->id . '.checkout_url')
+        );
+        $this->assertSame(
+            $this->buildExpectedAffiliateCheckoutUrl('REFCOUNTDOWN1', 'abc123', [
+                'src' => 'pagina_individual',
+                'offDiscount' => 'UP40',
+            ]),
+            data_get($config, 'pricing.offer_variants.basico_cupom:' . $cupomDestino->id . '.checkout_url')
+        );
         $response->assertSee('01:00');
     }
 
@@ -214,6 +267,40 @@ class PublicCoursePricingDisplayTest extends TestCase
         $this->assertSame('completo_padrao', data_get($config, 'pricing.current_complete_offer_key'));
         $this->assertSame('basico_padrao', data_get($config, 'pricing.current_basic_offer_key'));
         $this->assertArrayHasKey('basico_padrao', data_get($config, 'pricing.offer_variants', []));
+    }
+
+    public function test_public_page_serializes_countdown_configuration_for_whatsapp_waitlist(): void
+    {
+        [$user, $curso] = $this->createAffiliateAndCurso('curso-countdown-whatsapp');
+
+        Codigo_ref::create([
+            'user_id' => $user->id,
+            'curso_id' => $curso->id,
+            'codigo_ref' => 'REFCOUNTDOWNWA',
+            'mostrar_curso' => true,
+            'modo_precos' => 'padrao',
+            'usar_contador' => true,
+            'contador_minutos' => 5,
+            'contador_acao' => 'whatsapp',
+        ]);
+
+        $response = $this->get('http://afiliado.test/' . $curso->url);
+        $config = $this->extractLpCourseConfig($response->getContent());
+        $html = $response->getContent();
+
+        $this->assertTrue((bool) data_get($config, 'countdown.enabled'));
+        $this->assertSame('whatsapp', data_get($config, 'countdown.action'));
+        $this->assertNull(data_get($config, 'countdown.destination_offer'));
+        $response->assertSee('data-lp-waitlist-block', false);
+        $response->assertSee('data-lp-hero-waitlist', false);
+        $response->assertSee('data-lp-primary-scroll-cta', false);
+        $response->assertSee('Inscrições encerradas');
+        $response->assertSee('Entrar na lista de espera');
+        $response->assertSee(
+            'https://wa.me/5511999999999?text=Ol%C3%A1%2C%20quero%20entrar%20na%20lista%20de%20espera%20do%20curso%20de%20Curso%20Teste',
+            false
+        );
+        $this->assertMatchesRegularExpression('/data-lp-waitlist-block[^>]*hidden/u', $html);
     }
 
     public function test_public_page_renders_modules_as_accordion_and_anchor_ctas_to_planos(): void
@@ -436,6 +523,32 @@ class PublicCoursePricingDisplayTest extends TestCase
         }
 
         return trim(strip_tags(html_entity_decode($matches[1], ENT_QUOTES, 'UTF-8')));
+    }
+
+    private function extractPlanCheckoutUrl(string $html, string $plan): string
+    {
+        $matched = preg_match(
+            '/data-lp-plan-card="' . preg_quote($plan, '/') . '".*?data-checkout-url="([^"]+)"/s',
+            $html,
+            $matches
+        );
+
+        if ($matched !== 1 || empty($matches[1])) {
+            $this->fail('Checkout do plano ' . $plan . ' não encontrado.');
+        }
+
+        return html_entity_decode($matches[1], ENT_QUOTES, 'UTF-8');
+    }
+
+    private function buildExpectedAffiliateCheckoutUrl(string $codigoRef, string $ap, array $params = []): string
+    {
+        $base = 'https://go.hotmart.com/' . $codigoRef . '?ap=' . $ap;
+
+        if ($params === []) {
+            return $base;
+        }
+
+        return $base . '&' . http_build_query($params);
     }
 
     private function extractLpCourseConfig(string $html): array

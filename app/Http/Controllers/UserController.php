@@ -37,7 +37,7 @@ class UserController extends Controller
     public function index(Request $request)
     {
         $user = Auth::user();
-        $cursos = new Home_e_cursosController();
+        $cursos = app(Home_e_cursosController::class);
         $cursos = $cursos->listar_cursos($request, $user); 
 
         // Migração suave do campo legado em users para a nova tabela

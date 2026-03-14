@@ -594,7 +594,7 @@ class RootDomainCoursePublicStateService
             $enabled = false;
         }
 
-        if (!in_array($action, ['nada', 'encerrar_basico', 'alterar_preco'], true)) {
+        if (!in_array($action, ['nada', 'encerrar_basico', 'alterar_preco', 'whatsapp'], true)) {
             $enabled = false;
         }
 

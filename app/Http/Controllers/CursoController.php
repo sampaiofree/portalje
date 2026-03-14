@@ -23,7 +23,7 @@ class CursoController extends Controller
 {
     public function afiliados_cadastrar_curso(Request $request){
         $user = Auth::user();
-        $home_e_cursosController = new Home_e_cursosController();
+        $home_e_cursosController = app(Home_e_cursosController::class);
         $cursos = $home_e_cursosController->listar_cursos($request, $user);
         $cupons = Cupom::orderBy('desconto')->orderBy('codigo')->get();
 
@@ -233,6 +233,10 @@ class CursoController extends Controller
                 'modo_precos' => $configuracao['modo_precos'],
                 'cupom_principal_id' => $configuracao['cupom_principal_id'],
                 'cupom_secundario_id' => $configuracao['cupom_secundario_id'],
+                'usar_contador' => $configuracao['usar_contador'],
+                'contador_minutos' => $configuracao['contador_minutos'],
+                'contador_acao' => $configuracao['contador_acao'],
+                'contador_destino_oferta' => $configuracao['contador_destino_oferta'],
             ]);
 
             return response()->json([
@@ -245,6 +249,10 @@ class CursoController extends Controller
                 'modo_precos' => $configuracao['modo_precos'],
                 'cupom_principal_id' => $configuracao['cupom_principal_id'],
                 'cupom_secundario_id' => $configuracao['cupom_secundario_id'],
+                'usar_contador' => $configuracao['usar_contador'],
+                'contador_minutos' => $configuracao['contador_minutos'],
+                'contador_acao' => $configuracao['contador_acao'],
+                'contador_destino_oferta' => $configuracao['contador_destino_oferta'],
             ]);
         }
 
@@ -282,6 +290,10 @@ class CursoController extends Controller
             'modo_precos' => ['required', 'string', 'in:padrao,um_preco,dois_precos'],
             'cupom_principal_id' => ['nullable', 'integer'],
             'cupom_secundario_id' => ['nullable', 'integer'],
+            'usar_contador' => ['nullable', 'boolean'],
+            'contador_minutos' => ['nullable', 'integer', 'in:1,5,10,20,30,50'],
+            'contador_acao' => ['nullable', 'string', 'in:nada,encerrar_basico,alterar_preco,whatsapp'],
+            'contador_destino_oferta' => ['nullable', 'string', 'max:60'],
         ];
 
         if ($temCupons) {
@@ -292,28 +304,63 @@ class CursoController extends Controller
         $validator = Validator::make($request->all(), $rules, [
             'cupom_secundario_id.required' => 'Selecione o cupom do segundo preço.',
             'cupom_secundario_id.different' => 'O cupom do segundo preço deve ser diferente do principal.',
+            'contador_minutos.in' => 'Selecione um tempo válido para o contador.',
+            'contador_acao.in' => 'Selecione uma ação válida para o contador.',
         ]);
 
         $validator->after(function ($validator) use ($request, $temCupons) {
-            if (!$temCupons) {
-                return;
-            }
-
             $modoPrecos = $request->input('modo_precos', 'padrao');
+            $modoPrecosNormalizado = $this->normalizeModoPrecosInput($modoPrecos, $temCupons);
             $cupomPrincipalId = $request->filled('cupom_principal_id') ? (int) $request->input('cupom_principal_id') : null;
             $cupomSecundarioId = $request->filled('cupom_secundario_id') ? (int) $request->input('cupom_secundario_id') : null;
 
-            if ($modoPrecos === 'dois_precos' && empty($cupomSecundarioId)) {
-                $validator->errors()->add('cupom_secundario_id', 'Selecione o cupom do segundo preço.');
+            if ($temCupons) {
+                if ($modoPrecosNormalizado === 'dois_precos' && empty($cupomSecundarioId)) {
+                    $validator->errors()->add('cupom_secundario_id', 'Selecione o cupom do segundo preço.');
+                }
+
+                if (
+                    $modoPrecosNormalizado === 'dois_precos' &&
+                    !empty($cupomPrincipalId) &&
+                    !empty($cupomSecundarioId) &&
+                    $cupomPrincipalId === $cupomSecundarioId
+                ) {
+                    $validator->errors()->add('cupom_secundario_id', 'O cupom do segundo preço deve ser diferente do principal.');
+                }
             }
 
-            if (
-                $modoPrecos === 'dois_precos' &&
-                !empty($cupomPrincipalId) &&
-                !empty($cupomSecundarioId) &&
-                $cupomPrincipalId === $cupomSecundarioId
-            ) {
-                $validator->errors()->add('cupom_secundario_id', 'O cupom do segundo preço deve ser diferente do principal.');
+            if (!$request->boolean('usar_contador')) {
+                return;
+            }
+
+            if (!$request->filled('contador_minutos')) {
+                $validator->errors()->add('contador_minutos', 'Selecione os minutos do contador.');
+            }
+
+            if (!$request->filled('contador_acao')) {
+                $validator->errors()->add('contador_acao', 'Selecione a ação do contador.');
+                return;
+            }
+
+            $contadorAcao = (string) $request->input('contador_acao');
+
+            if ($contadorAcao === 'encerrar_basico' && !in_array($modoPrecosNormalizado, ['padrao', 'dois_precos'], true)) {
+                $validator->errors()->add('contador_acao', 'A ação de encerrar o plano básico só pode ser usada quando a página exibe o plano básico.');
+            }
+
+            if ($contadorAcao === 'alterar_preco') {
+                $contadorDestinoOferta = trim((string) $request->input('contador_destino_oferta', ''));
+
+                if ($contadorDestinoOferta === '') {
+                    $validator->errors()->add('contador_destino_oferta', 'Selecione o preço que será mostrado após o contador.');
+                    return;
+                }
+
+                $destinosValidos = $this->availableCountdownDestinationOffers($modoPrecosNormalizado, $temCupons);
+
+                if (!in_array($contadorDestinoOferta, $destinosValidos, true)) {
+                    $validator->errors()->add('contador_destino_oferta', 'Selecione um preço compatível com a configuração atual da página.');
+                }
             }
         });
 
@@ -338,11 +385,17 @@ class CursoController extends Controller
             $cupomSecundarioId = null;
         }
 
+        $countdownConfig = $this->normalizeCountdownConfiguration($request, $modoPrecos, $temCupons);
+
         return [
             'formulario_pre_checkout' => $request->boolean('formulario_pre_checkout'),
             'modo_precos' => $modoPrecos,
             'cupom_principal_id' => $cupomPrincipalId,
             'cupom_secundario_id' => $cupomSecundarioId,
+            'usar_contador' => $countdownConfig['usar_contador'],
+            'contador_minutos' => $countdownConfig['contador_minutos'],
+            'contador_acao' => $countdownConfig['contador_acao'],
+            'contador_destino_oferta' => $countdownConfig['contador_destino_oferta'],
         ];
     }
 
@@ -411,7 +464,7 @@ class CursoController extends Controller
             'contador_minutos' => $request->filled('contador_minutos')
                 ? (int) $request->input('contador_minutos')
                 : null,
-            'contador_acao' => in_array($contadorAcao, ['nada', 'encerrar_basico', 'alterar_preco'], true)
+            'contador_acao' => in_array($contadorAcao, ['nada', 'encerrar_basico', 'alterar_preco', 'whatsapp'], true)
                 ? $contadorAcao
                 : null,
             'contador_destino_oferta' => $contadorDestinoOferta !== '' ? $contadorDestinoOferta : null,
@@ -427,7 +480,7 @@ class CursoController extends Controller
             'cupom_secundario_id' => ['nullable', 'integer'],
             'usar_contador' => 'nullable|boolean',
             'contador_minutos' => 'nullable|integer|in:1,5,10,20,30,50',
-            'contador_acao' => 'nullable|string|in:nada,encerrar_basico,alterar_preco',
+            'contador_acao' => 'nullable|string|in:nada,encerrar_basico,alterar_preco,whatsapp',
             'contador_destino_oferta' => 'nullable|string|max:60',
         ];
 
@@ -648,7 +701,7 @@ class CursoController extends Controller
             'cupom_secundario_id' => ['nullable', 'integer'],
             'usar_contador' => 'nullable|boolean',
             'contador_minutos' => 'nullable|integer|in:1,5,10,20,30,50',
-            'contador_acao' => 'nullable|string|in:nada,encerrar_basico,alterar_preco',
+            'contador_acao' => 'nullable|string|in:nada,encerrar_basico,alterar_preco,whatsapp',
             'contador_destino_oferta' => 'nullable|string|max:60',
         ];
 

@@ -163,6 +163,12 @@
         'storage_key' => null,
         'end_label' => 'Encerrado',
     ];
+    $waitlistCopy = 'Entre na lista de espera pelo WhatsApp e avisaremos quando novas vagas forem liberadas.';
+    $waitlistWhatsappDigits = preg_replace('/\D/', '', (string) ($curso->whatsapp_atendimento ?? '')) ?? '';
+    $waitlistWhatsappText = 'Olá, quero entrar na lista de espera do curso de ' . $tituloCurso;
+    $waitlistWhatsappUrl = $waitlistWhatsappDigits !== ''
+        ? 'https://wa.me/' . $waitlistWhatsappDigits . '?text=' . rawurlencode($waitlistWhatsappText)
+        : '#';
     $currentCompleteOfferKey = $curso->current_complete_offer_key ?? 'completo_padrao';
     $currentBasicOfferKey = $curso->current_basic_offer_key ?? null;
 
@@ -260,6 +266,7 @@
             <a
                 href="#planos"
                 class="lp-btn lp-btn--small js-anchor-scroll"
+                data-lp-primary-scroll-cta
             >
                 Garantir vaga
             </a>
@@ -270,7 +277,7 @@
         <section id="hero" class="lp-hero">
             <div class="lp-shell lp-hero__grid">
                 <div class="lp-hero__content">
-                    <p class="lp-badge">Matrículas abertas</p>
+                    <p class="lp-badge" data-lp-hero-badge>Matrículas abertas</p>
                     <h1>{{ $tituloCurso }}</h1>
                     <p class="lp-subtitle">{{ $headlineCurso }}</p>
 
@@ -305,10 +312,13 @@
                         <a
                             href="#planos"
                             class="lp-btn js-anchor-scroll"
+                            data-lp-primary-scroll-cta
                         >
                             Quero me inscrever agora
                         </a>
                     </div>
+
+                    <p class="lp-hero__waitlist" data-lp-hero-waitlist hidden>{{ $waitlistCopy }}</p>
 
                     <div class="lp-proof-inline">
                         <span class="lp-proof-inline__item">
@@ -486,10 +496,9 @@
             <div class="lp-shell">
                 <div class="lp-heading lp-heading--light">
                     <h2 class="lp-heading__title">
-                        
-                        <span>Escolha seu plano de acesso</span>
+                        <span data-lp-pricing-title>Escolha seu plano de acesso</span>
                     </h2>
-                    <p>Oferta ativa por tempo limitado. Garanta o valor promocional enquanto as vagas estão abertas.</p>
+                    <p data-lp-pricing-copy>Oferta ativa por tempo limitado. Garanta o valor promocional enquanto as vagas estão abertas.</p>
                 </div>
 
                 @if(!empty($countdownConfig['enabled']))
@@ -576,6 +585,22 @@
                             <span>Garantia incondicional de 7 dias.</span>
                         </p>
                     </article>
+                </div>
+
+                <div class="lp-waitlist-card" data-lp-waitlist-block hidden>
+                    <p class="lp-waitlist-card__tag">Lista de espera</p>
+                    <h3>Inscrições encerradas</h3>
+                    <p>{{ $waitlistCopy }}</p>
+                    <a
+                        href="{{ $waitlistWhatsappUrl }}"
+                        class="lp-btn"
+                        data-lp-waitlist-cta
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        @if($waitlistWhatsappUrl === '#') hidden @endif
+                    >
+                        Entrar na lista de espera
+                    </a>
                 </div>
             </div>
         </section>
@@ -700,6 +725,7 @@
                 <a
                     href="#planos"
                     class="lp-btn js-anchor-scroll"
+                    data-lp-primary-scroll-cta
                 >
                     Quero garantir minha vaga agora
                 </a>
@@ -718,6 +744,7 @@
         <a
             href="#planos"
             class="lp-btn js-anchor-scroll"
+            data-lp-primary-scroll-cta
         >
             Garantir minha vaga
         </a>
