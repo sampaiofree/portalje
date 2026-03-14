@@ -4,13 +4,22 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use App\Models\User;
 use App\Models\Curso;
 use App\Models\PurchaseEvent;
 use App\Models\Cidades;
+use App\Models\Cupom;
+use App\Models\RootDomainCourseConfig;
+use App\Services\RootDomainCoursePublicStateService;
 
 class ConsultarController extends Controller
 {
+    private RootDomainCoursePublicStateService $rootDomainCoursePublicStateService;
+
+    public function __construct(RootDomainCoursePublicStateService $rootDomainCoursePublicStateService)
+    {
+        $this->rootDomainCoursePublicStateService = $rootDomainCoursePublicStateService;
+    }
+
     public function consultarAluno($nomeCampo, $conteudoCampo)
     {
         if($conteudoCampo=="03125257107"){
@@ -63,6 +72,16 @@ class ConsultarController extends Controller
 
         $cursos = $query->get();
 
+        if (!$id) {
+            $configsByCourseId = $this->rootDomainCoursePublicStateService->configsByCourseId();
+            $cursos = $cursos
+                ->filter(fn (Curso $curso) => $this->rootDomainCoursePublicStateService->isVisibleForCourse(
+                    $curso,
+                    $configsByCourseId->get($curso->id)
+                ))
+                ->values();
+        }
+
         if ($cursos->isEmpty()) {
             return "### ❌ Nenhum curso encontrado.";
         }
@@ -70,19 +89,7 @@ class ConsultarController extends Controller
         $markdown = "## 🎓 Lista de Cursos\n\n";
 
         foreach ($cursos as $curso) {
-            $markdown .= "### {$curso->titulo}\n";
-            $markdown .= "- **ID:** {$curso->id}\n";
-            $markdown .= "- **Professor:** {$curso->professor_nome}\n";
-            $markdown .= "- **Carga horária:** {$curso->horas_completo} horas\n";
-            $markdown .= "- **Preço:** {$curso->preco_parcelado_completo} (ou {$curso->preco_cheio_completo} à vista no PIX)\n";
-            $markdown .= "- **Avaliação:** {$curso->nota_avaliacao}\n";
-            $markdown .= "- **Área de atuação:** {$curso->areas_de_atuacao}\n";
-            $markdown .= "- **Página do curso:** https://jovemempreendedor.org/{$curso->url}\n";
-            $markdown .= "- **Aulas gratuitas:** https://jovemempreendedor.org/{$curso->url}?g=1\n";
-            $markdown .= "- **Pagamento:** {$curso->link_checkout_completo}\n";
-            $markdown .= "- **Área de Membros:** {$curso->link_area_membros}\n";
-            $markdown .= "- **Vídeo de apresentação:** (https://youtube.com/watch?v={$curso->video_apresentacao}\n";
-            $markdown .= "- **Por dentro do curso:** https://youtube.com/watch?v={$curso->video_dentro_do_curso}\n\n";
+            $markdown .= $this->buildCursoMarkdown($curso);
             $markdown .= "---\n\n";
         }
 
@@ -133,4 +140,101 @@ class ConsultarController extends Controller
     return response()->json($return);
 
    }
-} 
+
+    private function buildCursoMarkdown(Curso $curso): string
+    {
+        $state = $this->rootDomainCoursePublicStateService->resolveEffectivePublicStateForCourse($curso);
+        /** @var \App\Models\Curso $effectiveCourse */
+        $effectiveCourse = $state['course'];
+        $pricing = $state['pricing'];
+        $config = $state['config'];
+        $visible = (bool) ($state['visible'] ?? false);
+        $currentMode = (string) ($effectiveCourse->modo_precos ?? 'padrao');
+        $basicOfferKey = $pricing['current_basic_offer_key'] ?? null;
+        $completeOfferKey = $pricing['current_complete_offer_key'] ?? 'completo_padrao';
+        $offerVariants = collect($pricing['offer_variants'] ?? []);
+        $completeOffer = $offerVariants->get($completeOfferKey, []);
+        $basicOffer = $basicOfferKey ? $offerVariants->get($basicOfferKey, []) : null;
+        $countdown = $pricing['countdown'] ?? [];
+
+        $markdown = "### {$curso->titulo}\n";
+        $markdown .= "- **ID:** {$curso->id}\n";
+        $markdown .= "- **Professor:** {$curso->professor_nome}\n";
+        $markdown .= "- **Carga horária:** {$curso->horas_completo} horas\n";
+        $markdown .= "- **Avaliação:** {$curso->nota_avaliacao}\n";
+        $markdown .= "- **Área de atuação:** {$curso->areas_de_atuacao}\n";
+        $markdown .= "- **Visibilidade nos domínios raiz:** " . ($visible ? 'Visível' : 'Oculto') . "\n";
+        $markdown .= "- **Formulário antes do checkout:** " . ($effectiveCourse->formulario ? 'Sim' : 'Não') . "\n";
+        $markdown .= "- **Modo de preços:** {$currentMode}\n";
+        $markdown .= "- **Página do curso:** https://jovemempreendedor.org/{$curso->url}\n";
+        $markdown .= "- **Aulas gratuitas:** https://jovemempreendedor.org/{$curso->url}?g=1\n";
+        $markdown .= "- **Plano completo:** {$this->formatOfferLine($completeOffer)}\n";
+        $markdown .= "- **Pagamento plano completo:** " . ($completeOffer['checkout_url'] ?? ($effectiveCourse->link_checkout_completo ?? '#')) . "\n";
+
+        if (is_array($basicOffer) && !empty($basicOffer)) {
+            $markdown .= "- **Plano básico:** {$this->formatOfferLine($basicOffer)}\n";
+            $markdown .= "- **Pagamento plano básico:** " . ($basicOffer['checkout_url'] ?? ($effectiveCourse->link_checkout_basico ?? '#')) . "\n";
+        }
+
+        if (!empty($countdown['enabled'])) {
+            $markdown .= "- **Contador:** " . $this->formatCountdownLine($countdown) . "\n";
+        }
+
+        if ($config instanceof RootDomainCourseConfig) {
+            $markdown .= "- **Configuração raiz personalizada:** Sim\n";
+        }
+
+        $markdown .= "- **Área de Membros:** {$curso->link_area_membros}\n";
+        $markdown .= "- **Vídeo de apresentação:** https://youtube.com/watch?v={$curso->video_apresentacao}\n";
+        $markdown .= "- **Por dentro do curso:** https://youtube.com/watch?v={$curso->video_dentro_do_curso}\n\n";
+
+        return $markdown;
+    }
+
+    private function formatOfferLine(array $offer): string
+    {
+        $price = (string) ($offer['price_value'] ?? 'Consulte');
+        $cashValue = (string) ($offer['cash_value'] ?? 'Consulte');
+
+        if (!empty($offer['show_cash_line'])) {
+            return $price . " (ou {$cashValue} à vista no PIX)";
+        }
+
+        return $price;
+    }
+
+    private function formatCountdownLine(array $countdown): string
+    {
+        $minutes = (int) ($countdown['minutes'] ?? 0);
+        $minuteLabel = $minutes === 1 ? '1 minuto' : "{$minutes} minutos";
+        $action = (string) ($countdown['action'] ?? 'nada');
+        $line = $minuteLabel . " | ação: {$action}";
+
+        if ($action === 'alterar_preco' && !empty($countdown['destination_offer'])) {
+            $line .= ' | destino: ' . $this->describeDestinationOffer((string) $countdown['destination_offer']);
+        }
+
+        return $line;
+    }
+
+    private function describeDestinationOffer(string $destinationOffer): string
+    {
+        if ($destinationOffer === 'completo_padrao') {
+            return 'Plano completo padrão';
+        }
+
+        if ($destinationOffer === 'basico_padrao') {
+            return 'Plano básico padrão';
+        }
+
+        if (preg_match('/^(completo|basico)_cupom:(\d+)$/', $destinationOffer, $matches) !== 1) {
+            return $destinationOffer;
+        }
+
+        $planLabel = $matches[1] === 'basico' ? 'Plano básico' : 'Plano completo';
+        $cupom = Cupom::query()->find((int) $matches[2]);
+        $couponLabel = $cupom?->codigo ?: ('#' . $matches[2]);
+
+        return "{$planLabel} com cupom {$couponLabel}";
+    }
+}

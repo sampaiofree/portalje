@@ -10,152 +10,67 @@ use App\Http\Controllers\Meta_apiController;
 use App\Models\Curso;
 use App\Models\Cupom;
 use App\Models\User;
-use App\Models\Dados_portal;
 use App\Models\RootDomainCourseConfig;
+use App\Services\RootDomainCoursePublicStateService;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
 use DOMDocument;
 use DOMXPath;
-use Throwable;
 
 class Home_e_cursosController extends Controller
 {
 
     public $dados_portal;
+    private RootDomainCoursePublicStateService $rootDomainCoursePublicStateService;
 
-    public function __construct()
+    public function __construct(RootDomainCoursePublicStateService $rootDomainCoursePublicStateService)
     {
+        $this->rootDomainCoursePublicStateService = $rootDomainCoursePublicStateService;
         $this->dados_portal = $this->carregarDadosPortal();
     }
 
     private function carregarDadosPortal(): array
     {
-        $defaults = [
-            'telefone_suporte_alunos' => '5511982671533',
-            'whatsapp_atendimento_tempo' => 'Seg a Sex 08:00-18:00',
-            'formulario_pre_checkout' => true,
-            'formulario_whatsapp' => true,
-        ];
-
-        try {
-            if (!Schema::hasTable('portal_informacoes')) {
-                return $defaults;
-            }
-
-            $dados = Dados_portal::first();
-
-            if (!$dados) {
-                return $defaults;
-            }
-
-            return array_merge($defaults, $dados->toArray());
-        } catch (Throwable $e) {
-            return $defaults;
-        }
+        return $this->rootDomainCoursePublicStateService->portalData();
     }
 
     private function rootPortalHosts(): array
     {
-        return [
-            'portalje.org',
-            'dns.portalje.org',
-            'jovemempreendedor.org',
-            'dns.jovemempreendedor.org',
-        ];
+        return $this->rootDomainCoursePublicStateService->rootPortalHosts();
     }
 
     private function isRootPortalHost(?string $dominio): bool
     {
-        $dominio = $this->normalizarHost((string) $dominio);
-
-        return in_array($dominio, $this->rootPortalHosts(), true);
+        return $this->rootDomainCoursePublicStateService->isRootPortalHost($dominio);
     }
 
     private function rootDomainConfigsByCourseId()
     {
-        if (!Schema::hasTable('root_domain_course_configs')) {
-            return collect();
-        }
-
-        return RootDomainCourseConfig::query()->get()->keyBy('curso_id');
+        return $this->rootDomainCoursePublicStateService->configsByCourseId();
     }
 
     private function rootDomainConfigForCourse(?Curso $curso): ?RootDomainCourseConfig
     {
-        if (!$curso || !Schema::hasTable('root_domain_course_configs')) {
-            return null;
-        }
-
-        return RootDomainCourseConfig::query()
-            ->where('curso_id', $curso->id)
-            ->first();
+        return $this->rootDomainCoursePublicStateService->configForCourse($curso);
     }
 
     private function applyRootDomainPublicConfigOnCourse(Curso $curso, ?RootDomainCourseConfig $config): void
     {
-        $curso->root_domain_course_config_id = $config->id ?? null;
-        $curso->mostrar_curso = $config
-            ? (bool) $config->mostrar_curso
-            : (bool) ($curso->mostrar_na_pagina ?? false);
-        $curso->mostrar_na_pagina = $config
-            ? (bool) $config->mostrar_curso
-            : (bool) ($curso->mostrar_na_pagina ?? false);
-        $curso->modo_precos = $config && in_array((string) $config->modo_precos, ['padrao', 'um_preco', 'dois_precos'], true)
-            ? (string) $config->modo_precos
-            : 'padrao';
-        $curso->cupom_principal_id = $config && !empty($config->cupom_principal_id)
-            ? (int) $config->cupom_principal_id
-            : null;
-        $curso->cupom_secundario_id = $config && !empty($config->cupom_secundario_id)
-            ? (int) $config->cupom_secundario_id
-            : null;
-        $curso->formulario_pre_checkout = $config
-            ? (bool) $config->formulario_pre_checkout
-            : (bool) ($this->dados_portal['formulario_pre_checkout'] ?? true);
-        $curso->usar_contador = $config ? (bool) $config->usar_contador : false;
-        $curso->contador_minutos = $config && !empty($config->contador_minutos)
-            ? (int) $config->contador_minutos
-            : null;
-        $curso->contador_acao = $config->contador_acao ?? null;
-        $curso->contador_destino_oferta = $config->contador_destino_oferta ?? null;
+        $this->rootDomainCoursePublicStateService->applyConfigOnCourse($curso, $config, $this->dados_portal);
     }
 
     private function buildRootDomainCourseData(Curso $curso, ?RootDomainCourseConfig $config): array
     {
-        $dados = [
-            'whatsapp_atendimento' => $this->dados_portal['telefone_suporte_alunos'],
-            'whatsapp_atendimento_id' => null,
-            'whatsapp_atendimento_tempo' => $this->dados_portal['whatsapp_atendimento_tempo'],
-            'meta_pixel_id' => null,
-            'company_name' => 'Programa Jovem Empreendedor',
-            'logo_padrao_url' => $this->resolverLogoPadraoUrl(),
-            'logo_dark_url' => $this->resolverLogoDarkUrl(),
-            'formulario_pre_checkout' => $config
-                ? (bool) $config->formulario_pre_checkout
-                : (bool) ($this->dados_portal['formulario_pre_checkout'] ?? true),
-            'formulario_whatsapp' => (bool) ($this->dados_portal['formulario_whatsapp'] ?? true),
-            'user_id' => null,
-            'affiliate_code' => null,
-            'modo_precos' => $config && in_array((string) $config->modo_precos, ['padrao', 'um_preco', 'dois_precos'], true)
-                ? (string) $config->modo_precos
-                : 'padrao',
-            'cupom_principal_id' => $config && !empty($config->cupom_principal_id)
-                ? (int) $config->cupom_principal_id
-                : null,
-            'cupom_secundario_id' => $config && !empty($config->cupom_secundario_id)
-                ? (int) $config->cupom_secundario_id
-                : null,
-            'usar_contador' => $config ? (bool) $config->usar_contador : false,
-            'contador_minutos' => $config && !empty($config->contador_minutos)
-                ? (int) $config->contador_minutos
-                : null,
-            'contador_acao' => $config->contador_acao ?? null,
-            'contador_destino_oferta' => $config->contador_destino_oferta ?? null,
-            'link_checkout_completo' => $curso->link_checkout_completo . '&hideBillet=1',
-        ];
-
-        return $dados;
+        return $this->rootDomainCoursePublicStateService->buildRootDomainCourseData(
+            $curso,
+            $config,
+            [
+                'logo_padrao_url' => $this->resolverLogoPadraoUrl(),
+                'logo_dark_url' => $this->resolverLogoDarkUrl(),
+            ],
+            $this->dados_portal
+        );
     }
 
     //PÁGINA CURSO INDIVIDUAL
@@ -1552,67 +1467,12 @@ class Home_e_cursosController extends Controller
         array $dados,
         bool $descontoBannerAtivo
     ): array {
-        $modoPrecosAtual = in_array(($cursoAtual->modo_precos ?? 'padrao'), ['padrao', 'um_preco', 'dois_precos'], true)
-            ? $cursoAtual->modo_precos
-            : 'padrao';
-
-        $mostrarPlanoSecundario = ($cursoAtual->origem ?? 'checkout_completo') !== 'whatsapp'
-            && !$descontoBannerAtivo
-            && in_array($modoPrecosAtual, ['padrao', 'dois_precos'], true);
-
-        $offerVariants = $this->buildPublicCourseOfferVariants($cursoBasePricing, $modoPrecosAtual);
-
-        $currentCompleteOfferKey = !empty($cursoAtual->cupom_principal_id)
-            ? 'completo_cupom:' . (int) $cursoAtual->cupom_principal_id
-            : 'completo_padrao';
-
-        $currentBasicOfferKey = null;
-        if ($mostrarPlanoSecundario) {
-            $currentBasicOfferKey = $modoPrecosAtual === 'dois_precos' && !empty($cursoAtual->cupom_secundario_id)
-                ? 'basico_cupom:' . (int) $cursoAtual->cupom_secundario_id
-                : 'basico_padrao';
-        }
-
-        $countdown = $this->normalizePublicCountdownConfig(
+        return $this->rootDomainCoursePublicStateService->buildPublicCoursePricingConfig(
+            $cursoBasePricing,
+            $cursoAtual,
             $dados,
-            $modoPrecosAtual,
-            $offerVariants,
-            ($cursoAtual->origem ?? 'checkout_completo') !== 'whatsapp',
-            $mostrarPlanoSecundario
+            $descontoBannerAtivo
         );
-
-        if ($countdown['enabled']) {
-            $affiliateSegment = trim((string) ($dados['affiliate_code'] ?? $cursoAtual->affiliate_code ?? $dados['user_id'] ?? ''));
-            $affiliateSegment = preg_replace('/[^a-zA-Z0-9_-]/', '', $affiliateSegment) ?? '';
-            if ($affiliateSegment === '') {
-                $affiliateSegment = 'sem_ref';
-            }
-
-            $configHash = substr(sha1(json_encode([
-                'minutes' => $countdown['minutes'],
-                'action' => $countdown['action'],
-                'destination' => $countdown['destination_offer'],
-                'mode' => $modoPrecosAtual,
-                'principal' => $cursoAtual->cupom_principal_id,
-                'secundario' => $cursoAtual->cupom_secundario_id,
-                'desconto_banner' => $descontoBannerAtivo,
-            ])), 0, 16);
-
-            $countdown['storage_key'] = 'lp_course_countdown_'
-                . (int) ($cursoAtual->id ?? 0)
-                . '_'
-                . $affiliateSegment
-                . '_'
-                . $configHash;
-        }
-
-        return [
-            'initial_state' => $this->buildPublicCourseInitialState($cursoAtual, $mostrarPlanoSecundario),
-            'offer_variants' => $offerVariants,
-            'current_complete_offer_key' => $currentCompleteOfferKey,
-            'current_basic_offer_key' => $currentBasicOfferKey,
-            'countdown' => $countdown,
-        ];
     }
 
     private function buildPublicCourseInitialState(Curso $cursoAtual, bool $mostrarPlanoSecundario): array
@@ -1830,96 +1690,7 @@ class Home_e_cursosController extends Controller
 
     private function aplicarConfiguracaoDePrecosPorCupom(Curso $curso, array $dados, bool $descontoBannerAtivo): void
     {
-        $modoPrecos = $dados['modo_precos'] ?? 'padrao';
-        if (!in_array($modoPrecos, ['padrao', 'um_preco', 'dois_precos'], true)) {
-            $modoPrecos = 'padrao';
-        }
-
-        $cupomPrincipalId = !empty($dados['cupom_principal_id']) ? (int) $dados['cupom_principal_id'] : null;
-        $cupomSecundarioId = !empty($dados['cupom_secundario_id']) ? (int) $dados['cupom_secundario_id'] : null;
-
-        if ($descontoBannerAtivo || !Schema::hasTable('cupons')) {
-            $this->forcarConfiguracaoPadraoDePrecos($curso);
-            return;
-        }
-
-        $cupons = Cupom::query()->get()->keyBy('id');
-        if ($cupons->isEmpty()) {
-            $this->forcarConfiguracaoPadraoDePrecos($curso);
-            return;
-        }
-
-        $cupomPrincipal = $cupomPrincipalId ? $cupons->get($cupomPrincipalId) : null;
-        $cupomSecundario = $cupomSecundarioId ? $cupons->get($cupomSecundarioId) : null;
-
-        if ($modoPrecos === 'um_preco' && $cupomPrincipalId && !$cupomPrincipal) {
-            $this->forcarConfiguracaoPadraoDePrecos($curso);
-            return;
-        }
-
-        if (
-            $modoPrecos === 'dois_precos' &&
-            (
-                !$cupomSecundario ||
-                ($cupomPrincipalId && !$cupomPrincipal) ||
-                ($cupomPrincipalId && $cupomSecundarioId && $cupomPrincipalId === $cupomSecundarioId)
-            )
-        ) {
-            $this->forcarConfiguracaoPadraoDePrecos($curso);
-            return;
-        }
-
-        if ($modoPrecos === 'padrao') {
-            $curso->modo_precos = 'padrao';
-            $curso->cupom_principal_id = null;
-            $curso->cupom_secundario_id = null;
-            $curso->cupom_principal_codigo = null;
-            $curso->cupom_secundario_codigo = null;
-            return;
-        }
-
-        $precoCheioCompleto = $this->extrairValorMonetario($curso->preco_cheio_completo);
-        $precoParcelaCompleto = $this->extrairValorMonetario($curso->preco_parcelado_completo);
-
-        $curso->modo_precos = $modoPrecos;
-        $curso->cupom_principal_id = $cupomPrincipal?->id;
-        $curso->cupom_secundario_id = $cupomSecundario?->id;
-        $curso->cupom_principal_codigo = $cupomPrincipal?->codigo;
-        $curso->cupom_secundario_codigo = $cupomSecundario?->codigo;
-
-        if ($cupomPrincipal) {
-            $curso->link_checkout_completo = $this->aplicarCupomNoCheckoutUrl($curso->link_checkout_completo, $cupomPrincipal->codigo);
-
-            if ($precoCheioCompleto !== null) {
-                $curso->preco_cheio_completo = $this->formatarValorMonetario(
-                    $this->aplicarDescontoPercentual($precoCheioCompleto, (float) $cupomPrincipal->desconto)
-                );
-            }
-
-            if ($precoParcelaCompleto !== null) {
-                $curso->preco_parcelado_completo = $this->formatarPrecoParcelado(
-                    $this->aplicarDescontoPercentual($precoParcelaCompleto, (float) $cupomPrincipal->desconto),
-                    $curso->parcelamento
-                );
-            }
-        }
-
-        if ($modoPrecos === 'dois_precos' && $cupomSecundario) {
-            $curso->link_checkout_basico = $this->aplicarCupomNoCheckoutUrl($curso->link_checkout_basico, $cupomSecundario->codigo);
-
-            if ($precoCheioCompleto !== null) {
-                $curso->preco_cheio_basico = $this->formatarValorMonetario(
-                    $this->aplicarDescontoPercentual($precoCheioCompleto, (float) $cupomSecundario->desconto)
-                );
-            }
-
-            if ($precoParcelaCompleto !== null) {
-                $curso->preco_parcelado_basico = $this->formatarPrecoParcelado(
-                    $this->aplicarDescontoPercentual($precoParcelaCompleto, (float) $cupomSecundario->desconto),
-                    $curso->parcelamento
-                );
-            }
-        }
+        $this->rootDomainCoursePublicStateService->applyPricingConfigurationByCoupon($curso, $dados, $descontoBannerAtivo);
     }
 
     private function forcarConfiguracaoPadraoDePrecos(Curso $curso): void

@@ -518,18 +518,7 @@
             }
 
             if (ended) {
-                if (blockType === 'hero') {
-                    blockEl.hidden = true;
-                    return;
-                }
-
-                if (labelEl) {
-                    labelEl.textContent = text;
-                }
-
-                if (timerEl) {
-                    timerEl.hidden = true;
-                }
+                blockEl.hidden = true;
 
                 return;
             }
