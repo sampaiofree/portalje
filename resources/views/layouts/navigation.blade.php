@@ -113,6 +113,7 @@
                         <x-responsive-nav-link :href="route('adm_portal_informacoes')">Informações do Portal</x-responsive-nav-link>
                         <x-responsive-nav-link :href="route('cursos.novo')">Novo Curso</x-responsive-nav-link>
                         <x-responsive-nav-link :href="route('adm_cursos_lista')">Lista de Cursos</x-responsive-nav-link>
+                        <x-responsive-nav-link :href="route('admin.root_domain_course_pages')">Páginas dos Domínios</x-responsive-nav-link>
                         <x-responsive-nav-link :href="route('aulas_gratuitas_index')">Aulas Gratuitas</x-responsive-nav-link>
                         <x-responsive-nav-link :href="route('combo.index')">Combos</x-responsive-nav-link>
                         <x-responsive-nav-link :href="route('admin.cupons.index')">Cupons</x-responsive-nav-link>

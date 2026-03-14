@@ -247,6 +247,175 @@ class CodigoRefPricingConfigTest extends TestCase
         ]);
     }
 
+    public function test_store_saves_valid_countdown_configuration_with_one_minute(): void
+    {
+        $this->withoutMiddleware(MinhaJornada::class);
+
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+        ]);
+
+        $curso = $this->createCurso('curso-contador-valido', 'Curso Contador Válido');
+        $cupom = Cupom::create(['codigo' => 'COUNT20', 'desconto' => 20]);
+
+        $response = $this->actingAs($user)->postJson(route('cadastrar_codigo_ref'), [
+            'user_id' => $user->id,
+            'curso_id' => $curso->id,
+            'codigo_ref' => 'AFILIADOCOUNT1',
+            'mostrar_curso' => '1',
+            'modo_precos' => 'um_preco',
+            'usar_contador' => '1',
+            'contador_minutos' => '1',
+            'contador_acao' => 'alterar_preco',
+            'contador_destino_oferta' => 'completo_cupom:' . $cupom->id,
+            'titulo' => $curso->titulo,
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('usar_contador', true);
+        $response->assertJsonPath('contador_minutos', 1);
+        $response->assertJsonPath('contador_acao', 'alterar_preco');
+        $response->assertJsonPath('contador_destino_oferta', 'completo_cupom:' . $cupom->id);
+
+        $this->assertDatabaseHas('codigo_ref', [
+            'user_id' => $user->id,
+            'curso_id' => $curso->id,
+            'usar_contador' => 1,
+            'contador_minutos' => 1,
+            'contador_acao' => 'alterar_preco',
+            'contador_destino_oferta' => 'completo_cupom:' . $cupom->id,
+        ]);
+    }
+
+    public function test_store_clears_countdown_fields_when_disabled(): void
+    {
+        $this->withoutMiddleware(MinhaJornada::class);
+
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+        ]);
+
+        $curso = $this->createCurso('curso-contador-off', 'Curso Contador Off');
+
+        $registro = Codigo_ref::create([
+            'user_id' => $user->id,
+            'curso_id' => $curso->id,
+            'codigo_ref' => 'COUNTCLEAR1',
+            'mostrar_curso' => true,
+            'modo_precos' => 'padrao',
+            'usar_contador' => true,
+            'contador_minutos' => 20,
+            'contador_acao' => 'nada',
+            'contador_destino_oferta' => 'completo_padrao',
+        ]);
+
+        $response = $this->actingAs($user)->postJson(route('cadastrar_codigo_ref'), [
+            'id' => $registro->id,
+            'user_id' => $user->id,
+            'curso_id' => $curso->id,
+            'codigo_ref' => 'COUNTCLEAR1',
+            'mostrar_curso' => '1',
+            'modo_precos' => 'padrao',
+            'usar_contador' => '0',
+            'titulo' => $curso->titulo,
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('usar_contador', false);
+        $response->assertJsonPath('contador_minutos', null);
+        $response->assertJsonPath('contador_acao', null);
+        $response->assertJsonPath('contador_destino_oferta', null);
+
+        $this->assertDatabaseHas('codigo_ref', [
+            'id' => $registro->id,
+            'usar_contador' => 0,
+            'contador_minutos' => null,
+            'contador_acao' => null,
+            'contador_destino_oferta' => null,
+        ]);
+    }
+
+    public function test_store_rejects_encerrar_basico_in_um_preco_mode(): void
+    {
+        $this->withoutMiddleware(MinhaJornada::class);
+
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+        ]);
+
+        $curso = $this->createCurso('curso-contador-acao-invalida', 'Curso Contador Ação Inválida');
+        Cupom::create(['codigo' => 'COUNT15', 'desconto' => 15]);
+
+        $response = $this->actingAs($user)->postJson(route('cadastrar_codigo_ref'), [
+            'user_id' => $user->id,
+            'curso_id' => $curso->id,
+            'codigo_ref' => 'COUNTACT1',
+            'mostrar_curso' => '1',
+            'modo_precos' => 'um_preco',
+            'usar_contador' => '1',
+            'contador_minutos' => '5',
+            'contador_acao' => 'encerrar_basico',
+            'titulo' => $curso->titulo,
+        ]);
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors(['contador_acao']);
+    }
+
+    public function test_store_rejects_alterar_preco_without_destination_offer(): void
+    {
+        $this->withoutMiddleware(MinhaJornada::class);
+
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+        ]);
+
+        $curso = $this->createCurso('curso-contador-sem-destino', 'Curso Contador Sem Destino');
+
+        $response = $this->actingAs($user)->postJson(route('cadastrar_codigo_ref'), [
+            'user_id' => $user->id,
+            'curso_id' => $curso->id,
+            'codigo_ref' => 'COUNTDEST1',
+            'mostrar_curso' => '1',
+            'modo_precos' => 'padrao',
+            'usar_contador' => '1',
+            'contador_minutos' => '30',
+            'contador_acao' => 'alterar_preco',
+            'titulo' => $curso->titulo,
+        ]);
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors(['contador_destino_oferta']);
+    }
+
+    public function test_store_rejects_invalid_countdown_destination_for_current_mode(): void
+    {
+        $this->withoutMiddleware(MinhaJornada::class);
+
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+        ]);
+
+        $curso = $this->createCurso('curso-contador-destino-invalido', 'Curso Contador Destino Inválido');
+        $cupom = Cupom::create(['codigo' => 'INVALID20', 'desconto' => 20]);
+
+        $response = $this->actingAs($user)->postJson(route('cadastrar_codigo_ref'), [
+            'user_id' => $user->id,
+            'curso_id' => $curso->id,
+            'codigo_ref' => 'COUNTINVALID1',
+            'mostrar_curso' => '1',
+            'modo_precos' => 'padrao',
+            'usar_contador' => '1',
+            'contador_minutos' => '20',
+            'contador_acao' => 'alterar_preco',
+            'contador_destino_oferta' => 'completo_cupom:' . $cupom->id,
+            'titulo' => $curso->titulo,
+        ]);
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors(['contador_destino_oferta']);
+    }
+
     public function test_store_defaults_mostrar_curso_to_true_on_first_creation_when_omitted(): void
     {
         $this->withoutMiddleware(MinhaJornada::class);

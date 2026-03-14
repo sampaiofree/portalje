@@ -604,6 +604,16 @@ class DashboardHomeLayoutPreferenceTest extends TestCase
         $jovemCursos->assertViewIs('home_e_cursos.w3');
     }
 
+    public function test_jovem_domain_keeps_w3_on_root_with_campaign_query_params(): void
+    {
+        $this->createPublishedCourse('curso-raiz-campanha');
+
+        $response = $this->get('http://jovemempreendedor.org/?src=remarketing&sck=remarketing&d=o80');
+
+        $response->assertOk();
+        $response->assertViewIs('home_e_cursos.w3');
+    }
+
     public function test_jovem_domain_page_overrides_are_preserved_without_forcing_w3(): void
     {
         $this->createPublishedCourse('curso-jovem-override');

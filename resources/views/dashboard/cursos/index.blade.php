@@ -501,6 +501,102 @@
                     @foreach($cursos as $curso)
                         @if($curso->publicado && $curso->permitir_afiliacao)
                             <div class="lista_cursos" x-show="search === '' || @js(mb_strtolower($curso->titulo, 'UTF-8')).includes(search.toLowerCase())" x-transition>
+                                @php
+                                    $parseCourseMonetary = static function ($valor): ?float {
+                                        if (!is_scalar($valor) || $valor === '') {
+                                            return null;
+                                        }
+
+                                        $normalizado = trim((string) $valor);
+                                        $normalizado = preg_replace('/^\s*\d+\s*x(?:\s*de)?\s*/i', '', $normalizado) ?? $normalizado;
+                                        $somenteNumeros = preg_replace('/[^\d,.]/', '', $normalizado);
+
+                                        if (!$somenteNumeros) {
+                                            return null;
+                                        }
+
+                                        if (str_contains($somenteNumeros, ',') && str_contains($somenteNumeros, '.')) {
+                                            $ultimaVirgula = strrpos($somenteNumeros, ',');
+                                            $ultimoPonto = strrpos($somenteNumeros, '.');
+
+                                            if ($ultimaVirgula !== false && $ultimoPonto !== false && $ultimaVirgula > $ultimoPonto) {
+                                                $somenteNumeros = str_replace('.', '', $somenteNumeros);
+                                                $somenteNumeros = str_replace(',', '.', $somenteNumeros);
+                                            } else {
+                                                $somenteNumeros = str_replace(',', '', $somenteNumeros);
+                                            }
+                                        } elseif (str_contains($somenteNumeros, ',')) {
+                                            $somenteNumeros = str_replace('.', '', $somenteNumeros);
+                                            $somenteNumeros = str_replace(',', '.', $somenteNumeros);
+                                        } elseif (substr_count($somenteNumeros, '.') > 1) {
+                                            $partes = explode('.', $somenteNumeros);
+                                            $decimal = array_pop($partes);
+                                            $somenteNumeros = implode('', $partes) . '.' . $decimal;
+                                        }
+
+                                        return is_numeric($somenteNumeros) ? (float) $somenteNumeros : null;
+                                    };
+
+                                    $formatCourseCurrency = static function (?float $valor): ?string {
+                                        return $valor !== null ? 'R$' . number_format($valor, 2, ',', '.') : null;
+                                    };
+
+                                    $precoCompletoBase = $parseCourseMonetary($curso->preco_cheio_completo ?? null);
+                                    $precoBasicoPadrao = $precoCompletoBase !== null ? $precoCompletoBase * 0.5 : null;
+                                    $countdownDestinationOptions = [
+                                        'padrao' => [
+                                            [
+                                                'value' => 'completo_padrao',
+                                                'label' => 'Plano completo - Sem cupom'
+                                                    . ($precoCompletoBase !== null ? ' - ' . $formatCourseCurrency($precoCompletoBase) : ''),
+                                            ],
+                                            [
+                                                'value' => 'basico_padrao',
+                                                'label' => 'Plano básico - Sem cupom'
+                                                    . ($precoBasicoPadrao !== null ? ' - ' . $formatCourseCurrency($precoBasicoPadrao) : ''),
+                                            ],
+                                        ],
+                                        'um_preco' => [
+                                            [
+                                                'value' => 'completo_padrao',
+                                                'label' => 'Plano completo - Sem cupom'
+                                                    . ($precoCompletoBase !== null ? ' - ' . $formatCourseCurrency($precoCompletoBase) : ''),
+                                            ],
+                                        ],
+                                        'dois_precos' => [
+                                            [
+                                                'value' => 'completo_padrao',
+                                                'label' => 'Plano completo - Sem cupom'
+                                                    . ($precoCompletoBase !== null ? ' - ' . $formatCourseCurrency($precoCompletoBase) : ''),
+                                            ],
+                                        ],
+                                    ];
+
+                                    foreach (($cupons ?? collect()) as $cupomDestino) {
+                                        $precoCompletoCupom = $precoCompletoBase !== null
+                                            ? $precoCompletoBase * (1 - ($cupomDestino->desconto / 100))
+                                            : null;
+                                        $countdownDestinationOptions['um_preco'][] = [
+                                            'value' => 'completo_cupom:' . $cupomDestino->id,
+                                            'label' => 'Plano completo - ' . $cupomDestino->desconto . '% OFF (' . $cupomDestino->codigo . ')'
+                                                . ($precoCompletoCupom !== null ? ' - ' . $formatCourseCurrency($precoCompletoCupom) : ''),
+                                        ];
+                                        $countdownDestinationOptions['dois_precos'][] = [
+                                            'value' => 'completo_cupom:' . $cupomDestino->id,
+                                            'label' => 'Plano completo - ' . $cupomDestino->desconto . '% OFF (' . $cupomDestino->codigo . ')'
+                                                . ($precoCompletoCupom !== null ? ' - ' . $formatCourseCurrency($precoCompletoCupom) : ''),
+                                        ];
+
+                                        $precoBasicoCupom = $precoCompletoBase !== null
+                                            ? $precoCompletoBase * (1 - ($cupomDestino->desconto / 100))
+                                            : null;
+                                        $countdownDestinationOptions['dois_precos'][] = [
+                                            'value' => 'basico_cupom:' . $cupomDestino->id,
+                                            'label' => 'Plano básico - ' . $cupomDestino->desconto . '% OFF (' . $cupomDestino->codigo . ')'
+                                                . ($precoBasicoCupom !== null ? ' - ' . $formatCourseCurrency($precoBasicoCupom) : ''),
+                                        ];
+                                    }
+                                @endphp
                                 
                                 <!-- Início do Alpine Component para cada card -->
                                 <div
@@ -520,6 +616,11 @@
                                         modoPrecos: @js(in_array(($curso->modo_precos ?? 'padrao'), ['padrao', 'um_preco', 'dois_precos'], true) ? $curso->modo_precos : 'padrao'),
                                         cupomPrincipalId: @js(!empty($curso->cupom_principal_id) ? (string) $curso->cupom_principal_id : ''),
                                         cupomSecundarioId: @js(!empty($curso->cupom_secundario_id) ? (string) $curso->cupom_secundario_id : ''),
+                                        usarContador: @js(!empty($curso->usar_contador) ? '1' : '0'),
+                                        contadorMinutos: @js(!empty($curso->contador_minutos) ? (string) $curso->contador_minutos : ''),
+                                        contadorAcao: @js($curso->contador_acao ?? ''),
+                                        contadorDestinoOferta: @js($curso->contador_destino_oferta ?? ''),
+                                        countdownDestinationOptions: @js($countdownDestinationOptions),
                                         hasCuponsDisponiveis: {{ ($cupons ?? collect())->isNotEmpty() ? 'true' : 'false' }},
                                         isSavingPricing: false,
                                         pricingSaveMessage: '',
@@ -615,8 +716,76 @@
                                             return url;
                                         },
 
-                                        triggerPricingSave() {
+                                        get countdownActionOptions() {
+                                            if (this.modoPrecos === 'um_preco') {
+                                                return [
+                                                    { value: 'nada', label: 'Nada' },
+                                                    { value: 'alterar_preco', label: 'Alterar o preço para' },
+                                                ];
+                                            }
+
+                                            return [
+                                                { value: 'nada', label: 'Nada' },
+                                                { value: 'encerrar_basico', label: 'Encerrar o plano básico' },
+                                                { value: 'alterar_preco', label: 'Alterar o preço para' },
+                                            ];
+                                        },
+
+                                        get activeCountdownDestinationOptions() {
+                                            return this.countdownDestinationOptions[this.modoPrecos] || [];
+                                        },
+
+                                        normalizeCountdownSelections() {
+                                            if (this.usarContador !== '1') {
+                                                this.contadorMinutos = '';
+                                                this.contadorAcao = '';
+                                                this.contadorDestinoOferta = '';
+                                                return;
+                                            }
+
+                                            const actionValues = this.countdownActionOptions.map(option => option.value);
+                                            if (this.contadorAcao && !actionValues.includes(this.contadorAcao)) {
+                                                this.contadorAcao = '';
+                                            }
+
+                                            if (this.contadorAcao !== 'alterar_preco') {
+                                                this.contadorDestinoOferta = '';
+                                                return;
+                                            }
+
+                                            const destinationValues = this.activeCountdownDestinationOptions.map(option => option.value);
+                                            if (this.contadorDestinoOferta && !destinationValues.includes(this.contadorDestinoOferta)) {
+                                                this.contadorDestinoOferta = '';
+                                            }
+                                        },
+
+                                        isPricingConfigReady() {
+                                            if (this.usarContador !== '1') {
+                                                return true;
+                                            }
+
+                                            if (!['1', '5', '10', '20', '30', '50'].includes(String(this.contadorMinutos || ''))) {
+                                                return false;
+                                            }
+
+                                            const actionValues = this.countdownActionOptions.map(option => option.value);
+                                            if (!actionValues.includes(this.contadorAcao)) {
+                                                return false;
+                                            }
+
+                                            if (this.contadorAcao === 'alterar_preco') {
+                                                return this.activeCountdownDestinationOptions.some(
+                                                    option => option.value === this.contadorDestinoOferta
+                                                );
+                                            }
+
+                                            return true;
+                                        },
+
+                                        triggerPricingSave(force = false) {
                                             if (!this.hasCodigoRef || this.isSavingPricing) return;
+                                            this.normalizeCountdownSelections();
+                                            if (!force && !this.isPricingConfigReady()) return;
                                             const form = this.$el.querySelector('.ref-form');
                                             if (!form) return;
 
@@ -628,6 +797,7 @@
                                             form.requestSubmit();
                                         }
                                     }"
+                                    x-init="normalizeCountdownSelections()"
                                     @ref-saved.window="
                                         if (Number($event.detail.cursoId) === {{ $curso->id }}) {
                                             hasCodigoRef = true;
@@ -638,6 +808,11 @@
                                             if (typeof $event.detail.modoPrecos !== 'undefined') modoPrecos = $event.detail.modoPrecos;
                                             if (typeof $event.detail.cupomPrincipalId !== 'undefined') cupomPrincipalId = String($event.detail.cupomPrincipalId || '');
                                             if (typeof $event.detail.cupomSecundarioId !== 'undefined') cupomSecundarioId = String($event.detail.cupomSecundarioId || '');
+                                            if (typeof $event.detail.usarContador !== 'undefined') usarContador = $event.detail.usarContador ? '1' : '0';
+                                            if (typeof $event.detail.contadorMinutos !== 'undefined') contadorMinutos = String($event.detail.contadorMinutos || '');
+                                            if (typeof $event.detail.contadorAcao !== 'undefined') contadorAcao = $event.detail.contadorAcao || '';
+                                            if (typeof $event.detail.contadorDestinoOferta !== 'undefined') contadorDestinoOferta = $event.detail.contadorDestinoOferta || '';
+                                            normalizeCountdownSelections();
                                             if (typeof $event.detail.baseCheckoutUrl !== 'undefined') baseCheckoutUrl = $event.detail.baseCheckoutUrl || '';
                                         }
                                     "
@@ -668,6 +843,7 @@
                                             modoPrecos = $event.detail.modoPrecos || 'padrao';
                                             cupomPrincipalId = String($event.detail.cupomPrincipalId || '');
                                             cupomSecundarioId = String($event.detail.cupomSecundarioId || '');
+                                            normalizeCountdownSelections();
                                             pricingSaveError = '';
                                             pricingSaveMessage = 'Salvo';
                                             setTimeout(() => { pricingSaveMessage = ''; }, 1400);
@@ -820,6 +996,7 @@
                                                                                 } else if (modoPrecos === 'um_preco') {
                                                                                     cupomSecundarioId = '';
                                                                                 }
+                                                                                normalizeCountdownSelections();
                                                                                 triggerPricingSave();
                                                                             "
                                                                             :disabled="isSavingPricing"
@@ -843,7 +1020,7 @@
                                                                             id="cupom_principal_id_{{$curso->id}}"
                                                                             name="cupom_principal_id"
                                                                             x-model="cupomPrincipalId"
-                                                                            @change="triggerPricingSave()"
+                                                                            @change="normalizeCountdownSelections(); triggerPricingSave()"
                                                                             :disabled="isSavingPricing || modoPrecos !== 'um_preco'"
                                                                             class="je-dark-field block w-full appearance-none rounded-lg px-3 py-2.5 pr-10 text-sm shadow-sm transition"
                                                                         >
@@ -866,6 +1043,7 @@
                                                                                 x-model="cupomPrincipalId"
                                                                                 @change="
                                                                                     if (cupomSecundarioId && cupomSecundarioId === cupomPrincipalId) cupomSecundarioId = '';
+                                                                                    normalizeCountdownSelections();
                                                                                     triggerPricingSave();
                                                                                 "
                                                                                 :disabled="isSavingPricing || modoPrecos !== 'dois_precos'"
@@ -887,7 +1065,7 @@
                                                                                 id="cupom_secundario_id_{{$curso->id}}"
                                                                                 name="cupom_secundario_id"
                                                                                 x-model="cupomSecundarioId"
-                                                                                @change="triggerPricingSave()"
+                                                                                @change="normalizeCountdownSelections(); triggerPricingSave()"
                                                                                 :disabled="isSavingPricing || modoPrecos !== 'dois_precos'"
                                                                                 class="je-dark-field block w-full appearance-none rounded-lg px-3 py-2.5 pr-10 text-sm shadow-sm transition"
                                                                             >
@@ -911,6 +1089,105 @@
                                                         <input x-show="!hasCuponsDisponiveis" :disabled="hasCuponsDisponiveis" type="hidden" name="modo_precos" value="padrao">
                                                         <input x-show="!hasCuponsDisponiveis" :disabled="hasCuponsDisponiveis" type="hidden" name="cupom_principal_id" value="">
                                                         <input x-show="!hasCuponsDisponiveis" :disabled="hasCuponsDisponiveis" type="hidden" name="cupom_secundario_id" value="">
+
+                                                        <div class="rounded-md border border-blue-100 bg-white/70 p-4 space-y-4">
+                                                            <div>
+                                                                <p class="text-sm font-medium text-gray-800">Contador na página pública</p>
+                                                                <p class="text-xs text-gray-600">O contador começa ao carregar a página e continua de onde parou no mesmo navegador.</p>
+                                                            </div>
+
+                                                            <div>
+                                                                <x-input-label for="usar_contador_{{$curso->id}}" value="Usar contador?" class="text-sm font-medium" />
+                                                                <div class="relative mt-1">
+                                                                    <select
+                                                                        id="usar_contador_{{$curso->id}}"
+                                                                        name="usar_contador"
+                                                                        x-model="usarContador"
+                                                                        @change="
+                                                                            if (usarContador !== '1') {
+                                                                                contadorMinutos = '';
+                                                                                contadorAcao = '';
+                                                                                contadorDestinoOferta = '';
+                                                                                triggerPricingSave(true);
+                                                                            } else {
+                                                                                normalizeCountdownSelections();
+                                                                            }
+                                                                        "
+                                                                        :disabled="isSavingPricing"
+                                                                        class="je-dark-field block w-full appearance-none rounded-lg px-3 py-2.5 pr-10 text-sm shadow-sm transition"
+                                                                    >
+                                                                        <option value="0">Não</option>
+                                                                        <option value="1">Sim</option>
+                                                                    </select>
+                                                                    <i class="ri-arrow-down-s-line pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                                                </div>
+                                                            </div>
+
+                                                            <div x-show="usarContador === '1'" x-transition class="space-y-4">
+                                                                <div>
+                                                                    <x-input-label for="contador_minutos_{{$curso->id}}" value="Minutos" class="text-sm font-medium" />
+                                                                    <div class="relative mt-1">
+                                                                        <select
+                                                                            id="contador_minutos_{{$curso->id}}"
+                                                                            name="contador_minutos"
+                                                                            x-model="contadorMinutos"
+                                                                            @change="triggerPricingSave()"
+                                                                            :disabled="isSavingPricing"
+                                                                            class="je-dark-field block w-full appearance-none rounded-lg px-3 py-2.5 pr-10 text-sm shadow-sm transition"
+                                                                        >
+                                                                            <option value="">Selecione</option>
+                                                                        <option value="1">1 minuto</option>
+                                                                        <option value="5">5 minutos</option>
+                                                                        <option value="10">10 minutos</option>
+                                                                        <option value="20">20 minutos</option>
+                                                                        <option value="30">30 minutos</option>
+                                                                        <option value="50">50 minutos</option>
+                                                                        </select>
+                                                                        <i class="ri-arrow-down-s-line pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                                                    </div>
+                                                                </div>
+
+                                                                <div>
+                                                                    <x-input-label for="contador_acao_{{$curso->id}}" value="Após o contador" class="text-sm font-medium" />
+                                                                    <div class="relative mt-1">
+                                                                        <select
+                                                                            id="contador_acao_{{$curso->id}}"
+                                                                            name="contador_acao"
+                                                                            x-model="contadorAcao"
+                                                                            @change="normalizeCountdownSelections(); triggerPricingSave()"
+                                                                            :disabled="isSavingPricing"
+                                                                            class="je-dark-field block w-full appearance-none rounded-lg px-3 py-2.5 pr-10 text-sm shadow-sm transition"
+                                                                        >
+                                                                            <option value="">Selecione</option>
+                                                                            <template x-for="option in countdownActionOptions" :key="option.value">
+                                                                                <option :value="option.value" x-text="option.label"></option>
+                                                                            </template>
+                                                                        </select>
+                                                                        <i class="ri-arrow-down-s-line pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                                                    </div>
+                                                                </div>
+
+                                                                <div x-show="contadorAcao === 'alterar_preco'" x-transition>
+                                                                    <x-input-label for="contador_destino_oferta_{{$curso->id}}" value="Alterar o preço para" class="text-sm font-medium" />
+                                                                    <div class="relative mt-1">
+                                                                        <select
+                                                                            id="contador_destino_oferta_{{$curso->id}}"
+                                                                            name="contador_destino_oferta"
+                                                                            x-model="contadorDestinoOferta"
+                                                                            @change="triggerPricingSave()"
+                                                                            :disabled="isSavingPricing"
+                                                                            class="je-dark-field block w-full appearance-none rounded-lg px-3 py-2.5 pr-10 text-sm shadow-sm transition"
+                                                                        >
+                                                                            <option value="">Selecione um preço</option>
+                                                                            <template x-for="option in activeCountdownDestinationOptions" :key="option.value">
+                                                                                <option :value="option.value" x-text="option.label"></option>
+                                                                            </template>
+                                                                        </select>
+                                                                        <i class="ri-arrow-down-s-line pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </template>
@@ -1242,8 +1519,52 @@
                         formData.append('mostrar_curso', '0');
                     }
 
+                    const usarContador = formData.get('usar_contador') === '1';
+                    const contadorMinutos = String(formData.get('contador_minutos') || '');
+                    const contadorAcao = String(formData.get('contador_acao') || '');
+                    const contadorDestinoOferta = String(formData.get('contador_destino_oferta') || '');
+                    const modoPrecosAtual = String(formData.get('modo_precos') || 'padrao');
+
+                    let countdownValidationMessage = '';
+                    if (usarContador) {
+                        if (!['1', '5', '10', '20', '30', '50'].includes(contadorMinutos)) {
+                            countdownValidationMessage = 'Selecione os minutos do contador.';
+                        } else if (!['nada', 'encerrar_basico', 'alterar_preco'].includes(contadorAcao)) {
+                            countdownValidationMessage = 'Selecione a ação do contador.';
+                        } else if (contadorAcao === 'encerrar_basico' && modoPrecosAtual === 'um_preco') {
+                            countdownValidationMessage = 'A ação de encerrar o plano básico só pode ser usada quando a página exibe o plano básico.';
+                        } else if (contadorAcao === 'alterar_preco' && !contadorDestinoOferta) {
+                            countdownValidationMessage = 'Selecione o preço que será mostrado após o contador.';
+                        }
+                    }
+
                     if (submitSource === 'manual') {
                         feedbackDiv.innerHTML = '';
+                    }
+
+                    if (countdownValidationMessage) {
+                        if (submitSource === 'manual') {
+                            feedbackDiv.innerHTML = '';
+                            const countdownParagraph = document.createElement('p');
+                            countdownParagraph.className = 'text-red-600';
+                            countdownParagraph.textContent = countdownValidationMessage;
+                            feedbackDiv.appendChild(countdownParagraph);
+                        }
+
+                        if (submitSource === 'pricing') {
+                            window.dispatchEvent(new CustomEvent('ref-save-finished', {
+                                detail: {
+                                    cursoId: Number(cursoId),
+                                    source: 'pricing',
+                                    ok: false,
+                                    message: countdownValidationMessage
+                                }
+                            }));
+                        }
+
+                        form.dataset.submitting = '0';
+                        form.dataset.submitSource = 'manual';
+                        return;
                     }
 
                     fetch(form.action, {
@@ -1295,6 +1616,12 @@
                                 modoPrecos: data.modo_precos ?? formData.get('modo_precos') ?? 'padrao',
                                 cupomPrincipalId: data.cupom_principal_id ?? formData.get('cupom_principal_id') ?? '',
                                 cupomSecundarioId: data.cupom_secundario_id ?? formData.get('cupom_secundario_id') ?? '',
+                                usarContador: typeof data.usar_contador === 'boolean'
+                                    ? data.usar_contador
+                                    : formData.get('usar_contador') === '1',
+                                contadorMinutos: data.contador_minutos ?? formData.get('contador_minutos') ?? '',
+                                contadorAcao: data.contador_acao ?? formData.get('contador_acao') ?? '',
+                                contadorDestinoOferta: data.contador_destino_oferta ?? formData.get('contador_destino_oferta') ?? '',
                                 baseCheckoutUrl: data.base_checkout_url ?? ''
                             }
                         }));

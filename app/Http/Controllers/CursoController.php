@@ -12,6 +12,8 @@ use App\Models\Curso;
 use App\Models\AulasDemonstrativa;
 use App\Models\Cupom;
 use App\Models\User;
+use App\Models\Dados_portal;
+use App\Models\RootDomainCourseConfig;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
@@ -27,6 +29,127 @@ class CursoController extends Controller
 
         return view('dashboard.cursos.index', compact('cursos', 'cupons')); 
         //return view('adm.cursos.afiliados_cadastrar_curso', compact('cursos')); 
+    }
+
+    public function admin_root_domain_course_pages(Request $request)
+    {
+        $cupons = Cupom::orderBy('desconto')->orderBy('codigo')->get();
+        $formularioPreCheckoutDefault = $this->portalFormularioPreCheckoutDefault();
+        $configsByCourseId = Schema::hasTable('root_domain_course_configs')
+            ? RootDomainCourseConfig::query()->get()->keyBy('curso_id')
+            : collect();
+
+        $cursos = Curso::query()
+            ->orderBy('ordem')
+            ->orderBy('id')
+            ->get()
+            ->map(function (Curso $curso) use ($configsByCourseId, $formularioPreCheckoutDefault) {
+                /** @var \App\Models\RootDomainCourseConfig|null $config */
+                $config = $configsByCourseId->get($curso->id);
+
+                $curso->root_domain_course_config_id = $config->id ?? null;
+                $curso->mostrar_curso = $config
+                    ? (bool) $config->mostrar_curso
+                    : (bool) ($curso->mostrar_na_pagina ?? false);
+                $curso->formulario_pre_checkout = $config
+                    ? (bool) $config->formulario_pre_checkout
+                    : $formularioPreCheckoutDefault;
+                $curso->modo_precos = $config && in_array((string) $config->modo_precos, ['padrao', 'um_preco', 'dois_precos'], true)
+                    ? (string) $config->modo_precos
+                    : 'padrao';
+                $curso->cupom_principal_id = $config && !empty($config->cupom_principal_id)
+                    ? (int) $config->cupom_principal_id
+                    : null;
+                $curso->cupom_secundario_id = $config && !empty($config->cupom_secundario_id)
+                    ? (int) $config->cupom_secundario_id
+                    : null;
+                $curso->usar_contador = $config ? (bool) $config->usar_contador : false;
+                $curso->contador_minutos = $config && !empty($config->contador_minutos)
+                    ? (int) $config->contador_minutos
+                    : null;
+                $curso->contador_acao = $config->contador_acao ?? null;
+                $curso->contador_destino_oferta = $config->contador_destino_oferta ?? null;
+
+                return $curso;
+            })
+            ->values();
+
+        $sharedDomains = [
+            'portalje.org',
+            'jovemempreendedor.org',
+        ];
+
+        return view('dashboard.admin.root-domain-course-pages', compact('cursos', 'cupons', 'sharedDomains'));
+    }
+
+    public function admin_root_domain_course_pages_save(Request $request)
+    {
+        if (!Schema::hasTable('root_domain_course_configs')) {
+            $message = 'A configuração dos domínios raiz ainda não está disponível. Rode as migrations pendentes.';
+
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'message' => $message,
+                ], 503);
+            }
+
+            return redirect()
+                ->route('admin.root_domain_course_pages')
+                ->with('error', $message);
+        }
+
+        $request->validate([
+            'curso_id' => ['required', 'integer', 'exists:curso,id'],
+            'id' => ['nullable', 'integer'],
+        ]);
+
+        $temCupons = Schema::hasTable('cupons') && Cupom::query()->exists();
+        $configuracao = $this->validateAndNormalizeRootDomainPublicPageConfig($request, $temCupons);
+        $curso = Curso::query()->findOrFail((int) $request->input('curso_id'));
+
+        $mostrarCurso = $request->has('mostrar_curso')
+            ? $request->boolean('mostrar_curso')
+            : (bool) ($curso->mostrar_na_pagina ?? false);
+
+        $config = RootDomainCourseConfig::query()->firstOrNew([
+            'curso_id' => $curso->id,
+        ]);
+
+        $config->fill([
+            'mostrar_curso' => $mostrarCurso,
+            'formulario_pre_checkout' => $configuracao['formulario_pre_checkout'],
+            'modo_precos' => $configuracao['modo_precos'],
+            'cupom_principal_id' => $configuracao['cupom_principal_id'],
+            'cupom_secundario_id' => $configuracao['cupom_secundario_id'],
+            'usar_contador' => $configuracao['usar_contador'],
+            'contador_minutos' => $configuracao['contador_minutos'],
+            'contador_acao' => $configuracao['contador_acao'],
+            'contador_destino_oferta' => $configuracao['contador_destino_oferta'],
+        ]);
+        $config->save();
+
+        $message = 'Configurações da página pública do curso ' . $curso->titulo . ' salvas com sucesso.';
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => $message,
+                'root_domain_course_config_id' => (int) $config->id,
+                'curso_id' => (int) $curso->id,
+                'mostrar_curso' => (bool) $config->mostrar_curso,
+                'formulario_pre_checkout' => (bool) $config->formulario_pre_checkout,
+                'modo_precos' => $config->modo_precos ?? 'padrao',
+                'cupom_principal_id' => $config->cupom_principal_id ? (int) $config->cupom_principal_id : null,
+                'cupom_secundario_id' => $config->cupom_secundario_id ? (int) $config->cupom_secundario_id : null,
+                'usar_contador' => (bool) ($config->usar_contador ?? false),
+                'contador_minutos' => $config->contador_minutos ? (int) $config->contador_minutos : null,
+                'contador_acao' => $config->contador_acao ?: null,
+                'contador_destino_oferta' => $config->contador_destino_oferta ?: null,
+            ]);
+        }
+
+        return redirect()
+            ->route('admin.root_domain_course_pages')
+            ->with('success', $message);
     }
 
     public function afiliados_cadastrar_curso_bulk_actions(Request $request)
@@ -167,6 +290,208 @@ class CursoController extends Controller
             'cupom_secundario_id' => $cupomSecundarioId,
         ];
     }
+
+    private function normalizeModoPrecosInput(?string $modoPrecos, bool $temCupons): string
+    {
+        $modoPrecos = is_string($modoPrecos) ? trim($modoPrecos) : 'padrao';
+
+        if (!in_array($modoPrecos, ['padrao', 'um_preco', 'dois_precos'], true)) {
+            $modoPrecos = 'padrao';
+        }
+
+        if (!$temCupons) {
+            return 'padrao';
+        }
+
+        return $modoPrecos;
+    }
+
+    private function availableCountdownDestinationOffers(string $modoPrecos, bool $temCupons): array
+    {
+        $modoPrecos = $this->normalizeModoPrecosInput($modoPrecos, $temCupons);
+        $destinos = ['completo_padrao'];
+
+        if ($modoPrecos === 'padrao') {
+            $destinos[] = 'basico_padrao';
+            return $destinos;
+        }
+
+        $cupomIds = $temCupons
+            ? Cupom::query()->pluck('id')->map(fn ($id) => (int) $id)->filter(fn ($id) => $id > 0)->values()->all()
+            : [];
+
+        foreach ($cupomIds as $cupomId) {
+            $destinos[] = 'completo_cupom:' . $cupomId;
+        }
+
+        if ($modoPrecos === 'dois_precos') {
+            foreach ($cupomIds as $cupomId) {
+                $destinos[] = 'basico_cupom:' . $cupomId;
+            }
+        }
+
+        return $destinos;
+    }
+
+    private function normalizeCountdownConfiguration(Request $request, string $modoPrecos, bool $temCupons): array
+    {
+        if (!$request->boolean('usar_contador')) {
+            return [
+                'usar_contador' => false,
+                'contador_minutos' => null,
+                'contador_acao' => null,
+                'contador_destino_oferta' => null,
+            ];
+        }
+
+        $contadorAcao = $request->input('contador_acao');
+        $contadorDestinoOferta = trim((string) $request->input('contador_destino_oferta', ''));
+
+        if ($contadorAcao !== 'alterar_preco') {
+            $contadorDestinoOferta = null;
+        }
+
+        return [
+            'usar_contador' => true,
+            'contador_minutos' => $request->filled('contador_minutos')
+                ? (int) $request->input('contador_minutos')
+                : null,
+            'contador_acao' => in_array($contadorAcao, ['nada', 'encerrar_basico', 'alterar_preco'], true)
+                ? $contadorAcao
+                : null,
+            'contador_destino_oferta' => $contadorDestinoOferta !== '' ? $contadorDestinoOferta : null,
+        ];
+    }
+
+    private function validateAndNormalizeRootDomainPublicPageConfig(Request $request, bool $temCupons): array
+    {
+        $rules = [
+            'formulario_pre_checkout' => 'nullable|boolean',
+            'modo_precos' => 'nullable|string|in:padrao,um_preco,dois_precos',
+            'cupom_principal_id' => ['nullable', 'integer'],
+            'cupom_secundario_id' => ['nullable', 'integer'],
+            'usar_contador' => 'nullable|boolean',
+            'contador_minutos' => 'nullable|integer|in:1,5,10,20,30,50',
+            'contador_acao' => 'nullable|string|in:nada,encerrar_basico,alterar_preco',
+            'contador_destino_oferta' => 'nullable|string|max:60',
+        ];
+
+        if ($temCupons) {
+            $rules['cupom_principal_id'][] = 'exists:cupons,id';
+            $rules['cupom_secundario_id'][] = 'exists:cupons,id';
+        }
+
+        $validator = Validator::make($request->all(), $rules, [
+            'cupom_secundario_id.required' => 'Selecione o cupom do segundo preço.',
+            'cupom_secundario_id.different' => 'O cupom do segundo preço deve ser diferente do principal.',
+            'contador_minutos.in' => 'Selecione um tempo válido para o contador.',
+            'contador_acao.in' => 'Selecione uma ação válida para o contador.',
+        ]);
+
+        $validator->after(function ($validator) use ($request, $temCupons) {
+            $modoPrecos = $request->input('modo_precos', 'padrao');
+            $modoPrecosNormalizado = $this->normalizeModoPrecosInput($modoPrecos, $temCupons);
+            $cupomPrincipalId = $request->filled('cupom_principal_id') ? (int) $request->input('cupom_principal_id') : null;
+            $cupomSecundarioId = $request->filled('cupom_secundario_id') ? (int) $request->input('cupom_secundario_id') : null;
+
+            if ($temCupons) {
+                if ($modoPrecosNormalizado === 'dois_precos' && empty($cupomSecundarioId)) {
+                    $validator->errors()->add('cupom_secundario_id', 'Selecione o cupom do segundo preço.');
+                }
+
+                if (
+                    $modoPrecosNormalizado === 'dois_precos' &&
+                    !empty($cupomPrincipalId) &&
+                    !empty($cupomSecundarioId) &&
+                    $cupomPrincipalId === $cupomSecundarioId
+                ) {
+                    $validator->errors()->add('cupom_secundario_id', 'O cupom do segundo preço deve ser diferente do principal.');
+                }
+            }
+
+            if (!$request->boolean('usar_contador')) {
+                return;
+            }
+
+            if (!$request->filled('contador_minutos')) {
+                $validator->errors()->add('contador_minutos', 'Selecione os minutos do contador.');
+            }
+
+            if (!$request->filled('contador_acao')) {
+                $validator->errors()->add('contador_acao', 'Selecione a ação do contador.');
+                return;
+            }
+
+            $contadorAcao = (string) $request->input('contador_acao');
+
+            if ($contadorAcao === 'encerrar_basico' && !in_array($modoPrecosNormalizado, ['padrao', 'dois_precos'], true)) {
+                $validator->errors()->add('contador_acao', 'A ação de encerrar o plano básico só pode ser usada quando a página exibe o plano básico.');
+            }
+
+            if ($contadorAcao === 'alterar_preco') {
+                $contadorDestinoOferta = trim((string) $request->input('contador_destino_oferta', ''));
+
+                if ($contadorDestinoOferta === '') {
+                    $validator->errors()->add('contador_destino_oferta', 'Selecione o preço que será mostrado após o contador.');
+                    return;
+                }
+
+                $destinosValidos = $this->availableCountdownDestinationOffers($modoPrecosNormalizado, $temCupons);
+
+                if (!in_array($contadorDestinoOferta, $destinosValidos, true)) {
+                    $validator->errors()->add('contador_destino_oferta', 'Selecione um preço compatível com a configuração atual da página.');
+                }
+            }
+        });
+
+        $validator->validate();
+
+        $formularioPreCheckout = $request->has('formulario_pre_checkout')
+            ? $request->boolean('formulario_pre_checkout')
+            : $this->portalFormularioPreCheckoutDefault();
+
+        $modoPrecos = $this->normalizeModoPrecosInput($request->input('modo_precos', 'padrao'), $temCupons);
+
+        $cupomPrincipalId = $request->filled('cupom_principal_id') ? (int) $request->input('cupom_principal_id') : null;
+        $cupomSecundarioId = $request->filled('cupom_secundario_id') ? (int) $request->input('cupom_secundario_id') : null;
+
+        if (!$temCupons) {
+            $modoPrecos = 'padrao';
+            $cupomPrincipalId = null;
+            $cupomSecundarioId = null;
+        } elseif ($modoPrecos === 'padrao') {
+            $cupomPrincipalId = null;
+            $cupomSecundarioId = null;
+        } elseif ($modoPrecos === 'um_preco') {
+            $cupomSecundarioId = null;
+        }
+
+        $countdownConfig = $this->normalizeCountdownConfiguration($request, $modoPrecos, $temCupons);
+
+        return [
+            'formulario_pre_checkout' => $formularioPreCheckout,
+            'modo_precos' => $modoPrecos,
+            'cupom_principal_id' => $cupomPrincipalId,
+            'cupom_secundario_id' => $cupomSecundarioId,
+            'usar_contador' => $countdownConfig['usar_contador'],
+            'contador_minutos' => $countdownConfig['contador_minutos'],
+            'contador_acao' => $countdownConfig['contador_acao'],
+            'contador_destino_oferta' => $countdownConfig['contador_destino_oferta'],
+        ];
+    }
+
+    private function portalFormularioPreCheckoutDefault(): bool
+    {
+        if (!Schema::hasTable('portal_informacoes')) {
+            return true;
+        }
+
+        $dadosPortal = Dados_portal::query()->first();
+
+        return isset($dadosPortal->formulario_pre_checkout)
+            ? (bool) $dadosPortal->formulario_pre_checkout
+            : true;
+    }
  
     public function updateOrder(Request $request)
     {
@@ -240,6 +565,10 @@ class CursoController extends Controller
             'modo_precos' => 'nullable|string|in:padrao,um_preco,dois_precos',
             'cupom_principal_id' => ['nullable', 'integer'],
             'cupom_secundario_id' => ['nullable', 'integer'],
+            'usar_contador' => 'nullable|boolean',
+            'contador_minutos' => 'nullable|integer|in:1,5,10,20,30,50',
+            'contador_acao' => 'nullable|string|in:nada,encerrar_basico,alterar_preco',
+            'contador_destino_oferta' => 'nullable|string|max:60',
         ];
 
         if ($temCupons) {
@@ -252,28 +581,63 @@ class CursoController extends Controller
             'codigo_ref.max' => 'O campo Código REF deve ter no máximo 15 caracteres.',
             'cupom_secundario_id.required' => 'Selecione o cupom do segundo preço.',
             'cupom_secundario_id.different' => 'O cupom do segundo preço deve ser diferente do principal.',
+            'contador_minutos.in' => 'Selecione um tempo válido para o contador.',
+            'contador_acao.in' => 'Selecione uma ação válida para o contador.',
         ]);
 
       $validator->after(function ($validator) use ($request, $temCupons) {
-          if (!$temCupons) {
-              return;
-          }
-
           $modoPrecos = $request->input('modo_precos', 'padrao');
+          $modoPrecosNormalizado = $this->normalizeModoPrecosInput($modoPrecos, $temCupons);
           $cupomPrincipalId = $request->filled('cupom_principal_id') ? (int) $request->input('cupom_principal_id') : null;
           $cupomSecundarioId = $request->filled('cupom_secundario_id') ? (int) $request->input('cupom_secundario_id') : null;
 
-          if ($modoPrecos === 'dois_precos' && empty($cupomSecundarioId)) {
-              $validator->errors()->add('cupom_secundario_id', 'Selecione o cupom do segundo preço.');
+          if ($temCupons) {
+              if ($modoPrecosNormalizado === 'dois_precos' && empty($cupomSecundarioId)) {
+                  $validator->errors()->add('cupom_secundario_id', 'Selecione o cupom do segundo preço.');
+              }
+
+              if (
+                  $modoPrecosNormalizado === 'dois_precos' &&
+                  !empty($cupomPrincipalId) &&
+                  !empty($cupomSecundarioId) &&
+                  $cupomPrincipalId === $cupomSecundarioId
+              ) {
+                  $validator->errors()->add('cupom_secundario_id', 'O cupom do segundo preço deve ser diferente do principal.');
+              }
           }
 
-          if (
-              $modoPrecos === 'dois_precos' &&
-              !empty($cupomPrincipalId) &&
-              !empty($cupomSecundarioId) &&
-              $cupomPrincipalId === $cupomSecundarioId
-          ) {
-              $validator->errors()->add('cupom_secundario_id', 'O cupom do segundo preço deve ser diferente do principal.');
+          if (!$request->boolean('usar_contador')) {
+              return;
+          }
+
+          if (!$request->filled('contador_minutos')) {
+              $validator->errors()->add('contador_minutos', 'Selecione os minutos do contador.');
+          }
+
+          if (!$request->filled('contador_acao')) {
+              $validator->errors()->add('contador_acao', 'Selecione a ação do contador.');
+              return;
+          }
+
+          $contadorAcao = (string) $request->input('contador_acao');
+
+          if ($contadorAcao === 'encerrar_basico' && !in_array($modoPrecosNormalizado, ['padrao', 'dois_precos'], true)) {
+              $validator->errors()->add('contador_acao', 'A ação de encerrar o plano básico só pode ser usada quando a página exibe o plano básico.');
+          }
+
+          if ($contadorAcao === 'alterar_preco') {
+              $contadorDestinoOferta = trim((string) $request->input('contador_destino_oferta', ''));
+
+              if ($contadorDestinoOferta === '') {
+                  $validator->errors()->add('contador_destino_oferta', 'Selecione o preço que será mostrado após o contador.');
+                  return;
+              }
+
+              $destinosValidos = $this->availableCountdownDestinationOffers($modoPrecosNormalizado, $temCupons);
+
+              if (!in_array($contadorDestinoOferta, $destinosValidos, true)) {
+                  $validator->errors()->add('contador_destino_oferta', 'Selecione um preço compatível com a configuração atual da página.');
+              }
           }
       });
 
@@ -284,9 +648,7 @@ class CursoController extends Controller
           : true;
 
       $modoPrecos = $request->input('modo_precos', 'padrao');
-      if (!in_array($modoPrecos, ['padrao', 'um_preco', 'dois_precos'], true)) {
-          $modoPrecos = 'padrao';
-      }
+      $modoPrecos = $this->normalizeModoPrecosInput($modoPrecos, $temCupons);
 
       $cupomPrincipalId = $request->filled('cupom_principal_id') ? (int) $request->input('cupom_principal_id') : null;
       $cupomSecundarioId = $request->filled('cupom_secundario_id') ? (int) $request->input('cupom_secundario_id') : null;
@@ -301,6 +663,8 @@ class CursoController extends Controller
       } elseif ($modoPrecos === 'um_preco') {
           $cupomSecundarioId = null;
       }
+
+      $countdownConfig = $this->normalizeCountdownConfiguration($request, $modoPrecos, $temCupons);
 
       $userId = (int) $request->input('user_id');
 
@@ -355,6 +719,10 @@ class CursoController extends Controller
               'modo_precos' => $modoPrecos,
               'cupom_principal_id' => $cupomPrincipalId,
               'cupom_secundario_id' => $cupomSecundarioId,
+              'usar_contador' => $countdownConfig['usar_contador'],
+              'contador_minutos' => $countdownConfig['contador_minutos'],
+              'contador_acao' => $countdownConfig['contador_acao'],
+              'contador_destino_oferta' => $countdownConfig['contador_destino_oferta'],
           ]);
           $registroExistente = true;
       } else {
@@ -368,6 +736,10 @@ class CursoController extends Controller
               'modo_precos' => $modoPrecos,
               'cupom_principal_id' => $cupomPrincipalId,
               'cupom_secundario_id' => $cupomSecundarioId,
+              'usar_contador' => $countdownConfig['usar_contador'],
+              'contador_minutos' => $countdownConfig['contador_minutos'],
+              'contador_acao' => $countdownConfig['contador_acao'],
+              'contador_destino_oferta' => $countdownConfig['contador_destino_oferta'],
           ]);
           $codigo_ref->save();
           $registroExistente = false;
@@ -393,6 +765,10 @@ class CursoController extends Controller
               'modo_precos' => $codigo_ref->modo_precos ?? 'padrao',
               'cupom_principal_id' => $codigo_ref->cupom_principal_id ? (int) $codigo_ref->cupom_principal_id : null,
               'cupom_secundario_id' => $codigo_ref->cupom_secundario_id ? (int) $codigo_ref->cupom_secundario_id : null,
+              'usar_contador' => (bool) ($codigo_ref->usar_contador ?? false),
+              'contador_minutos' => $codigo_ref->contador_minutos ? (int) $codigo_ref->contador_minutos : null,
+              'contador_acao' => $codigo_ref->contador_acao ?: null,
+              'contador_destino_oferta' => $codigo_ref->contador_destino_oferta ?: null,
               'base_checkout_url' => $baseCheckoutUrl,
           ]);
       }

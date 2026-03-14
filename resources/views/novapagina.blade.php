@@ -153,6 +153,19 @@
         $curso->meta_pixel_id ?? null,
     ])));
 
+    $pricingInitialState = is_array($curso->pricing_initial_state ?? null) ? $curso->pricing_initial_state : [];
+    $pricingOfferVariants = is_array($curso->pricing_offer_variants ?? null) ? $curso->pricing_offer_variants : [];
+    $countdownConfig = is_array($curso->countdown ?? null) ? $curso->countdown : [
+        'enabled' => false,
+        'minutes' => null,
+        'action' => null,
+        'destination_offer' => null,
+        'storage_key' => null,
+        'end_label' => 'Encerrado',
+    ];
+    $currentCompleteOfferKey = $curso->current_complete_offer_key ?? 'completo_padrao';
+    $currentBasicOfferKey = $curso->current_basic_offer_key ?? null;
+
     $trackingConfig = [
         'pixel_ids' => $pixelIds,
         'course_id' => (string) ($curso->id ?? ''),
@@ -162,6 +175,13 @@
         'csrf_token' => csrf_token(),
         'lead_endpoint' => route('lead_whatsapp'),
         'back_redirect_url' => $backRedirectUrl,
+        'countdown' => $countdownConfig,
+        'pricing' => [
+            'initial_state' => $pricingInitialState,
+            'offer_variants' => $pricingOfferVariants,
+            'current_complete_offer_key' => $currentCompleteOfferKey,
+            'current_basic_offer_key' => $currentBasicOfferKey,
+        ],
     ];
 
     $lpCssVersion = file_exists(public_path('css/lp-course.css'))
@@ -275,12 +295,10 @@
                         </li>
                     </ul>
 
-                    <div class="lp-price-highlight">
-                        <span class="lp-price-highlight__label">{{ $heroPriceLabel }}</span>
-                        <strong>{{ $heroPriceValue }}</strong>
-                        @if($heroShowCashLine)
-                            <small>ou {{ $heroCashValue }} à vista</small>
-                        @endif
+                    <div class="lp-price-highlight" data-lp-hero-price>
+                        <span class="lp-price-highlight__label" data-lp-hero-label>{{ $heroPriceLabel }}</span>
+                        <strong data-lp-hero-value>{{ $heroPriceValue }}</strong>
+                        <small data-lp-hero-cash @if(!$heroShowCashLine) hidden @endif>ou {{ $heroCashValue }} à vista</small>
                     </div>
 
                     <div class="lp-hero__actions">
@@ -474,18 +492,27 @@
                     <p>Oferta ativa por tempo limitado. Garanta o valor promocional enquanto as vagas estão abertas.</p>
                 </div>
 
-                <div class="lp-pricing {{ $mostrarPlanoSecundario ? 'lp-pricing--two' : 'lp-pricing--one' }}">
+                @if(!empty($countdownConfig['enabled']))
+                    <div class="lp-countdown lp-countdown--plans" data-lp-countdown-block="plans">
+                        <span class="lp-countdown__label">Oferta encerra em</span>
+                        <strong class="lp-countdown__timer" data-lp-countdown-timer>{{ sprintf('%02d:00', (int) ($countdownConfig['minutes'] ?? 0)) }}</strong>
+                    </div>
+                @endif
+
+                <div
+                    class="lp-pricing {{ $mostrarPlanoSecundario ? 'lp-pricing--two' : 'lp-pricing--one' }}"
+                    id="lp-pricing-grid"
+                    data-lp-pricing-layout="{{ $mostrarPlanoSecundario ? 'two' : 'one' }}"
+                >
                     @if($mostrarPlanoSecundario)
-                        <article class="lp-price-card lp-price-card--secondary">
+                        <article class="lp-price-card lp-price-card--secondary" data-lp-plan-card="basico">
                             <p class="lp-price-card__tag">
                                 <svg class="lp-icon lp-icon--sm" aria-hidden="true"><use href="#lp-icon-tag"></use></svg>
                                 <span>Plano Básico</span>
                             </p>
                             <h3>Acesso Essencial</h3>
-                            <p class="lp-price-card__value">{{ $exibicaoPrecoBasico }}</p>
-                            @unless($ocultarParceladoBasico)
-                                <p class="lp-price-card__cash">ou {{ $curso->preco_cheio_basico ?? 'consulte' }} à vista</p>
-                            @endunless
+                            <p class="lp-price-card__value" data-lp-plan-value="basico">{{ $exibicaoPrecoBasico }}</p>
+                            <p class="lp-price-card__cash" data-lp-plan-cash="basico" @if($ocultarParceladoBasico) hidden @endif>ou {{ $curso->preco_cheio_basico ?? 'consulte' }} à vista</p>
 
                             <ul>
                                 <li>Acesso ao curso completo</li>
@@ -503,22 +530,23 @@
                                 data-checkout-url="{{ $checkoutBasicoPlano }}"
                                 data-plan="basico"
                                 data-requires-lead="{{ !empty($curso->formulario) ? '1' : '0' }}"
+                                data-lp-plan-cta="basico"
                             >
                                 Quero o plano básico
                             </a>
+
+                            <p class="lp-price-card__ended" data-lp-plan-ended="basico" hidden>Encerrado</p>
                         </article>
                     @endif
 
-                    <article class="lp-price-card lp-price-card--primary">
+                    <article class="lp-price-card lp-price-card--primary" data-lp-plan-card="completo">
                         <p class="lp-price-card__tag">
                             <svg class="lp-icon lp-icon--sm" aria-hidden="true"><use href="#lp-icon-tag"></use></svg>
                             <span>Plano Completo</span>
                         </p>
                         <h3>Mais recomendado</h3>
-                        <p class="lp-price-card__value">{{ $exibicaoPrecoCompleto }}</p>
-                        @unless($ocultarParceladoCompleto)
-                            <p class="lp-price-card__cash">ou {{ $curso->preco_cheio_completo ?? 'consulte' }} à vista</p>
-                        @endunless
+                        <p class="lp-price-card__value" data-lp-plan-value="completo">{{ $exibicaoPrecoCompleto }}</p>
+                        <p class="lp-price-card__cash" data-lp-plan-cash="completo" @if($ocultarParceladoCompleto) hidden @endif>ou {{ $curso->preco_cheio_completo ?? 'consulte' }} à vista</p>
 
                         <ul>
                             <li>Acesso ao curso completo</li>
@@ -536,9 +564,12 @@
                             data-checkout-url="{{ $checkoutCompletoPlano }}"
                             data-plan="completo"
                             data-requires-lead="{{ !empty($curso->formulario) ? '1' : '0' }}"
+                            data-lp-plan-cta="completo"
                         >
                             Quero o plano completo
                         </a>
+
+                        <p class="lp-price-card__ended" data-lp-plan-ended="completo" hidden>Encerrado</p>
 
                         <p class="lp-guarantee">
                             <svg class="lp-icon lp-icon--sm" aria-hidden="true"><use href="#lp-icon-shield"></use></svg>

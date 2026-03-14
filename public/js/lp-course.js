@@ -22,11 +22,18 @@
     var selectedCheckoutInput = document.getElementById('selected_checkout_url');
     var testimonialsSection = document.getElementById('depoimentos');
     var testimonialsContainer = testimonialsSection ? testimonialsSection.querySelector('.lp-testimonials') : null;
+    var heroLabelEl = document.querySelector('[data-lp-hero-label]');
+    var heroValueEl = document.querySelector('[data-lp-hero-value]');
+    var heroCashEl = document.querySelector('[data-lp-hero-cash]');
+    var pricingGrid = document.getElementById('lp-pricing-grid');
+    var countdownTimers = document.querySelectorAll('[data-lp-countdown-timer]');
+    var countdownBlocks = document.querySelectorAll('[data-lp-countdown-block]');
 
     var selectedCheckoutUrl = '';
     var selectedCtaContext = {};
     var isSubmittingLead = false;
     var isRedirectingBack = false;
+    var countdownExpiredApplied = false;
 
     function compactObject(obj) {
         var output = {};
@@ -215,6 +222,439 @@
         } catch (error) {
             return checkoutUrl;
         }
+    }
+
+    function getCardElementsFromCard(card) {
+        if (!card) {
+            return {
+                card: null,
+                value: null,
+                cash: null,
+                cta: null,
+                ended: null
+            };
+        }
+
+        return {
+            card: card,
+            value: card.querySelector('.lp-price-card__value'),
+            cash: card.querySelector('.lp-price-card__cash'),
+            cta: card.querySelector('.js-cta'),
+            ended: card.querySelector('.lp-price-card__ended')
+        };
+    }
+
+    function getPlanElements(plan) {
+        var card = document.querySelector(
+            '[data-lp-plan-card="' + plan + '"]:not([data-lp-generated-card="1"])'
+        );
+
+        if (!card) {
+            card = document.querySelector('[data-lp-plan-card="' + plan + '"]');
+        }
+
+        return getCardElementsFromCard(card);
+    }
+
+    function getVisibleStaticPlans() {
+        return ['basico', 'completo'].filter(function (plan) {
+            var elements = getPlanElements(plan);
+            return !!(elements.card && !elements.card.hidden);
+        });
+    }
+
+    function registerCtaHandler(button) {
+        if (!button || button.dataset.lpCtaBound === '1') {
+            return;
+        }
+
+        button.addEventListener('click', onCtaClick);
+        button.dataset.lpCtaBound = '1';
+    }
+
+    function clearGeneratedOfferCards() {
+        if (!pricingGrid) {
+            return;
+        }
+
+        pricingGrid.querySelectorAll('[data-lp-generated-card="1"]').forEach(function (card) {
+            card.remove();
+        });
+    }
+
+    function setCardPrimaryState(card, isPrimary) {
+        if (!card) {
+            return;
+        }
+
+        var elements = getCardElementsFromCard(card);
+
+        card.classList.toggle('lp-price-card--primary', !!isPrimary);
+        card.classList.toggle('lp-price-card--secondary', !isPrimary);
+
+        if (elements.cta) {
+            elements.cta.classList.toggle('lp-btn--outline', !isPrimary);
+        }
+    }
+
+    function enableCard(card) {
+        var elements = getCardElementsFromCard(card);
+        if (!elements.card) {
+            return;
+        }
+
+        elements.card.classList.remove('is-disabled');
+
+        if (elements.ended) {
+            elements.ended.hidden = true;
+        }
+
+        if (elements.cta) {
+            elements.cta.removeAttribute('aria-disabled');
+            elements.cta.classList.remove('is-disabled');
+            elements.cta.tabIndex = 0;
+        }
+    }
+
+    function disableCard(card, endLabel) {
+        var elements = getCardElementsFromCard(card);
+        if (!elements.card) {
+            return;
+        }
+
+        elements.card.classList.add('is-disabled');
+
+        if (elements.ended) {
+            elements.ended.hidden = false;
+            elements.ended.textContent = endLabel || 'Encerrado';
+        }
+
+        if (elements.cta) {
+            elements.cta.setAttribute('aria-disabled', 'true');
+            elements.cta.classList.add('is-disabled');
+            elements.cta.setAttribute('href', '#');
+            elements.cta.setAttribute('data-checkout-url', '#');
+            elements.cta.tabIndex = -1;
+        }
+    }
+
+    function applyOfferToCard(card, plan, offer) {
+        if (!offer) {
+            return;
+        }
+
+        var elements = getCardElementsFromCard(card);
+        if (!elements.card) {
+            return;
+        }
+
+        if (elements.value) {
+            elements.value.textContent = offer.price_value || '';
+        }
+
+        if (elements.cash) {
+            if (offer.show_cash_line) {
+                elements.cash.hidden = false;
+                elements.cash.textContent = 'ou ' + (offer.cash_value || 'consulte') + ' à vista';
+            } else {
+                elements.cash.hidden = true;
+                elements.cash.textContent = '';
+            }
+        }
+
+        if (elements.cta) {
+            var checkoutUrl = withSck(
+                offer.checkout_url || '#',
+                plan === 'basico' ? 'plano_basico' : 'plano_completo'
+            );
+
+            elements.cta.textContent = offer.cta_label || elements.cta.textContent;
+            elements.cta.setAttribute('href', checkoutUrl);
+            elements.cta.setAttribute('data-checkout-url', checkoutUrl);
+            elements.cta.setAttribute('data-plan', plan);
+            elements.cta.setAttribute('data-requires-lead', offer.requires_lead ? '1' : '0');
+            registerCtaHandler(elements.cta);
+        }
+
+        enableCard(elements.card);
+    }
+
+    function createGeneratedOfferCard(plan, offer) {
+        if (!pricingGrid) {
+            return null;
+        }
+
+        var sourceElements = getPlanElements(plan);
+        if (!sourceElements.card) {
+            return null;
+        }
+
+        var generatedCard = sourceElements.card.cloneNode(true);
+        generatedCard.hidden = false;
+        generatedCard.dataset.lpGeneratedCard = '1';
+        generatedCard.classList.add('lp-price-card--generated');
+
+        applyOfferToCard(generatedCard, plan, offer);
+        setCardPrimaryState(generatedCard, true);
+
+        return generatedCard;
+    }
+
+    function withSck(url, sck) {
+        if (!url || url === '#') {
+            return '#';
+        }
+
+        try {
+            var parsed = new URL(decodeHtmlEntities(url), window.location.origin);
+            parsed.searchParams.set('sck', sck);
+            return parsed.toString();
+        } catch (error) {
+            return url;
+        }
+    }
+
+    function setHeroPricingState(offer) {
+        if (!offer) {
+            return;
+        }
+
+        if (heroLabelEl) {
+            heroLabelEl.textContent = offer.hero_label || '';
+        }
+
+        if (heroValueEl) {
+            heroValueEl.textContent = offer.price_value || '';
+        }
+
+        if (heroCashEl) {
+            if (offer.show_cash_line) {
+                heroCashEl.hidden = false;
+                heroCashEl.textContent = 'ou ' + (offer.cash_value || 'consulte') + ' à vista';
+            } else {
+                heroCashEl.hidden = true;
+                heroCashEl.textContent = '';
+            }
+        }
+    }
+
+    function setPricingLayout(layout) {
+        if (!pricingGrid) {
+            return;
+        }
+
+        pricingGrid.setAttribute('data-lp-pricing-layout', layout);
+        pricingGrid.classList.toggle('lp-pricing--two', layout === 'two');
+        pricingGrid.classList.toggle('lp-pricing--one', layout !== 'two');
+    }
+
+    function setPlanVisibility(plan, visible) {
+        var elements = getPlanElements(plan);
+        if (!elements.card) {
+            return;
+        }
+
+        elements.card.hidden = !visible;
+    }
+
+    function setPlanPrimary(plan, isPrimary) {
+        var elements = getPlanElements(plan);
+        if (!elements.card) {
+            return;
+        }
+
+        setCardPrimaryState(elements.card, isPrimary);
+    }
+
+    function enablePlan(plan) {
+        var elements = getPlanElements(plan);
+        if (!elements.card) {
+            return;
+        }
+
+        enableCard(elements.card);
+    }
+
+    function disablePlan(plan, endLabel) {
+        var elements = getPlanElements(plan);
+        if (!elements.card) {
+            return;
+        }
+
+        disableCard(elements.card, endLabel);
+    }
+
+    function applyOfferToPlan(plan, offer) {
+        if (!offer) {
+            return;
+        }
+
+        var elements = getPlanElements(plan);
+        if (!elements.card) {
+            return;
+        }
+
+        applyOfferToCard(elements.card, plan, offer);
+    }
+
+    function formatCountdown(msRemaining) {
+        var totalSeconds = Math.max(0, Math.floor(msRemaining / 1000));
+        var minutes = Math.floor(totalSeconds / 60);
+        var seconds = totalSeconds % 60;
+
+        return String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
+    }
+
+    function setCountdownText(text, ended) {
+        countdownBlocks.forEach(function (blockEl) {
+            var labelEl = blockEl.querySelector('.lp-countdown__label');
+            var timerEl = blockEl.querySelector('[data-lp-countdown-timer]');
+            var blockType = blockEl.getAttribute('data-lp-countdown-block') || '';
+
+            blockEl.classList.toggle('is-ended', !!ended);
+
+            if (labelEl && !labelEl.dataset.originalText) {
+                labelEl.dataset.originalText = labelEl.textContent || '';
+            }
+
+            if (ended) {
+                if (blockType === 'hero') {
+                    blockEl.hidden = true;
+                    return;
+                }
+
+                if (labelEl) {
+                    labelEl.textContent = text;
+                }
+
+                if (timerEl) {
+                    timerEl.hidden = true;
+                }
+
+                return;
+            }
+
+            blockEl.hidden = false;
+
+            if (labelEl) {
+                labelEl.textContent = labelEl.dataset.originalText || labelEl.textContent;
+            }
+
+            if (timerEl) {
+                timerEl.hidden = false;
+                timerEl.textContent = text;
+            }
+        });
+    }
+
+    function applyCountdownExpiration() {
+        if (countdownExpiredApplied) {
+            return;
+        }
+
+        countdownExpiredApplied = true;
+
+        var countdownConfig = config.countdown || {};
+        var pricingConfig = config.pricing || {};
+        var variants = pricingConfig.offer_variants || {};
+        var endLabel = countdownConfig.end_label || 'Encerrado';
+
+        setCountdownText(endLabel, true);
+
+        if (countdownConfig.action === 'encerrar_basico') {
+            var currentCompleteKey = pricingConfig.current_complete_offer_key || 'completo_padrao';
+            var completeOffer = variants[currentCompleteKey];
+
+            if (completeOffer) {
+                applyOfferToPlan('completo', completeOffer);
+                setHeroPricingState(completeOffer);
+            }
+
+            setPlanVisibility('completo', true);
+            setPlanPrimary('completo', true);
+
+            if (pricingConfig.current_basic_offer_key) {
+                setPlanVisibility('basico', true);
+                setPlanPrimary('basico', false);
+                disablePlan('basico', endLabel);
+                setPricingLayout('two');
+            }
+
+            return;
+        }
+
+        if (countdownConfig.action === 'alterar_preco') {
+            var destinationKey = countdownConfig.destination_offer || '';
+            var destinationOffer = variants[destinationKey];
+
+            if (!destinationOffer) {
+                return;
+            }
+
+            clearGeneratedOfferCards();
+
+            getVisibleStaticPlans().forEach(function (plan) {
+                setPlanVisibility(plan, true);
+                setPlanPrimary(plan, false);
+                disablePlan(plan, endLabel);
+            });
+
+            var generatedCard = createGeneratedOfferCard(destinationOffer.plan, destinationOffer);
+            if (!generatedCard) {
+                return;
+            }
+
+            pricingGrid.appendChild(generatedCard);
+            setHeroPricingState(destinationOffer);
+            setPricingLayout('two');
+        }
+    }
+
+    function initCountdown() {
+        var countdownConfig = config.countdown || {};
+
+        if (!countdownConfig.enabled || !countdownTimers.length || !countdownConfig.storage_key) {
+            return;
+        }
+
+        var storageKey = String(countdownConfig.storage_key);
+        var endTimestamp = null;
+
+        try {
+            endTimestamp = window.localStorage.getItem(storageKey);
+        } catch (error) {
+            endTimestamp = null;
+        }
+
+        var parsedTimestamp = parseInt(endTimestamp || '', 10);
+        if (!parsedTimestamp) {
+            parsedTimestamp = Date.now() + (Number(countdownConfig.minutes || 0) * 60 * 1000);
+
+            try {
+                window.localStorage.setItem(storageKey, String(parsedTimestamp));
+            } catch (error) {
+                // no-op
+            }
+        }
+
+        function tick() {
+            var remaining = parsedTimestamp - Date.now();
+
+            if (remaining <= 0) {
+                applyCountdownExpiration();
+                return;
+            }
+
+            setCountdownText(formatCountdown(remaining), false);
+            window.setTimeout(tick, 1000);
+        }
+
+        if (parsedTimestamp <= Date.now()) {
+            applyCountdownExpiration();
+            return;
+        }
+
+        tick();
     }
 
     function sendLeadPayload(payload) {
@@ -424,6 +864,16 @@
 
     function onCtaClick(event) {
         var button = event.currentTarget;
+
+        if (
+            !button ||
+            button.getAttribute('aria-disabled') === 'true' ||
+            button.classList.contains('is-disabled')
+        ) {
+            event.preventDefault();
+            return;
+        }
+
         var checkoutUrl = button.getAttribute('data-checkout-url') || button.getAttribute('href') || '#';
         var checkoutContext = extractCheckoutContext(checkoutUrl);
         var plan = button.getAttribute('data-plan') || 'completo';
@@ -563,7 +1013,7 @@
     }, true);
 
     document.querySelectorAll('.js-cta').forEach(function (button) {
-        button.addEventListener('click', onCtaClick);
+        registerCtaHandler(button);
     });
 
     if (leadForm) {
@@ -572,6 +1022,7 @@
 
     setupBackRedirect();
     syncTestimonialsVisibility();
+    initCountdown();
     ensureMetaPixel(config.pixel_ids || []);
     trackMeta('ViewContent', buildPayload());
 })();

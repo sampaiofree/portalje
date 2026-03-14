@@ -20,6 +20,7 @@
         {{-- Espaço para estilos específicos da página, se necessário --}}
         @yield('head')
         @stack('head')
+        @stack('styles')
     </head>
     <body class="font-sans antialiased">
         <!-- Bloco de Notificação Global para Mensagens da Sessão Laravel -->

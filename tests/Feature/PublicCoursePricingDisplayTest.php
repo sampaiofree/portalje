@@ -84,7 +84,8 @@ class PublicCoursePricingDisplayTest extends TestCase
         $heroPriceHighlight = $this->extractHeroPriceHighlight($response->getContent());
         $this->assertStringContainsString('Investimento único de', $heroPriceHighlight);
         $this->assertStringNotContainsString('Investimento do plano completo', $heroPriceHighlight);
-        $this->assertStringNotContainsString(' à vista', $heroPriceHighlight);
+        $this->assertStringContainsString('data-lp-hero-cash', $heroPriceHighlight);
+        $this->assertStringContainsString('hidden', $heroPriceHighlight);
         $this->assertSame(
             $this->extractHeroPriceValue($response->getContent()),
             $this->extractFirstPlanCardValue($response->getContent())
@@ -155,6 +156,64 @@ class PublicCoursePricingDisplayTest extends TestCase
         $response->assertOk();
         $response->assertSee('data-requires-lead="0"', false);
         $response->assertDontSee('data-requires-lead="1"', false);
+    }
+
+    public function test_public_page_serializes_countdown_configuration_for_alterar_preco_with_one_minute_timer(): void
+    {
+        [$user, $curso] = $this->createAffiliateAndCurso('curso-countdown-alterar');
+        $cupomPrincipal = Cupom::create(['codigo' => 'MAIN10', 'desconto' => 10]);
+        $cupomDestino = Cupom::create(['codigo' => 'UP40', 'desconto' => 40]);
+
+        Codigo_ref::create([
+            'user_id' => $user->id,
+            'curso_id' => $curso->id,
+            'codigo_ref' => 'REFCOUNTDOWN1',
+            'mostrar_curso' => true,
+            'modo_precos' => 'dois_precos',
+            'cupom_principal_id' => $cupomPrincipal->id,
+            'cupom_secundario_id' => $cupomDestino->id,
+            'usar_contador' => true,
+            'contador_minutos' => 1,
+            'contador_acao' => 'alterar_preco',
+            'contador_destino_oferta' => 'completo_cupom:' . $cupomDestino->id,
+        ]);
+
+        $response = $this->get('http://afiliado.test/' . $curso->url);
+        $config = $this->extractLpCourseConfig($response->getContent());
+
+        $this->assertTrue((bool) data_get($config, 'countdown.enabled'));
+        $this->assertSame(1, data_get($config, 'countdown.minutes'));
+        $this->assertSame('alterar_preco', data_get($config, 'countdown.action'));
+        $this->assertSame('completo_cupom:' . $cupomDestino->id, data_get($config, 'countdown.destination_offer'));
+        $this->assertIsString(data_get($config, 'countdown.storage_key'));
+        $this->assertArrayHasKey('completo_cupom:' . $cupomDestino->id, data_get($config, 'pricing.offer_variants', []));
+        $this->assertSame('completo', data_get($config, 'pricing.offer_variants.completo_cupom:' . $cupomDestino->id . '.plan'));
+        $response->assertSee('01:00');
+    }
+
+    public function test_public_page_serializes_countdown_configuration_for_encerrar_basico(): void
+    {
+        [$user, $curso] = $this->createAffiliateAndCurso('curso-countdown-encerrar');
+
+        Codigo_ref::create([
+            'user_id' => $user->id,
+            'curso_id' => $curso->id,
+            'codigo_ref' => 'REFCOUNTDOWN2',
+            'mostrar_curso' => true,
+            'modo_precos' => 'padrao',
+            'usar_contador' => true,
+            'contador_minutos' => 5,
+            'contador_acao' => 'encerrar_basico',
+        ]);
+
+        $response = $this->get('http://afiliado.test/' . $curso->url);
+        $config = $this->extractLpCourseConfig($response->getContent());
+
+        $this->assertTrue((bool) data_get($config, 'countdown.enabled'));
+        $this->assertSame('encerrar_basico', data_get($config, 'countdown.action'));
+        $this->assertSame('completo_padrao', data_get($config, 'pricing.current_complete_offer_key'));
+        $this->assertSame('basico_padrao', data_get($config, 'pricing.current_basic_offer_key'));
+        $this->assertArrayHasKey('basico_padrao', data_get($config, 'pricing.offer_variants', []));
     }
 
     public function test_public_page_renders_modules_as_accordion_and_anchor_ctas_to_planos(): void
@@ -253,7 +312,10 @@ class PublicCoursePricingDisplayTest extends TestCase
         $response->assertOk();
         $response->assertSee('R$78,00', false);
         $response->assertDontSee('12xR$6,53', false);
-        $response->assertDontSee('ou R$78,00 à vista', false);
+        $this->assertMatchesRegularExpression(
+            '/data-lp-plan-cash="completo"[^>]*hidden/u',
+            $response->getContent()
+        );
     }
 
     public function test_public_page_hides_installments_for_basico_and_keeps_complete_when_only_basico_is_below_one_hundred(): void
@@ -282,7 +344,10 @@ class PublicCoursePricingDisplayTest extends TestCase
         $response->assertSee('ou R$197,00 à vista', false);
         $response->assertSee('R$98,50', false);
         $response->assertDontSee('12xR$9,85', false);
-        $response->assertDontSee('ou R$98,50 à vista', false);
+        $this->assertMatchesRegularExpression(
+            '/data-lp-plan-cash="basico"[^>]*hidden/u',
+            $response->getContent()
+        );
     }
 
     public function test_public_page_keeps_installment_display_when_complete_total_is_equal_or_above_one_hundred(): void
@@ -340,7 +405,7 @@ class PublicCoursePricingDisplayTest extends TestCase
 
     private function extractHeroPriceHighlight(string $html): string
     {
-        $matched = preg_match('/<div class="lp-price-highlight">(.*?)<\/div>/s', $html, $matches);
+        $matched = preg_match('/<div class="lp-price-highlight"[^>]*>(.*?)<\/div>/s', $html, $matches);
         if ($matched !== 1 || empty($matches[1])) {
             $this->fail('Bloco lp-price-highlight não encontrado na LP pública.');
         }
@@ -351,7 +416,7 @@ class PublicCoursePricingDisplayTest extends TestCase
     private function extractHeroPriceValue(string $html): string
     {
         $matched = preg_match(
-            '/<div class="lp-price-highlight">.*?<strong>(.*?)<\/strong>.*?<\/div>/s',
+            '/<div class="lp-price-highlight"[^>]*>.*?<strong[^>]*>(.*?)<\/strong>.*?<\/div>/s',
             $html,
             $matches
         );
@@ -365,11 +430,26 @@ class PublicCoursePricingDisplayTest extends TestCase
 
     private function extractFirstPlanCardValue(string $html): string
     {
-        $matched = preg_match('/<p class="lp-price-card__value">(.*?)<\/p>/', $html, $matches);
+        $matched = preg_match('/<p class="lp-price-card__value"[^>]*>(.*?)<\/p>/', $html, $matches);
         if ($matched !== 1 || empty($matches[1])) {
             $this->fail('Valor do primeiro card de plano não encontrado.');
         }
 
         return trim(strip_tags(html_entity_decode($matches[1], ENT_QUOTES, 'UTF-8')));
+    }
+
+    private function extractLpCourseConfig(string $html): array
+    {
+        $matched = preg_match('/<script id="lp-course-config" type="application\/json">(.*?)<\/script>/s', $html, $matches);
+        if ($matched !== 1 || empty($matches[1])) {
+            $this->fail('Bloco lp-course-config não encontrado na LP pública.');
+        }
+
+        $decoded = json_decode(html_entity_decode($matches[1], ENT_QUOTES, 'UTF-8'), true);
+        if (!is_array($decoded)) {
+            $this->fail('Configuração JSON da LP pública está inválida.');
+        }
+
+        return $decoded;
     }
 }

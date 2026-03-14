@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\User;
+use App\Models\RootDomainCourseConfig;
 
 class Curso extends Model
 {
@@ -58,6 +59,11 @@ class Curso extends Model
     public function codigo_ref()
     {
         return $this->hasMany(Codigo_ref::class, 'curso_id', 'id');
+    }
+
+    public function rootDomainConfig()
+    {
+        return $this->hasOne(RootDomainCourseConfig::class, 'curso_id', 'id');
     }
 
     public function aulas_demonstrativas()

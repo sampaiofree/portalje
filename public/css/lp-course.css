@@ -190,6 +190,47 @@ img {
     font-size: 0.92rem;
 }
 
+.lp-countdown {
+    margin-top: 18px;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 999px;
+    border: 1px solid #d0342c;
+    background: linear-gradient(180deg, #ef4444 0%, #c81e1e 100%);
+    color: #ffffff;
+    box-shadow: 0 12px 30px rgba(153, 27, 27, 0.22);
+}
+
+.lp-countdown--plans {
+    margin: 0 0 18px;
+}
+
+.lp-countdown__label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.92);
+}
+
+.lp-countdown__timer {
+    font-size: 1rem;
+    font-weight: 800;
+    color: #ffffff;
+}
+
+.lp-countdown.is-ended {
+    border-color: #7f1d1d;
+    background: linear-gradient(180deg, #b91c1c 0%, #7f1d1d 100%);
+}
+
+.lp-countdown.is-ended .lp-countdown__label,
+.lp-countdown.is-ended .lp-countdown__timer {
+    color: #ffffff;
+}
+
 .lp-hero__actions {
     margin-top: 24px;
     display: flex;
@@ -652,6 +693,40 @@ img {
 .lp-price-card__cash {
     margin: 6px 0 0;
     color: #d5e0fb;
+}
+
+.lp-price-card__ended {
+    margin: 14px 0 0;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #fecaca;
+}
+
+.lp-price-card--generated {
+    border-color: rgba(249, 250, 251, 0.68);
+    box-shadow: 0 22px 44px rgba(6, 20, 47, 0.4);
+}
+
+.lp-price-card.is-disabled {
+    position: relative;
+    opacity: 0.72;
+}
+
+.lp-price-card.is-disabled::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 16px;
+    background: rgba(6, 18, 44, 0.34);
+    pointer-events: none;
+}
+
+.lp-btn.is-disabled,
+.lp-btn[aria-disabled="true"] {
+    opacity: 0.55;
+    cursor: not-allowed;
+    pointer-events: none;
 }
 
 .lp-price-card ul {

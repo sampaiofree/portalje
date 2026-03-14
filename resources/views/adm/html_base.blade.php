@@ -627,6 +627,9 @@ $dominioseco = str_replace('.portalje.org', '', Auth::user()->dominio);
                                 <a href="{{route('adm_cursos_lista')}}">Lista dos cursos</a>
                             </li>
                             <li>
+                                <a href="{{ route('admin.root_domain_course_pages') }}">Páginas dos domínios</a>
+                            </li>
+                            <li>
                                 <a href="{{route('aulas_gratuitas_index')}}">Aulas Gratuitas</a>
                             </li>
                         </ul>

@@ -11,6 +11,7 @@ use App\Models\Curso;
 use App\Models\Cupom;
 use App\Models\User;
 use App\Models\Dados_portal;
+use App\Models\RootDomainCourseConfig;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
@@ -52,6 +53,109 @@ class Home_e_cursosController extends Controller
         } catch (Throwable $e) {
             return $defaults;
         }
+    }
+
+    private function rootPortalHosts(): array
+    {
+        return [
+            'portalje.org',
+            'dns.portalje.org',
+            'jovemempreendedor.org',
+            'dns.jovemempreendedor.org',
+        ];
+    }
+
+    private function isRootPortalHost(?string $dominio): bool
+    {
+        $dominio = $this->normalizarHost((string) $dominio);
+
+        return in_array($dominio, $this->rootPortalHosts(), true);
+    }
+
+    private function rootDomainConfigsByCourseId()
+    {
+        if (!Schema::hasTable('root_domain_course_configs')) {
+            return collect();
+        }
+
+        return RootDomainCourseConfig::query()->get()->keyBy('curso_id');
+    }
+
+    private function rootDomainConfigForCourse(?Curso $curso): ?RootDomainCourseConfig
+    {
+        if (!$curso || !Schema::hasTable('root_domain_course_configs')) {
+            return null;
+        }
+
+        return RootDomainCourseConfig::query()
+            ->where('curso_id', $curso->id)
+            ->first();
+    }
+
+    private function applyRootDomainPublicConfigOnCourse(Curso $curso, ?RootDomainCourseConfig $config): void
+    {
+        $curso->root_domain_course_config_id = $config->id ?? null;
+        $curso->mostrar_curso = $config
+            ? (bool) $config->mostrar_curso
+            : (bool) ($curso->mostrar_na_pagina ?? false);
+        $curso->mostrar_na_pagina = $config
+            ? (bool) $config->mostrar_curso
+            : (bool) ($curso->mostrar_na_pagina ?? false);
+        $curso->modo_precos = $config && in_array((string) $config->modo_precos, ['padrao', 'um_preco', 'dois_precos'], true)
+            ? (string) $config->modo_precos
+            : 'padrao';
+        $curso->cupom_principal_id = $config && !empty($config->cupom_principal_id)
+            ? (int) $config->cupom_principal_id
+            : null;
+        $curso->cupom_secundario_id = $config && !empty($config->cupom_secundario_id)
+            ? (int) $config->cupom_secundario_id
+            : null;
+        $curso->formulario_pre_checkout = $config
+            ? (bool) $config->formulario_pre_checkout
+            : (bool) ($this->dados_portal['formulario_pre_checkout'] ?? true);
+        $curso->usar_contador = $config ? (bool) $config->usar_contador : false;
+        $curso->contador_minutos = $config && !empty($config->contador_minutos)
+            ? (int) $config->contador_minutos
+            : null;
+        $curso->contador_acao = $config->contador_acao ?? null;
+        $curso->contador_destino_oferta = $config->contador_destino_oferta ?? null;
+    }
+
+    private function buildRootDomainCourseData(Curso $curso, ?RootDomainCourseConfig $config): array
+    {
+        $dados = [
+            'whatsapp_atendimento' => $this->dados_portal['telefone_suporte_alunos'],
+            'whatsapp_atendimento_id' => null,
+            'whatsapp_atendimento_tempo' => $this->dados_portal['whatsapp_atendimento_tempo'],
+            'meta_pixel_id' => null,
+            'company_name' => 'Programa Jovem Empreendedor',
+            'logo_padrao_url' => $this->resolverLogoPadraoUrl(),
+            'logo_dark_url' => $this->resolverLogoDarkUrl(),
+            'formulario_pre_checkout' => $config
+                ? (bool) $config->formulario_pre_checkout
+                : (bool) ($this->dados_portal['formulario_pre_checkout'] ?? true),
+            'formulario_whatsapp' => (bool) ($this->dados_portal['formulario_whatsapp'] ?? true),
+            'user_id' => null,
+            'affiliate_code' => null,
+            'modo_precos' => $config && in_array((string) $config->modo_precos, ['padrao', 'um_preco', 'dois_precos'], true)
+                ? (string) $config->modo_precos
+                : 'padrao',
+            'cupom_principal_id' => $config && !empty($config->cupom_principal_id)
+                ? (int) $config->cupom_principal_id
+                : null,
+            'cupom_secundario_id' => $config && !empty($config->cupom_secundario_id)
+                ? (int) $config->cupom_secundario_id
+                : null,
+            'usar_contador' => $config ? (bool) $config->usar_contador : false,
+            'contador_minutos' => $config && !empty($config->contador_minutos)
+                ? (int) $config->contador_minutos
+                : null,
+            'contador_acao' => $config->contador_acao ?? null,
+            'contador_destino_oferta' => $config->contador_destino_oferta ?? null,
+            'link_checkout_completo' => $curso->link_checkout_completo . '&hideBillet=1',
+        ];
+
+        return $dados;
     }
 
     //PÁGINA CURSO INDIVIDUAL
@@ -205,6 +309,7 @@ class Home_e_cursosController extends Controller
         $curso->cupom_principal_codigo = null;
         $curso->cupom_secundario_codigo = null;
 
+        $cursoBasePricing = clone $curso;
         $this->aplicarConfiguracaoDePrecosPorCupom($curso, $dados, !empty($desconto_banner));
         $curso->origem = 'checkout_completo';
 
@@ -219,6 +324,18 @@ class Home_e_cursosController extends Controller
             $curso->link_checkout_completo = "https://wa.me/$curso->whatsapp_atendimento?text=Olá, $zap_complemento quero fazer minha inscrição no curso de $curso->titulo";
             $curso->origem = 'whatsapp';
         }
+
+        $publicPricingConfig = $this->buildPublicCoursePricingConfig(
+            $cursoBasePricing,
+            $curso,
+            $dados,
+            !empty($desconto_banner)
+        );
+        $curso->pricing_initial_state = $publicPricingConfig['initial_state'];
+        $curso->pricing_offer_variants = $publicPricingConfig['offer_variants'];
+        $curso->current_complete_offer_key = $publicPricingConfig['current_complete_offer_key'];
+        $curso->current_basic_offer_key = $publicPricingConfig['current_basic_offer_key'];
+        $curso->countdown = $publicPricingConfig['countdown'];
 
         $lpView = config('lp.course_view', 'novapagina');
         if (!view()->exists($lpView)) {
@@ -266,6 +383,13 @@ class Home_e_cursosController extends Controller
     private function dadosusuario($dominio, $curso = null, $ref = null){
         $dominio = $this->normalizarHost((string) $dominio);
 
+        if ($curso && !$ref && $this->isRootPortalHost($dominio)) {
+            return $this->buildRootDomainCourseData(
+                $curso,
+                $this->rootDomainConfigForCourse($curso)
+            );
+        }
+
         //VERIFICAR SE É UM SOBDOMINIO OU DOMINIO COMPRADO
         if(
             Schema::hasTable('users') AND
@@ -296,6 +420,10 @@ class Home_e_cursosController extends Controller
                     'modo_precos' => 'padrao',
                     'cupom_principal_id' => null,
                     'cupom_secundario_id' => null,
+                    'usar_contador' => false,
+                    'contador_minutos' => null,
+                    'contador_acao' => null,
+                    'contador_destino_oferta' => null,
                     
                 ];
 
@@ -316,6 +444,14 @@ class Home_e_cursosController extends Controller
                     $dados['formulario_pre_checkout'] = isset($dados_codigo_ref['formulario_pre_checkout'])
                         ? (bool) $dados_codigo_ref['formulario_pre_checkout']
                         : (bool) $dados['formulario_pre_checkout'];
+                    $dados['usar_contador'] = isset($dados_codigo_ref['usar_contador'])
+                        ? (bool) $dados_codigo_ref['usar_contador']
+                        : false;
+                    $dados['contador_minutos'] = !empty($dados_codigo_ref['contador_minutos'])
+                        ? (int) $dados_codigo_ref['contador_minutos']
+                        : null;
+                    $dados['contador_acao'] = $dados_codigo_ref['contador_acao'] ?? null;
+                    $dados['contador_destino_oferta'] = $dados_codigo_ref['contador_destino_oferta'] ?? null;
                 }
 
                 return $dados;
@@ -345,6 +481,10 @@ class Home_e_cursosController extends Controller
         $refModoPrecosRaw = is_object($ref) ? ($ref->modo_precos ?? 'padrao') : (is_array($ref) ? ($ref['modo_precos'] ?? 'padrao') : 'padrao');
         $refCupomPrincipalIdRaw = is_object($ref) ? ($ref->cupom_principal_id ?? null) : (is_array($ref) ? ($ref['cupom_principal_id'] ?? null) : null);
         $refCupomSecundarioIdRaw = is_object($ref) ? ($ref->cupom_secundario_id ?? null) : (is_array($ref) ? ($ref['cupom_secundario_id'] ?? null) : null);
+        $refUsarContadorRaw = is_object($ref) ? ($ref->usar_contador ?? false) : (is_array($ref) ? ($ref['usar_contador'] ?? false) : false);
+        $refContadorMinutosRaw = is_object($ref) ? ($ref->contador_minutos ?? null) : (is_array($ref) ? ($ref['contador_minutos'] ?? null) : null);
+        $refContadorAcaoRaw = is_object($ref) ? ($ref->contador_acao ?? null) : (is_array($ref) ? ($ref['contador_acao'] ?? null) : null);
+        $refContadorDestinoOfertaRaw = is_object($ref) ? ($ref->contador_destino_oferta ?? null) : (is_array($ref) ? ($ref['contador_destino_oferta'] ?? null) : null);
 
         $whatsappSelecionadoRef = ['id' => null, 'whatsapp' => null];
         if ($refUserId && Schema::hasTable('users')) {
@@ -373,6 +513,10 @@ class Home_e_cursosController extends Controller
             'modo_precos' => in_array($refModoPrecosRaw, ['padrao', 'um_preco', 'dois_precos'], true) ? $refModoPrecosRaw : 'padrao',
             'cupom_principal_id' => !empty($refCupomPrincipalIdRaw) ? (int) $refCupomPrincipalIdRaw : null,
             'cupom_secundario_id' => !empty($refCupomSecundarioIdRaw) ? (int) $refCupomSecundarioIdRaw : null,
+            'usar_contador' => (bool) $refUsarContadorRaw,
+            'contador_minutos' => !empty($refContadorMinutosRaw) ? (int) $refContadorMinutosRaw : null,
+            'contador_acao' => $refContadorAcaoRaw ?: null,
+            'contador_destino_oferta' => $refContadorDestinoOfertaRaw ?: null,
         ];
 
         if($curso){
@@ -439,7 +583,30 @@ class Home_e_cursosController extends Controller
                 $src = "src=$src_conteudo&sck=$src_conteudo";
             }
         }
-        
+    
+        $host = strtolower($request->getHost());
+        $pathInfo = rtrim($request->getPathInfo(), '/');
+        if ($pathInfo === '') {
+            $pathInfo = '/';
+        }
+        $isRootPortalDomain = $this->isRootPortalHost($host);
+        $isHomeOrCursosPath = in_array($pathInfo, ['/', '/cursos'], true);
+        $hasPageOverride = $request->has('edital')
+            || $request->has('test')
+            || $request->has('lista')
+            || $request->has('gratuito');
+
+        // Root portal domains should always use the W3 home unless an explicit legacy override is requested.
+        if ($isRootPortalDomain && $isHomeOrCursosPath && !$hasPageOverride) {
+            $cidadeLayout = $cidade_desconto ?? $request->get('c') ?? null;
+            $pagina = $this->dados_da_pagina(null, $cidadeLayout);
+            $modoCardsW3 = $this->resolverModoCardsW3($request, null, 'curso');
+            $pagina['cards_destino'] = $modoCardsW3;
+            $pagina['whatsapp_requires_form'] = true;
+            $cursos = $this->listar_cursos($request, null, 'w3', $modoCardsW3, true);
+
+            return view('home_e_cursos.w3', compact('cursos', 'pagina'));
+        }
 
         
 
@@ -482,29 +649,6 @@ class Home_e_cursosController extends Controller
             }
         }
 
-        $host = strtolower($request->getHost());
-        $pathInfo = rtrim($request->getPathInfo(), '/');
-        if ($pathInfo === '') {
-            $pathInfo = '/';
-        }
-        $isRootPortalDomain = in_array($host, ['portalje.org', 'jovemempreendedor.org'], true);
-        $isHomeOrCursosPath = in_array($pathInfo, ['/', '/cursos'], true);
-        $hasPageOverride = $request->has('edital')
-            || $request->has('test')
-            || $request->has('lista')
-            || $request->has('gratuito');
-
-        if ($isRootPortalDomain && $isHomeOrCursosPath && !$hasPageOverride) {
-            $cidadeLayout = $cidade_desconto ?? $request->get('c') ?? null;
-            $pagina = $this->dados_da_pagina(null, $cidadeLayout);
-            $modoCardsW3 = $this->resolverModoCardsW3($request, null, 'curso');
-            $pagina['cards_destino'] = $modoCardsW3;
-            $pagina['whatsapp_requires_form'] = true;
-            $cursos = $this->listar_cursos($request, null, 'w3', $modoCardsW3, true);
-
-            return view('home_e_cursos.w3', compact('cursos', 'pagina'));
-        }
-
         //PEGAR TODOS OS PARAMETROS PARA COLOCAR NA URL    
         $info = $dados['dados'];
         $info['parametros'] = isset($query) ? $query.$src : $src;
@@ -523,7 +667,7 @@ class Home_e_cursosController extends Controller
         
         //DESCONTO
         $d = request()->get('d') ?? null;
-        if(request()->getHost() === 'jovemempreendedor.org'){
+        if($this->normalizarHost((string) $request->getHost()) === 'jovemempreendedor.org'){
             $d = "o80";
             //$info['parametros'] =$info['parametros']."&d=o80";
         } //Desconto padrão no Portal JE Produtor        
@@ -550,7 +694,7 @@ class Home_e_cursosController extends Controller
             return view('landign_pages.edital', compact('cursos', 'info', 'desconto_banner'));
         }elseif(request()->get('test')=='1'){
             return view('home', compact('cursos', 'info', 'desconto_banner'));
-        }elseif(request()->getHost() === 'jovemempreendedor.org'){ 
+        }elseif($isRootPortalDomain && request()->get('lista')=='1'){ 
             return view('home', compact('cursos', 'info', 'desconto_banner'));
         }elseif(request()->get('lista')=='1'){
             return view('cursos.lista_publica', compact('cursos', 'info', 'desconto_banner'));
@@ -978,6 +1122,11 @@ class Home_e_cursosController extends Controller
             $whatsAppAtendimentoId = null;
             $data_user = null;
         }
+
+        $isRootPortalHost = !$user && $this->isRootPortalHost((string) $request->getHost());
+        $rootDomainConfigsByCourseId = $isRootPortalHost
+            ? $this->rootDomainConfigsByCourseId()
+            : collect();
         
         $datacursos = Curso::orderBy('ordem')
             ->orderBy('id')
@@ -1008,6 +1157,14 @@ class Home_e_cursosController extends Controller
                             $curso->formulario_pre_checkout = isset($codigo_ref->formulario_pre_checkout)
                                 ? (bool) $codigo_ref->formulario_pre_checkout
                                 : true;
+                            $curso->usar_contador = isset($codigo_ref->usar_contador)
+                                ? (bool) $codigo_ref->usar_contador
+                                : false;
+                            $curso->contador_minutos = !empty($codigo_ref->contador_minutos)
+                                ? (int) $codigo_ref->contador_minutos
+                                : null;
+                            $curso->contador_acao = $codigo_ref->contador_acao ?? null;
+                            $curso->contador_destino_oferta = $codigo_ref->contador_destino_oferta ?? null;
                             $cursoEncontrado = true;
                             break;
                         }
@@ -1024,6 +1181,17 @@ class Home_e_cursosController extends Controller
                 $curso->cupom_principal_id = null;
                 $curso->cupom_secundario_id = null;
                 $curso->formulario_pre_checkout = true;
+                $curso->usar_contador = false;
+                $curso->contador_minutos = null;
+                $curso->contador_acao = null;
+                $curso->contador_destino_oferta = null;
+            }
+
+            if ($isRootPortalHost) {
+                $this->applyRootDomainPublicConfigOnCourse(
+                    $curso,
+                    $rootDomainConfigsByCourseId->get($curso->id)
+                );
             }
             
             //DETERMINAR SE CADA CURSO IRÁ APARECER NA PÁGINA OU NÃO
@@ -1376,6 +1544,288 @@ class Home_e_cursosController extends Controller
 
         return $botao;
 
+    }
+
+    private function buildPublicCoursePricingConfig(
+        Curso $cursoBasePricing,
+        Curso $cursoAtual,
+        array $dados,
+        bool $descontoBannerAtivo
+    ): array {
+        $modoPrecosAtual = in_array(($cursoAtual->modo_precos ?? 'padrao'), ['padrao', 'um_preco', 'dois_precos'], true)
+            ? $cursoAtual->modo_precos
+            : 'padrao';
+
+        $mostrarPlanoSecundario = ($cursoAtual->origem ?? 'checkout_completo') !== 'whatsapp'
+            && !$descontoBannerAtivo
+            && in_array($modoPrecosAtual, ['padrao', 'dois_precos'], true);
+
+        $offerVariants = $this->buildPublicCourseOfferVariants($cursoBasePricing, $modoPrecosAtual);
+
+        $currentCompleteOfferKey = !empty($cursoAtual->cupom_principal_id)
+            ? 'completo_cupom:' . (int) $cursoAtual->cupom_principal_id
+            : 'completo_padrao';
+
+        $currentBasicOfferKey = null;
+        if ($mostrarPlanoSecundario) {
+            $currentBasicOfferKey = $modoPrecosAtual === 'dois_precos' && !empty($cursoAtual->cupom_secundario_id)
+                ? 'basico_cupom:' . (int) $cursoAtual->cupom_secundario_id
+                : 'basico_padrao';
+        }
+
+        $countdown = $this->normalizePublicCountdownConfig(
+            $dados,
+            $modoPrecosAtual,
+            $offerVariants,
+            ($cursoAtual->origem ?? 'checkout_completo') !== 'whatsapp',
+            $mostrarPlanoSecundario
+        );
+
+        if ($countdown['enabled']) {
+            $affiliateSegment = trim((string) ($dados['affiliate_code'] ?? $cursoAtual->affiliate_code ?? $dados['user_id'] ?? ''));
+            $affiliateSegment = preg_replace('/[^a-zA-Z0-9_-]/', '', $affiliateSegment) ?? '';
+            if ($affiliateSegment === '') {
+                $affiliateSegment = 'sem_ref';
+            }
+
+            $configHash = substr(sha1(json_encode([
+                'minutes' => $countdown['minutes'],
+                'action' => $countdown['action'],
+                'destination' => $countdown['destination_offer'],
+                'mode' => $modoPrecosAtual,
+                'principal' => $cursoAtual->cupom_principal_id,
+                'secundario' => $cursoAtual->cupom_secundario_id,
+                'desconto_banner' => $descontoBannerAtivo,
+            ])), 0, 16);
+
+            $countdown['storage_key'] = 'lp_course_countdown_'
+                . (int) ($cursoAtual->id ?? 0)
+                . '_'
+                . $affiliateSegment
+                . '_'
+                . $configHash;
+        }
+
+        return [
+            'initial_state' => $this->buildPublicCourseInitialState($cursoAtual, $mostrarPlanoSecundario),
+            'offer_variants' => $offerVariants,
+            'current_complete_offer_key' => $currentCompleteOfferKey,
+            'current_basic_offer_key' => $currentBasicOfferKey,
+            'countdown' => $countdown,
+        ];
+    }
+
+    private function buildPublicCourseInitialState(Curso $cursoAtual, bool $mostrarPlanoSecundario): array
+    {
+        $completeOffer = $this->buildOfferPayloadFromCourse($cursoAtual, 'completo');
+        $basicOffer = $mostrarPlanoSecundario
+            ? $this->buildOfferPayloadFromCourse($cursoAtual, 'basico')
+            : null;
+
+        return [
+            'layout' => $mostrarPlanoSecundario ? 'two' : 'one',
+            'hero' => $mostrarPlanoSecundario && $basicOffer
+                ? [
+                    'label' => $basicOffer['hero_label'],
+                    'value' => $basicOffer['price_value'],
+                    'cash_value' => $basicOffer['cash_value'],
+                    'show_cash_line' => false,
+                    'plan' => 'basico',
+                ]
+                : [
+                    'label' => $completeOffer['hero_label'],
+                    'value' => $completeOffer['price_value'],
+                    'cash_value' => $completeOffer['cash_value'],
+                    'show_cash_line' => $completeOffer['show_cash_line'],
+                    'plan' => 'completo',
+                ],
+            'cards' => [
+                'basico' => $basicOffer,
+                'completo' => $completeOffer,
+            ],
+        ];
+    }
+
+    private function buildPublicCourseOfferVariants(Curso $cursoBasePricing, string $modoPrecos): array
+    {
+        $variants = [
+            'completo_padrao' => $this->buildOfferPayloadFromCourse($cursoBasePricing, 'completo'),
+        ];
+
+        if ($modoPrecos === 'padrao') {
+            $variants['basico_padrao'] = $this->buildOfferPayloadFromCourse($cursoBasePricing, 'basico');
+            return $variants;
+        }
+
+        if (!Schema::hasTable('cupons')) {
+            return $variants;
+        }
+
+        $cupons = Cupom::query()->orderBy('id')->get();
+        foreach ($cupons as $cupom) {
+            $variants['completo_cupom:' . $cupom->id] = $this->buildOfferPayloadFromCourse(
+                $this->applyOfferCouponOnClonedCourse($cursoBasePricing, 'completo', $cupom),
+                'completo'
+            );
+        }
+
+        if ($modoPrecos === 'dois_precos') {
+            foreach ($cupons as $cupom) {
+                $variants['basico_cupom:' . $cupom->id] = $this->buildOfferPayloadFromCourse(
+                    $this->applyOfferCouponOnClonedCourse($cursoBasePricing, 'basico', $cupom),
+                    'basico'
+                );
+            }
+        }
+
+        return $variants;
+    }
+
+    private function applyOfferCouponOnClonedCourse(Curso $cursoBasePricing, string $plano, Cupom $cupom): Curso
+    {
+        $cursoVariant = clone $cursoBasePricing;
+
+        $precoCheioCompleto = $this->extrairValorMonetario($cursoBasePricing->preco_cheio_completo);
+        $precoParcelaCompleto = $this->extrairValorMonetario($cursoBasePricing->preco_parcelado_completo);
+
+        if ($plano === 'completo') {
+            $cursoVariant->link_checkout_completo = $this->aplicarCupomNoCheckoutUrl(
+                $cursoVariant->link_checkout_completo,
+                $cupom->codigo
+            );
+
+            if ($precoCheioCompleto !== null) {
+                $cursoVariant->preco_cheio_completo = $this->formatarValorMonetario(
+                    $this->aplicarDescontoPercentual($precoCheioCompleto, (float) $cupom->desconto)
+                );
+            }
+
+            if ($precoParcelaCompleto !== null) {
+                $cursoVariant->preco_parcelado_completo = $this->formatarPrecoParcelado(
+                    $this->aplicarDescontoPercentual($precoParcelaCompleto, (float) $cupom->desconto),
+                    $cursoVariant->parcelamento
+                );
+            }
+
+            return $cursoVariant;
+        }
+
+        $cursoVariant->link_checkout_basico = $this->aplicarCupomNoCheckoutUrl(
+            $cursoVariant->link_checkout_basico,
+            $cupom->codigo
+        );
+
+        if ($precoCheioCompleto !== null) {
+            $cursoVariant->preco_cheio_basico = $this->formatarValorMonetario(
+                $this->aplicarDescontoPercentual($precoCheioCompleto, (float) $cupom->desconto)
+            );
+        }
+
+        if ($precoParcelaCompleto !== null) {
+            $cursoVariant->preco_parcelado_basico = $this->formatarPrecoParcelado(
+                $this->aplicarDescontoPercentual($precoParcelaCompleto, (float) $cupom->desconto),
+                $cursoVariant->parcelamento
+            );
+        }
+
+        return $cursoVariant;
+    }
+
+    private function buildOfferPayloadFromCourse(Curso $curso, string $plano): array
+    {
+        $isBasico = $plano === 'basico';
+        $precoCheio = $isBasico
+            ? ($curso->preco_cheio_basico ?? null)
+            : ($curso->preco_cheio_completo ?? null);
+        $precoParcelado = $isBasico
+            ? ($curso->preco_parcelado_basico ?? null)
+            : ($curso->preco_parcelado_completo ?? null);
+        $precoCheioValor = $this->extrairValorMonetario($precoCheio);
+        $ocultarParcelado = $precoCheioValor !== null && $precoCheioValor < 100;
+
+        return [
+            'plan' => $isBasico ? 'basico' : 'completo',
+            'price_value' => $ocultarParcelado
+                ? ($precoCheio ?? 'Consulte')
+                : ($precoParcelado ?? 'Consulte'),
+            'cash_value' => $precoCheio ?? 'consulte',
+            'show_cash_line' => !$ocultarParcelado,
+            'checkout_url' => $isBasico
+                ? ($curso->link_checkout_basico ?? '#')
+                : ($curso->link_checkout_completo ?? '#'),
+            'requires_lead' => !empty($curso->formulario),
+            'cta_label' => $isBasico ? 'Quero o plano básico' : 'Quero o plano completo',
+            'hero_label' => $isBasico ? 'Investimento único de' : 'Investimento do plano completo',
+        ];
+    }
+
+    private function normalizePublicCountdownConfig(
+        array $dados,
+        string $modoPrecos,
+        array $offerVariants,
+        bool $paginaPermiteCountdown,
+        bool $planoBasicoVisivel
+    ): array {
+        $minutes = !empty($dados['contador_minutos']) ? (int) $dados['contador_minutos'] : null;
+        $action = $dados['contador_acao'] ?? null;
+        $destinationOffer = $dados['contador_destino_oferta'] ?? null;
+        $enabled = !empty($dados['usar_contador']) && $paginaPermiteCountdown;
+
+        if (!$enabled) {
+            return [
+                'enabled' => false,
+                'minutes' => null,
+                'action' => null,
+                'destination_offer' => null,
+                'storage_key' => null,
+                'end_label' => 'Encerrado',
+            ];
+        }
+
+        if (!in_array($minutes, [1, 5, 10, 20, 30, 50], true)) {
+            $enabled = false;
+        }
+
+        if (!in_array($action, ['nada', 'encerrar_basico', 'alterar_preco'], true)) {
+            $enabled = false;
+        }
+
+        if ($action === 'encerrar_basico' && (!$planoBasicoVisivel || !in_array($modoPrecos, ['padrao', 'dois_precos'], true))) {
+            $enabled = false;
+        }
+
+        if ($action === 'alterar_preco' && !array_key_exists((string) $destinationOffer, $offerVariants)) {
+            $enabled = false;
+        }
+
+        if (
+            $action === 'alterar_preco' &&
+            is_string($destinationOffer) &&
+            str_starts_with($destinationOffer, 'basico_') &&
+            !$planoBasicoVisivel
+        ) {
+            $enabled = false;
+        }
+
+        if (!$enabled) {
+            return [
+                'enabled' => false,
+                'minutes' => null,
+                'action' => null,
+                'destination_offer' => null,
+                'storage_key' => null,
+                'end_label' => 'Encerrado',
+            ];
+        }
+
+        return [
+            'enabled' => true,
+            'minutes' => $minutes,
+            'action' => $action,
+            'destination_offer' => $action === 'alterar_preco' ? (string) $destinationOffer : null,
+            'storage_key' => null,
+            'end_label' => 'Encerrado',
+        ];
     }
 
     private function aplicarConfiguracaoDePrecosPorCupom(Curso $curso, array $dados, bool $descontoBannerAtivo): void
