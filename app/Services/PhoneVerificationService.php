@@ -60,9 +60,7 @@ class PhoneVerificationService
 
     public function requestText(): string
     {
-        $default = 'Solicito meu codigo de verificacao';
-
-        return trim((string) Config::get('services.botconversa.verification_request_text', $default)) ?: $default;
+        return 'Solicito meu codigo de verificacao';
     }
 
     public function requestUrl(): ?string

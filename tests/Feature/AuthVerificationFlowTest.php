@@ -108,7 +108,6 @@ class AuthVerificationFlowTest extends TestCase
         config([
             'services.botconversa.verification_webhook_url' => 'https://bot.example/webhook',
             'services.botconversa.verification_request_phone' => '5511954490511',
-            'services.botconversa.verification_request_text' => 'Solicito meu codigo de verificacao',
         ]);
 
         Http::fake([
