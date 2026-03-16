@@ -712,100 +712,16 @@
                         @if($curso->publicado && $curso->permitir_afiliacao)
                             <div class="lista_cursos" x-show="search === '' || @js(mb_strtolower($curso->titulo, 'UTF-8')).includes(search.toLowerCase())" x-transition>
                                 @php
-                                    $parseCourseMonetary = static function ($valor): ?float {
-                                        if (!is_scalar($valor) || $valor === '') {
-                                            return null;
-                                        }
-
-                                        $normalizado = trim((string) $valor);
-                                        $normalizado = preg_replace('/^\s*\d+\s*x(?:\s*de)?\s*/i', '', $normalizado) ?? $normalizado;
-                                        $somenteNumeros = preg_replace('/[^\d,.]/', '', $normalizado);
-
-                                        if (!$somenteNumeros) {
-                                            return null;
-                                        }
-
-                                        if (str_contains($somenteNumeros, ',') && str_contains($somenteNumeros, '.')) {
-                                            $ultimaVirgula = strrpos($somenteNumeros, ',');
-                                            $ultimoPonto = strrpos($somenteNumeros, '.');
-
-                                            if ($ultimaVirgula !== false && $ultimoPonto !== false && $ultimaVirgula > $ultimoPonto) {
-                                                $somenteNumeros = str_replace('.', '', $somenteNumeros);
-                                                $somenteNumeros = str_replace(',', '.', $somenteNumeros);
-                                            } else {
-                                                $somenteNumeros = str_replace(',', '', $somenteNumeros);
-                                            }
-                                        } elseif (str_contains($somenteNumeros, ',')) {
-                                            $somenteNumeros = str_replace('.', '', $somenteNumeros);
-                                            $somenteNumeros = str_replace(',', '.', $somenteNumeros);
-                                        } elseif (substr_count($somenteNumeros, '.') > 1) {
-                                            $partes = explode('.', $somenteNumeros);
-                                            $decimal = array_pop($partes);
-                                            $somenteNumeros = implode('', $partes) . '.' . $decimal;
-                                        }
-
-                                        return is_numeric($somenteNumeros) ? (float) $somenteNumeros : null;
-                                    };
-
-                                    $formatCourseCurrency = static function (?float $valor): ?string {
-                                        return $valor !== null ? 'R$' . number_format($valor, 2, ',', '.') : null;
-                                    };
-
-                                    $precoCompletoBase = $parseCourseMonetary($curso->preco_cheio_completo ?? null);
-                                    $precoBasicoPadrao = $precoCompletoBase !== null ? $precoCompletoBase * 0.5 : null;
-                                    $countdownDestinationOptions = [
-                                        'padrao' => [
-                                            [
-                                                'value' => 'completo_padrao',
-                                                'label' => 'Plano completo - Sem cupom'
-                                                    . ($precoCompletoBase !== null ? ' - ' . $formatCourseCurrency($precoCompletoBase) : ''),
-                                            ],
-                                            [
-                                                'value' => 'basico_padrao',
-                                                'label' => 'Plano básico - Sem cupom'
-                                                    . ($precoBasicoPadrao !== null ? ' - ' . $formatCourseCurrency($precoBasicoPadrao) : ''),
-                                            ],
-                                        ],
-                                        'um_preco' => [
-                                            [
-                                                'value' => 'completo_padrao',
-                                                'label' => 'Plano completo - Sem cupom'
-                                                    . ($precoCompletoBase !== null ? ' - ' . $formatCourseCurrency($precoCompletoBase) : ''),
-                                            ],
-                                        ],
-                                        'dois_precos' => [
-                                            [
-                                                'value' => 'completo_padrao',
-                                                'label' => 'Plano completo - Sem cupom'
-                                                    . ($precoCompletoBase !== null ? ' - ' . $formatCourseCurrency($precoCompletoBase) : ''),
-                                            ],
-                                        ],
-                                    ];
-
-                                    foreach (($cupons ?? collect()) as $cupomDestino) {
-                                        $precoCompletoCupom = $precoCompletoBase !== null
-                                            ? $precoCompletoBase * (1 - ($cupomDestino->desconto / 100))
-                                            : null;
-                                        $countdownDestinationOptions['um_preco'][] = [
-                                            'value' => 'completo_cupom:' . $cupomDestino->id,
-                                            'label' => 'Plano completo - ' . $cupomDestino->desconto . '% OFF (' . $cupomDestino->codigo . ')'
-                                                . ($precoCompletoCupom !== null ? ' - ' . $formatCourseCurrency($precoCompletoCupom) : ''),
+                                    $pricingSelectPreviewLabels = is_array($curso->pricing_select_preview_labels ?? null)
+                                        ? $curso->pricing_select_preview_labels
+                                        : [];
+                                    $countdownDestinationOptions = is_array($curso->countdown_destination_options ?? null)
+                                        ? $curso->countdown_destination_options
+                                        : [
+                                            'padrao' => [],
+                                            'um_preco' => [],
+                                            'dois_precos' => [],
                                         ];
-                                        $countdownDestinationOptions['dois_precos'][] = [
-                                            'value' => 'completo_cupom:' . $cupomDestino->id,
-                                            'label' => 'Plano completo - ' . $cupomDestino->desconto . '% OFF (' . $cupomDestino->codigo . ')'
-                                                . ($precoCompletoCupom !== null ? ' - ' . $formatCourseCurrency($precoCompletoCupom) : ''),
-                                        ];
-
-                                        $precoBasicoCupom = $precoCompletoBase !== null
-                                            ? $precoCompletoBase * (1 - ($cupomDestino->desconto / 100))
-                                            : null;
-                                        $countdownDestinationOptions['dois_precos'][] = [
-                                            'value' => 'basico_cupom:' . $cupomDestino->id,
-                                            'label' => 'Plano básico - ' . $cupomDestino->desconto . '% OFF (' . $cupomDestino->codigo . ')'
-                                                . ($precoBasicoCupom !== null ? ' - ' . $formatCourseCurrency($precoBasicoCupom) : ''),
-                                        ];
-                                    }
                                 @endphp
                                 
                                 <!-- Início do Alpine Component para cada card -->
@@ -1240,9 +1156,9 @@
                                                                             :disabled="isSavingPricing || modoPrecos !== 'um_preco'"
                                                                             class="je-dark-field block w-full appearance-none rounded-lg px-3 py-2.5 pr-10 text-sm shadow-sm transition"
                                                                         >
-                                                                            <option value="">Padrão (sem cupom)</option>
+                                                                            <option value="">{{ $pricingSelectPreviewLabels['single_plan_default'] ?? 'Padrão (sem cupom)' }}</option>
                                                                             @foreach(($cupons ?? collect()) as $cupom)
-                                                                                <option value="{{ $cupom->id }}">{{ $cupom->desconto }}% OFF ({{ $cupom->codigo }})</option>
+                                                                                <option value="{{ $cupom->id }}">{{ $pricingSelectPreviewLabels['single_plan_coupon_labels'][(string) $cupom->id] ?? ($cupom->desconto . '% OFF (' . $cupom->codigo . ')') }}</option>
                                                                             @endforeach
                                                                         </select>
                                                                         <i class="ri-arrow-down-s-line pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
@@ -1265,9 +1181,9 @@
                                                                                 :disabled="isSavingPricing || modoPrecos !== 'dois_precos'"
                                                                                 class="je-dark-field block w-full appearance-none rounded-lg px-3 py-2.5 pr-10 text-sm shadow-sm transition"
                                                                             >
-                                                                                <option value="">Padrão (sem cupom)</option>
+                                                                                <option value="">{{ $pricingSelectPreviewLabels['complete_plan_default'] ?? 'Padrão (sem cupom)' }}</option>
                                                                                 @foreach(($cupons ?? collect()) as $cupom)
-                                                                                    <option value="{{ $cupom->id }}">{{ $cupom->desconto }}% OFF ({{ $cupom->codigo }})</option>
+                                                                                    <option value="{{ $cupom->id }}">{{ $pricingSelectPreviewLabels['complete_plan_coupon_labels'][(string) $cupom->id] ?? ($cupom->desconto . '% OFF (' . $cupom->codigo . ')') }}</option>
                                                                                 @endforeach
                                                                             </select>
                                                                             <i class="ri-arrow-down-s-line pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
@@ -1285,13 +1201,13 @@
                                                                                 :disabled="isSavingPricing || modoPrecos !== 'dois_precos'"
                                                                                 class="je-dark-field block w-full appearance-none rounded-lg px-3 py-2.5 pr-10 text-sm shadow-sm transition"
                                                                             >
-                                                                                <option value="">Selecione um cupom</option>
+                                                                                <option value="">{{ $pricingSelectPreviewLabels['basic_plan_default'] ?? 'Padrão (sem cupom)' }}</option>
                                                                                 @foreach(($cupons ?? collect()) as $cupom)
                                                                                     <option
                                                                                         value="{{ $cupom->id }}"
                                                                                         :disabled="cupomPrincipalId === '{{ $cupom->id }}'"
                                                                                     >
-                                                                                        {{ $cupom->desconto }}% OFF ({{ $cupom->codigo }})
+                                                                                        {{ $pricingSelectPreviewLabels['basic_plan_coupon_labels'][(string) $cupom->id] ?? ($cupom->desconto . '% OFF (' . $cupom->codigo . ')') }}
                                                                                     </option>
                                                                                 @endforeach
                                                                             </select>

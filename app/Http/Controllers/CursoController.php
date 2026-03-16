@@ -14,6 +14,7 @@ use App\Models\Cupom;
 use App\Models\User;
 use App\Models\Dados_portal;
 use App\Models\RootDomainCourseConfig;
+use App\Services\RootDomainCoursePublicStateService;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
@@ -26,6 +27,17 @@ class CursoController extends Controller
         $home_e_cursosController = app(Home_e_cursosController::class);
         $cursos = $home_e_cursosController->listar_cursos($request, $user);
         $cupons = Cupom::orderBy('desconto')->orderBy('codigo')->get();
+
+        $pricingPreviewService = app(RootDomainCoursePublicStateService::class);
+        foreach ($cursos as $curso) {
+            if (!$curso instanceof Curso) {
+                continue;
+            }
+
+            $previewVariants = $pricingPreviewService->buildAffiliateCoursePricingPreviewVariants($curso);
+            $curso->pricing_select_preview_labels = $this->buildAffiliatePricingSelectPreviewLabels($cupons, $previewVariants);
+            $curso->countdown_destination_options = $this->buildAffiliateCountdownDestinationOptions($cupons, $previewVariants);
+        }
 
         return view('dashboard.cursos.index', compact('cursos', 'cupons')); 
         //return view('adm.cursos.afiliados_cadastrar_curso', compact('cursos')); 
@@ -625,6 +637,115 @@ class CursoController extends Controller
         return isset($dadosPortal->formulario_pre_checkout)
             ? (bool) $dadosPortal->formulario_pre_checkout
             : true;
+    }
+
+    private function buildAffiliatePricingSelectPreviewLabels($cupons, array $previewVariants): array
+    {
+        $labels = [
+            'single_plan_default' => $this->formatAffiliatePricingPreviewLabel(
+                'Padrão (sem cupom)',
+                data_get($previewVariants, 'completo_padrao.cash_value')
+            ),
+            'complete_plan_default' => $this->formatAffiliatePricingPreviewLabel(
+                'Padrão (sem cupom)',
+                data_get($previewVariants, 'completo_padrao.cash_value')
+            ),
+            'basic_plan_default' => $this->formatAffiliatePricingPreviewLabel(
+                'Padrão (sem cupom)',
+                data_get($previewVariants, 'basico_padrao.cash_value')
+            ),
+            'single_plan_coupon_labels' => [],
+            'complete_plan_coupon_labels' => [],
+            'basic_plan_coupon_labels' => [],
+        ];
+
+        foreach ($cupons as $cupom) {
+            $baseLabel = $cupom->desconto . '% OFF (' . $cupom->codigo . ')';
+            $labels['single_plan_coupon_labels'][(string) $cupom->id] = $this->formatAffiliatePricingPreviewLabel(
+                $baseLabel,
+                data_get($previewVariants, 'completo_cupom:' . $cupom->id . '.cash_value')
+            );
+            $labels['complete_plan_coupon_labels'][(string) $cupom->id] = $labels['single_plan_coupon_labels'][(string) $cupom->id];
+            $labels['basic_plan_coupon_labels'][(string) $cupom->id] = $this->formatAffiliatePricingPreviewLabel(
+                $baseLabel,
+                data_get($previewVariants, 'basico_cupom:' . $cupom->id . '.cash_value')
+            );
+        }
+
+        return $labels;
+    }
+
+    private function buildAffiliateCountdownDestinationOptions($cupons, array $previewVariants): array
+    {
+        $options = [
+            'padrao' => [
+                [
+                    'value' => 'completo_padrao',
+                    'label' => $this->formatAffiliatePricingPreviewLabel(
+                        'Plano completo - Sem cupom',
+                        data_get($previewVariants, 'completo_padrao.cash_value')
+                    ),
+                ],
+                [
+                    'value' => 'basico_padrao',
+                    'label' => $this->formatAffiliatePricingPreviewLabel(
+                        'Plano básico - Sem cupom',
+                        data_get($previewVariants, 'basico_padrao.cash_value')
+                    ),
+                ],
+            ],
+            'um_preco' => [
+                [
+                    'value' => 'completo_padrao',
+                    'label' => $this->formatAffiliatePricingPreviewLabel(
+                        'Plano completo - Sem cupom',
+                        data_get($previewVariants, 'completo_padrao.cash_value')
+                    ),
+                ],
+            ],
+            'dois_precos' => [
+                [
+                    'value' => 'completo_padrao',
+                    'label' => $this->formatAffiliatePricingPreviewLabel(
+                        'Plano completo - Sem cupom',
+                        data_get($previewVariants, 'completo_padrao.cash_value')
+                    ),
+                ],
+            ],
+        ];
+
+        foreach ($cupons as $cupom) {
+            $completeLabel = $this->formatAffiliatePricingPreviewLabel(
+                'Plano completo - ' . $cupom->desconto . '% OFF (' . $cupom->codigo . ')',
+                data_get($previewVariants, 'completo_cupom:' . $cupom->id . '.cash_value')
+            );
+            $options['um_preco'][] = [
+                'value' => 'completo_cupom:' . $cupom->id,
+                'label' => $completeLabel,
+            ];
+            $options['dois_precos'][] = [
+                'value' => 'completo_cupom:' . $cupom->id,
+                'label' => $completeLabel,
+            ];
+            $options['dois_precos'][] = [
+                'value' => 'basico_cupom:' . $cupom->id,
+                'label' => $this->formatAffiliatePricingPreviewLabel(
+                    'Plano básico - ' . $cupom->desconto . '% OFF (' . $cupom->codigo . ')',
+                    data_get($previewVariants, 'basico_cupom:' . $cupom->id . '.cash_value')
+                ),
+            ];
+        }
+
+        return $options;
+    }
+
+    private function formatAffiliatePricingPreviewLabel(string $baseLabel, ?string $priceLabel): string
+    {
+        $priceLabel = trim((string) $priceLabel);
+
+        return $priceLabel !== ''
+            ? $baseLabel . ' - ' . $priceLabel
+            : $baseLabel;
     }
  
     public function updateOrder(Request $request)

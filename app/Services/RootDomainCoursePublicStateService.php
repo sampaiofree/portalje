@@ -333,6 +333,47 @@ class RootDomainCoursePublicStateService
         ];
     }
 
+    public function buildAffiliateCoursePricingPreviewVariants(Curso $curso): array
+    {
+        $precoCompletoOriginal = $this->extractMonetaryValue($curso->preco_cheio_completo ?? null);
+        $precoParceladoOriginal = $this->extractMonetaryValue($curso->preco_parcelado_completo ?? null);
+        $cursoBasePricing = $this->prepareCoursePricingBase($curso);
+
+        if ($precoCompletoOriginal === null) {
+            $cursoBasePricing->preco_cheio_completo = null;
+            $cursoBasePricing->preco_cheio_basico = null;
+        }
+
+        if ($precoParceladoOriginal === null) {
+            $cursoBasePricing->preco_parcelado_completo = null;
+            $cursoBasePricing->preco_parcelado_basico = null;
+        }
+
+        $variants = [
+            'completo_padrao' => $this->buildOfferPayloadFromCourse($cursoBasePricing, 'completo'),
+            'basico_padrao' => $this->buildOfferPayloadFromCourse($cursoBasePricing, 'basico'),
+        ];
+
+        if (!Schema::hasTable('cupons')) {
+            return $variants;
+        }
+
+        $cupons = Cupom::query()->orderBy('id')->get();
+        foreach ($cupons as $cupom) {
+            $variants['completo_cupom:' . $cupom->id] = $this->buildOfferPayloadFromCourse(
+                $this->applyOfferCouponOnClonedCourse($cursoBasePricing, 'completo', $cupom),
+                'completo'
+            );
+
+            $variants['basico_cupom:' . $cupom->id] = $this->buildOfferPayloadFromCourse(
+                $this->applyOfferCouponOnClonedCourse($cursoBasePricing, 'basico', $cupom),
+                'basico'
+            );
+        }
+
+        return $variants;
+    }
+
     public function applyPricingConfigurationByCoupon(Curso $curso, array $dados, bool $descontoBannerAtivo): void
     {
         $modoPrecos = $dados['modo_precos'] ?? 'padrao';

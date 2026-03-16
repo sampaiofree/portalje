@@ -206,11 +206,12 @@
                                     ->orderByDesc('updated_at')
                                     ->orderBy('id')
                                     ->get();
+                                $w3FloatWhatsappPadrao = $w3FloatWhatsappOptions->contains('id', Auth::user()->w3_whatsapp_float_whatsapp_atendimento_id)
+                                    ? (string) Auth::user()->w3_whatsapp_float_whatsapp_atendimento_id
+                                    : (string) optional($w3FloatWhatsappOptions->first())->id;
                                 $w3FloatChannelAtual = old(
                                     'w3_whatsapp_float_channel',
-                                    $w3FloatWhatsappOptions->contains('id', Auth::user()->w3_whatsapp_float_whatsapp_atendimento_id)
-                                        ? (string) Auth::user()->w3_whatsapp_float_whatsapp_atendimento_id
-                                        : 'rodizio'
+                                    $w3FloatWhatsappPadrao
                                 );
                             @endphp
                             <div>
@@ -249,7 +250,9 @@
                                     name="w3_whatsapp_float_channel"
                                     class="mt-1 px-4 py-3 bg-gray-100 focus:bg-white block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
                                 >
-                                    <option value="rodizio" @selected($w3FloatChannelAtual === 'rodizio')>Rodízio (automático)</option>
+                                    @if($w3FloatWhatsappOptions->isEmpty())
+                                        <option value="">Cadastre um WhatsApp ativo</option>
+                                    @endif
                                     @foreach($w3FloatWhatsappOptions as $w3FloatWhatsappOption)
                                         <option value="{{ $w3FloatWhatsappOption->id }}" @selected($w3FloatChannelAtual === (string) $w3FloatWhatsappOption->id)>
                                             {{ $w3FloatWhatsappOption->whatsapp }}
@@ -257,9 +260,9 @@
                                     @endforeach
                                 </select>
                                 @if($w3FloatWhatsappOptions->isEmpty())
-                                    <p class="mt-1 text-xs text-yellow-700">Nenhum WhatsApp ativo encontrado. O botão flutuante continuará usando o rodízio atual.</p>
+                                    <p class="mt-1 text-xs text-yellow-700">Nenhum WhatsApp ativo encontrado. Cadastre um número de atendimento para usar no botão flutuante.</p>
                                 @else
-                                    <p class="mt-1 text-xs text-gray-500">Escolha um número fixo ou mantenha em rodízio para usar a lógica automática já existente.</p>
+                                    <p class="mt-1 text-xs text-gray-500">Escolha qual número será usado no botão flutuante.</p>
                                 @endif
                                 <x-input-error :messages="$errors->get('w3_whatsapp_float_channel')" class="mt-2" />
                             </div>

@@ -36,9 +36,10 @@ class DashboardHomeLayoutPreferenceTest extends TestCase
         $response->assertSee('id="w3_whatsapp_float_enabled"', false);
         $response->assertSee('id="w3_whatsapp_float_delay_seconds"', false);
         $response->assertSee('id="w3_whatsapp_float_channel"', false);
-        $response->assertSee('Rodízio (automático)');
+        $response->assertDontSee('Rodízio (automático)');
         $response->assertSee('5511999991111');
         $response->assertSee('Configuração aplicada à home (/) e /cursos, além da W3 (/w3 e /w3/{cidade}).', false);
+        $response->assertSee('Escolha qual número será usado no botão flutuante.');
     }
 
     public function test_configurar_site2_shows_logo_remove_icons_only_when_custom_logo_exists(): void

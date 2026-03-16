@@ -170,4 +170,78 @@ class AfiliadosCupomSelectTest extends TestCase
         $response->assertSee('Plano completo - Sem cupom - R$197,00');
         $response->assertSee('25OFF) - R$147,75');
     }
+
+    public function test_afiliados_cadastrar_curso_renders_final_price_in_individual_public_page_price_selects(): void
+    {
+        $this->withoutMiddleware(MinhaJornada::class);
+
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+        ]);
+
+        $curso = Curso::create([
+            'titulo' => 'Curso Preview de Preço',
+            'url' => 'curso-preview-preco',
+            'publicado' => true,
+            'permitir_afiliacao' => true,
+            'preco_cheio_completo' => 'R$197',
+            'codigo_afiliado_plano_completo' => 'abc123',
+            'link_checkout_completo' => 'https://go.hotmart.com/T99999999A?ap=abc123',
+        ]);
+
+        Codigo_ref::create([
+            'user_id' => $user->id,
+            'curso_id' => $curso->id,
+            'codigo_ref' => 'REFPREVIEW123',
+            'mostrar_curso' => true,
+            'modo_precos' => 'dois_precos',
+        ]);
+
+        Cupom::create(['codigo' => '10OFF', 'desconto' => 10]);
+        Cupom::create(['codigo' => '25OFF', 'desconto' => 25]);
+
+        $response = $this->actingAs($user)->get(route('cadastrar_cursos'));
+
+        $response->assertOk();
+        $response->assertSee('Padrão (sem cupom) - R$197,00');
+        $response->assertSee('10% OFF (10OFF) - R$177,30');
+        $response->assertSee('25% OFF (25OFF) - R$147,75');
+        $response->assertSee('Padrão (sem cupom) - R$98,50');
+    }
+
+    public function test_afiliados_cadastrar_curso_falls_back_to_plain_labels_when_price_is_invalid(): void
+    {
+        $this->withoutMiddleware(MinhaJornada::class);
+
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+        ]);
+
+        $curso = Curso::create([
+            'titulo' => 'Curso Sem Preço Válido',
+            'url' => 'curso-sem-preco-valido',
+            'publicado' => true,
+            'permitir_afiliacao' => true,
+            'preco_cheio_completo' => 'consulte',
+            'codigo_afiliado_plano_completo' => 'abc123',
+            'link_checkout_completo' => 'https://go.hotmart.com/T99999999A?ap=abc123',
+        ]);
+
+        Codigo_ref::create([
+            'user_id' => $user->id,
+            'curso_id' => $curso->id,
+            'codigo_ref' => 'REFINVALIDOPRECO',
+            'mostrar_curso' => true,
+            'modo_precos' => 'um_preco',
+        ]);
+
+        Cupom::create(['codigo' => '10OFF', 'desconto' => 10]);
+
+        $response = $this->actingAs($user)->get(route('cadastrar_cursos'));
+
+        $response->assertOk();
+        $response->assertSee('Padrão (sem cupom)');
+        $response->assertDontSee('Padrão (sem cupom) - R$', false);
+        $response->assertSee('10% OFF (10OFF)');
+    }
 }
