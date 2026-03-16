@@ -12,7 +12,9 @@ use App\Models\PurchaseEvent;
 use App\Models\WhatsappAtendimento;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Carbon\Carbon;
+use App\Notifications\EmailVerificationCodeNotification;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
@@ -27,12 +29,20 @@ class User extends Authenticatable implements MustVerifyEmail
         'name',
         'email',
         'email_verified_at',
+        'email_verification_code_hash',
+        'email_verification_code_expires_at',
+        'email_verification_code_sent_at',
         'password',
         'nivel_acesso',
         'thumb',
         'cpf',
         'telefone_pessoal_1',
+        'telefone_pessoal_1_pending',
         'telefone_pessoal_2',
+        'telefone_pessoal_1_verification_code_hash',
+        'telefone_pessoal_1_verification_code_expires_at',
+        'telefone_pessoal_1_verification_code_sent_at',
+        'telefone_pessoal_1_verified_at',
         'apelido',
         'nome_empresa',
         'logo_padrao_path',
@@ -67,11 +77,18 @@ class User extends Authenticatable implements MustVerifyEmail
     protected $hidden = [
         'password',
         'remember_token',
+        'email_verification_code_hash',
+        'telefone_pessoal_1_verification_code_hash',
     ];
 
     protected $casts = [
         'email_verified_at' => 'datetime',
+        'email_verification_code_expires_at' => 'datetime',
+        'email_verification_code_sent_at' => 'datetime',
         'password' => 'hashed',
+        'telefone_pessoal_1_verification_code_expires_at' => 'datetime',
+        'telefone_pessoal_1_verification_code_sent_at' => 'datetime',
+        'telefone_pessoal_1_verified_at' => 'datetime',
         'w3_whatsapp_float_enabled' => 'boolean',
         'w3_whatsapp_float_delay_seconds' => 'integer',
         'home_page_destination' => 'string',
@@ -80,6 +97,107 @@ class User extends Authenticatable implements MustVerifyEmail
         'logo_padrao_path' => 'string',
         'logo_dark_path' => 'string',
     ];
+
+    public function sendEmailVerificationNotification(): void
+    {
+        $code = $this->issueEmailVerificationCode();
+
+        $this->notify(new EmailVerificationCodeNotification($code));
+    }
+
+    public function issueEmailVerificationCode(int $minutes = 15): string
+    {
+        $code = $this->generateVerificationCode();
+
+        $this->forceFill([
+            'email_verification_code_hash' => Hash::make($code),
+            'email_verification_code_expires_at' => now()->addMinutes($minutes),
+            'email_verification_code_sent_at' => now(),
+        ])->save();
+
+        return $code;
+    }
+
+    public function clearEmailVerificationCode(): void
+    {
+        $this->forceFill([
+            'email_verification_code_hash' => null,
+            'email_verification_code_expires_at' => null,
+            'email_verification_code_sent_at' => null,
+        ])->save();
+    }
+
+    public function matchesEmailVerificationCode(string $code): bool
+    {
+        $hash = (string) ($this->email_verification_code_hash ?? '');
+        $expiresAt = $this->email_verification_code_expires_at;
+
+        if ($hash === '' || !$expiresAt || now()->greaterThan($expiresAt)) {
+            return false;
+        }
+
+        return Hash::check($code, $hash);
+    }
+
+    public function issuePhoneVerificationCode(string $phone, int $minutes = 15): string
+    {
+        $code = $this->generateVerificationCode();
+
+        $this->forceFill([
+            'telefone_pessoal_1_pending' => $phone,
+            'telefone_pessoal_1_verification_code_hash' => Hash::make($code),
+            'telefone_pessoal_1_verification_code_expires_at' => now()->addMinutes($minutes),
+            'telefone_pessoal_1_verification_code_sent_at' => now(),
+        ])->save();
+
+        return $code;
+    }
+
+    public function clearPhoneVerificationCode(): void
+    {
+        $this->forceFill([
+            'telefone_pessoal_1_pending' => null,
+            'telefone_pessoal_1_verification_code_hash' => null,
+            'telefone_pessoal_1_verification_code_expires_at' => null,
+            'telefone_pessoal_1_verification_code_sent_at' => null,
+        ])->save();
+    }
+
+    public function matchesPhoneVerificationCode(string $code): bool
+    {
+        $hash = (string) ($this->telefone_pessoal_1_verification_code_hash ?? '');
+        $expiresAt = $this->telefone_pessoal_1_verification_code_expires_at;
+
+        if ($hash === '' || !$expiresAt || now()->greaterThan($expiresAt)) {
+            return false;
+        }
+
+        return Hash::check($code, $hash);
+    }
+
+    public function confirmPhoneVerification(): void
+    {
+        $pendingPhone = trim((string) ($this->telefone_pessoal_1_pending ?? ''));
+
+        $this->forceFill([
+            'telefone_pessoal_1' => $pendingPhone !== '' ? $pendingPhone : $this->telefone_pessoal_1,
+            'telefone_pessoal_1_pending' => null,
+            'telefone_pessoal_1_verification_code_hash' => null,
+            'telefone_pessoal_1_verification_code_expires_at' => null,
+            'telefone_pessoal_1_verification_code_sent_at' => null,
+            'telefone_pessoal_1_verified_at' => now(),
+        ])->save();
+    }
+
+    public function hasVerifiedPhone(): bool
+    {
+        return !empty($this->telefone_pessoal_1) && !empty($this->telefone_pessoal_1_verified_at);
+    }
+
+    private function generateVerificationCode(int $length = 6): string
+    {
+        return str_pad((string) random_int(0, (10 ** $length) - 1), $length, '0', STR_PAD_LEFT);
+    }
 
     public function codigo_ref()
     {

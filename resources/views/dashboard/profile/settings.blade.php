@@ -20,7 +20,26 @@
                         <div class="mt-6 space-y-4">
                             <div>
                                 <x-input-label for="telefone_pessoal_1" value="Telefone Pessoal 1" />
-                                <x-text-input id="telefone_pessoal_1" name="telefone_pessoal_1" type="number" class="px-4 py-3 bg-gray-100 focus:bg-white mt-1 block w-full" :value="old('telefone_pessoal_1', Auth::user()->telefone_pessoal_1)" placeholder="Ex: 5562999998888" />
+                                <x-text-input
+                                    id="telefone_pessoal_1"
+                                    name="telefone_pessoal_1"
+                                    type="text"
+                                    inputmode="numeric"
+                                    pattern="[0-9]{12,14}"
+                                    class="px-4 py-3 bg-gray-100 focus:bg-white mt-1 block w-full"
+                                    :value="old('telefone_pessoal_1', Auth::user()->telefone_pessoal_1_pending ?: Auth::user()->telefone_pessoal_1)"
+                                    placeholder="Ex: 5562999998888"
+                                />
+                                @if(Auth::user()->telefone_pessoal_1_verified_at)
+                                    <p class="mt-1 text-xs text-green-700">
+                                        Numero validado em {{ Auth::user()->telefone_pessoal_1_verified_at->format('d/m/Y H:i') }}.
+                                    </p>
+                                @endif
+                                @if(Auth::user()->telefone_pessoal_1_pending)
+                                    <p class="mt-1 text-xs text-amber-700">
+                                        Novo numero pendente de confirmacao. <a href="{{ route('phone.verification.notice') }}" class="underline">Concluir verificacao</a>.
+                                    </p>
+                                @endif
                             </div>
                             <div>
                                 <x-input-label for="telefone_pessoal_2" value="Telefone Pessoal 2" />

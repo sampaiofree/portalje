@@ -42,7 +42,12 @@ class BotConversa
     {
         $response = Http::timeout($this->timeout)->post($webhook, $dados);
 
-        return $this->decodeResponse($response);
+        return [
+            'status' => $response->status(),
+            'successful' => $response->successful(),
+            'body' => $response->body(),
+            'data' => $response->json(),
+        ];
     }
 
     /** Objetivo: Listar os campos de bot disponiveis. */

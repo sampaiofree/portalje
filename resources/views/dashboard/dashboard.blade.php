@@ -341,27 +341,36 @@
 
                 <!-- PASSO 4: ANÁLISE E OTIMIZAÇÃO -->
                 <div class="bg-white bg-gray-800 p-6 rounded-lg shadow-sm">
+                    @php
+                        $quantidadeVendas = $quantidade_vendas ?? 0;
+                        $totalSum = $total_sum ?? 0;
+                        $vencidosResumo = $vencidos ?? ['n' => 0, 'soma' => 0];
+                        $dashboardResumo = array_merge([
+                            'conversao_vendas' => null,
+                            'totalLeads' => 0,
+                        ], $dashboard ?? []);
+                    @endphp
                     <h3 class="text-xl font-semibold mb-4 flex items-center text-gray-900 text-gray-100"><span class="bg-blue-500 text-white rounded-full h-8 w-8 flex items-center justify-center mr-3 text-sm">4</span>Análise de Resultados</h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        @if($quantidade_vendas)
+                        @if($quantidadeVendas)
                             <div class="text-center p-4 border border-gray-700 rounded-lg">
                                 <div class="text-sm font-medium text-gray-500 text-gray-400 uppercase">Faturamento Bruto</div>
-                                <div class="text-4xl font-bold text-gray-800 text-gray-200 mt-2">R${{ number_format($total_sum, 2, ',', '.') }}</div>
-                                <div class="text-sm text-gray-500 text-gray-400 mt-1">{{ $quantidade_vendas}} Vendas Totais</div>
+                                <div class="text-4xl font-bold text-gray-800 text-gray-200 mt-2">R${{ number_format($totalSum, 2, ',', '.') }}</div>
+                                <div class="text-sm text-gray-500 text-gray-400 mt-1">{{ $quantidadeVendas }} Vendas Totais</div>
                             </div>
                         @endif
-                         @if($vencidos && $vencidos['n'] > 0)
+                         @if($vencidosResumo['n'] > 0)
                             <div class="text-center p-4 bg-yellow-50  border border-yellow-300 border-yellow-700 rounded-lg">
                                 <div class="text-sm font-medium text-yellow-600 text-yellow-400 uppercase">A Recuperar</div>
-                                <div class="text-4xl font-bold text-red-600 text-red-400 mt-2">R${{ number_format($vencidos['soma'], 2, ',', '.') }}</div>
-                                <div class="text-sm text-yellow-600 text-yellow-400 mt-1">{{ $vencidos['n']}} vendas expiradas</div>
+                                <div class="text-4xl font-bold text-red-600 text-red-400 mt-2">R${{ number_format($vencidosResumo['soma'], 2, ',', '.') }}</div>
+                                <div class="text-sm text-yellow-600 text-yellow-400 mt-1">{{ $vencidosResumo['n'] }} vendas expiradas</div>
                             </div>
                         @endif
-                        @if($dashboard['conversao_vendas'])
+                        @if($dashboardResumo['conversao_vendas'])
                              <div class="text-center p-4 border border-gray-700 rounded-lg">
                                 <div class="text-sm font-medium text-gray-500 text-gray-400 uppercase">Taxa de Conversão</div>
-                                <div class="text-4xl font-bold mt-2 {{ $dashboard['conversao_vendas']<5 ? 'text-red-500' : 'text-green-500' }}">{{$dashboard['conversao_vendas']}}%</div>
-                                <div class="text-sm text-gray-500 text-gray-400 mt-1">{{$dashboard['totalLeads']}} leads → {{$quantidade_vendas}} vendas</div>
+                                <div class="text-4xl font-bold mt-2 {{ $dashboardResumo['conversao_vendas'] < 5 ? 'text-red-500' : 'text-green-500' }}">{{ $dashboardResumo['conversao_vendas'] }}%</div>
+                                <div class="text-sm text-gray-500 text-gray-400 mt-1">{{ $dashboardResumo['totalLeads'] }} leads → {{ $quantidadeVendas }} vendas</div>
                             </div>
                         @endif
                     </div>

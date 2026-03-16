@@ -6,6 +6,7 @@ use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Session\TokenMismatchException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
+use App\Http\Middleware\EnsurePhoneIsVerified;
 use App\Http\Middleware\MinhaJornada;
 use App\Http\Middleware\CheckAdmin;
 use App\Http\Middleware\RedirectWwwToNonWww;
@@ -21,6 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'minha_jornada' => MinhaJornada::class,
             'check.admin' => CheckAdmin::class,
+            'verified.phone' => EnsurePhoneIsVerified::class,
         ]);
 
         

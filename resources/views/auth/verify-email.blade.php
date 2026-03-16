@@ -1,36 +1,61 @@
 <x-guest-layout>
-    {{-- Bloco de mensagem de sucesso ao reenviar o e-mail --}}
-    @if (session('status') == 'verification-link-sent')
-        <div class="mb-4 font-medium text-sm text-green-600">
-            Um novo link de verificação foi enviado para o seu endereço de e-mail.
+    @if (session('status') === 'verification-code-sent')
+        <div class="mb-4 rounded-md bg-green-50 px-4 py-3 text-sm text-green-700">
+            Enviamos um novo codigo de verificacao para {{ Auth::user()->email }}.
         </div>
     @endif
 
-    <div class="mb-4 text-sm text-gray-600">
-        Antes de continuar, por favor, verifique seu e-mail para encontrar o link de verificação. Se você não recebeu o e-mail, clique no botão abaixo para solicitar um novo.
+    @if (session('status') === 'email-verified')
+        <div class="mb-4 rounded-md bg-green-50 px-4 py-3 text-sm text-green-700">
+            E-mail confirmado com sucesso.
+        </div>
+    @endif
+
+    <div class="mb-4">
+        <h1 class="text-lg font-semibold text-gray-900">Confirme seu e-mail</h1>
+        <p class="mt-2 text-sm text-gray-600">
+            Digite o codigo de 6 digitos enviado para <strong>{{ Auth::user()->email }}</strong>.
+        </p>
     </div>
 
-    {{-- O Breeze geralmente coloca os botões de Reenviar e Sair lado a lado --}}
-    <div class="mt-4 flex items-center justify-between">
+    <form method="POST" action="{{ route('verification.code') }}" class="space-y-4">
+        @csrf
+
+        <div>
+            <x-input-label for="code" value="Codigo de verificacao" />
+            <x-text-input
+                id="code"
+                name="code"
+                type="text"
+                inputmode="numeric"
+                pattern="[0-9]{6}"
+                maxlength="6"
+                class="mt-1 block w-full bg-gray-100 p-3 tracking-[0.35em] text-center text-lg"
+                :value="old('code')"
+                required
+                autofocus
+            />
+            <x-input-error :messages="$errors->get('code')" class="mt-2" />
+        </div>
+
+        <x-primary-button class="w-full justify-center">
+            Confirmar e-mail
+        </x-primary-button>
+    </form>
+
+    <div class="mt-6 flex items-center justify-between gap-4">
         <form method="POST" action="{{ route('verification.send') }}">
             @csrf
-
-            <x-primary-button>
-                Reenviar e-mail
-            </x-primary-button>
+            <x-secondary-button>
+                Reenviar codigo
+            </x-secondary-button>
         </form>
 
         <form method="POST" action="{{ route('logout') }}">
             @csrf
-
-            <button type="submit" class="underline text-sm text-gray-600 hover:text-gray-900 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+            <button type="submit" class="text-sm text-gray-600 underline hover:text-gray-900">
                 Sair
             </button>
         </form>
-    </div>
-
-    {{-- Sua mensagem customizada, estilizada com Tailwind --}}
-    <div class="border-t pt-4 mt-4 text-center text-sm text-gray-500">
-        Se você estiver com dificuldades para ativar sua conta, entre em contato pelo WhatsApp <a href="https://wa.me/5562995772922" target="_blank" class="underline">(62) 99577-2922</a>.
     </div>
 </x-guest-layout>

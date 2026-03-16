@@ -34,7 +34,7 @@ class VerificationController extends Controller
      */
     public function __construct()
     {
-        $this->redirectTo = route('home');
+        $this->redirectTo = route('phone.verification.notice');
         $this->middleware('auth');
         $this->middleware('signed')->only('verify');
         $this->middleware('throttle:6,1')->only('verify', 'resend');

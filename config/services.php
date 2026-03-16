@@ -45,4 +45,10 @@ return [
         'timeout' => env('HOTMART_TIMEOUT', 30),
     ],
 
+    'botconversa' => [
+        'verification_webhook_url' => env('BOTCONVERSA_VERIFICATION_WEBHOOK_URL'),
+        'verification_request_phone' => env('BOTCONVERSA_VERIFICATION_REQUEST_PHONE'),
+        'verification_request_text' => env('BOTCONVERSA_VERIFICATION_REQUEST_TEXT', 'Solicito meu codigo de verificacao'),
+    ],
+
 ];

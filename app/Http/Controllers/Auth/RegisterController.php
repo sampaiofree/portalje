@@ -38,7 +38,7 @@ class RegisterController extends Controller
     public function __construct()
     {
         $this->middleware('guest');
-        $this->redirectTo = route('home');
+        $this->redirectTo = route('verification.notice');
     }
 
     /**

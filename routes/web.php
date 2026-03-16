@@ -31,6 +31,10 @@ use App\Http\Controllers\LandingPageController;
 use App\Http\Controllers\FacebookConversionsController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Afiliados\CatalogoController;
+use App\Http\Controllers\Auth\EmailVerificationCodeController;
+use App\Http\Controllers\Auth\EmailVerificationNotificationController;
+use App\Http\Controllers\Auth\EmailVerificationPromptController;
+use App\Http\Controllers\Auth\PhoneVerificationController;
 use Laravel\Folio\Folio; 
 
 //require __DIR__.'/auth.php';
@@ -111,7 +115,17 @@ Route::view('/afiliados/termos', 'termos_e_politica.termos_uso')->name('afiliado
 Route::view('/afiliados/politica', 'termos_e_politica.politica')->name('afiliados_politica'); 
  
 /*ROTAS DOS USUARIOS |EXIGE EMAIL EMAIL AUTENTICADO */
-Route::middleware(['auth', 'verified', 'minha_jornada'])->group(function () {
+Route::middleware(['auth', 'verified'])->prefix('user')->group(function () {
+    Route::get('/verificar-whatsapp', [PhoneVerificationController::class, 'show'])->name('phone.verification.notice');
+    Route::post('/verificar-whatsapp/enviar', [PhoneVerificationController::class, 'send'])
+        ->middleware('throttle:6,1')
+        ->name('phone.verification.send');
+    Route::post('/verificar-whatsapp/confirmar', [PhoneVerificationController::class, 'confirm'])
+        ->middleware('throttle:10,1')
+        ->name('phone.verification.confirm');
+});
+
+Route::middleware(['auth', 'verified', 'verified.phone', 'minha_jornada'])->group(function () {
     Route::prefix('user')->group(function () {
         /**META API */
         Route::get('/auto_ads/auto_ads', [Meta_apiController::class, 'auto_ads'])->name('auto_ads');
@@ -320,20 +334,22 @@ Route::get('/redirect', [RedirectController::class, 'redirectWithUrl'])->name('r
 
 /**EMAIL NOTIFICAÇÕES DE CADASTRO E REDEFINIÇÃO DE SENHA**/
 Route::prefix('email')->group(function () {
-    Route::get('/verify', function () {
-        return view('auth.verify-email');
-    })->middleware('auth')->name('verification.notice');
+    Route::get('/verify', EmailVerificationPromptController::class)->middleware('auth')->name('verification.notice');
+
+    Route::post('/verify-code', [EmailVerificationCodeController::class, 'store'])
+        ->middleware(['auth', 'throttle:10,1'])
+        ->name('verification.code');
 
     Route::get('/verify/{id}/{hash}', function (EmailVerificationRequest $request) {
         $request->fulfill(); // Marca o e-mail como verificado
-        return redirect()->route('home')->with('message', 'E-mail verificado com sucesso!');
+        $request->user()->clearEmailVerificationCode();
+        return redirect()->route('phone.verification.notice')->with('status', 'email-verified');
     })->middleware(['auth', 'signed'])->name('verification.verify');
     
 
-    Route::post('/verification-notification', function (Request $request) {
-        $request->user()->sendEmailVerificationNotification();
-        return back()->with('message', 'Verification link sent!');
-    })->middleware(['auth', 'throttle:6,1'])->name('verification.send');
+    Route::post('/verification-notification', [EmailVerificationNotificationController::class, 'store'])
+        ->middleware(['auth', 'throttle:6,1'])
+        ->name('verification.send');
 });
 
 //LOGIN DOS AFILIADOS

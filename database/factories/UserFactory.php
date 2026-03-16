@@ -27,6 +27,8 @@ class UserFactory extends Factory
             'name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
+            'telefone_pessoal_1' => '556299999' . fake()->numerify('####'),
+            'telefone_pessoal_1_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
         ];
@@ -39,6 +41,18 @@ class UserFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'email_verified_at' => null,
+        ]);
+    }
+
+    public function unverifiedPhone(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'telefone_pessoal_1' => null,
+            'telefone_pessoal_1_pending' => null,
+            'telefone_pessoal_1_verified_at' => null,
+            'telefone_pessoal_1_verification_code_hash' => null,
+            'telefone_pessoal_1_verification_code_expires_at' => null,
+            'telefone_pessoal_1_verification_code_sent_at' => null,
         ]);
     }
 }

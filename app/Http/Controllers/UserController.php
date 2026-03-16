@@ -13,6 +13,7 @@ use App\Http\Controllers\Home_e_cursosController;
 
 use App\Models\PurchaseEvent;
 use App\Models\WhatsappAtendimento;
+use App\Services\PhoneVerificationService;
 
 class UserController extends Controller 
 {
@@ -258,7 +259,7 @@ class UserController extends Controller
         return $host !== '' ? $host : null;
     }
 
-    public function afiliado_configurar_site(Request $request)
+    public function afiliado_configurar_site(Request $request, PhoneVerificationService $phoneVerificationService)
     {
 
         //printf($request->input('formulario_whatsapp'));
@@ -271,6 +272,8 @@ class UserController extends Controller
     //    ]);
 
         $request->validate([
+            'telefone_pessoal_1' => 'nullable|regex:/^[0-9]{12,14}$/',
+            'telefone_pessoal_2' => 'nullable|regex:/^[0-9]{12,14}$/',
             'w3_whatsapp_float_enabled' => 'nullable|boolean',
             'w3_whatsapp_float_delay_seconds' => 'nullable|in:0,5,10,20,30,45,60,120',
             'nome_empresa' => 'nullable|string|max:120',
@@ -282,14 +285,20 @@ class UserController extends Controller
 
         // Atualizar os dados do usuário
         $user = Auth::user();
+        $requestedPhone1 = preg_replace('/\D/', '', (string) $request->input('telefone_pessoal_1'));
+        $currentPhone1 = preg_replace('/\D/', '', (string) $user->telefone_pessoal_1);
+        $shouldReverifyPhone1 = $requestedPhone1 !== '' && $requestedPhone1 !== $currentPhone1;
+
         $user->formulario_whatsapp = $request->has('formulario_whatsapp')
             ? $request->boolean('formulario_whatsapp')
             : (bool) ($user->formulario_whatsapp ?? true);
         $user->formulario_pre_checkout = $request->has('formulario_pre_checkout')
             ? $request->boolean('formulario_pre_checkout')
             : (bool) ($user->formulario_pre_checkout ?? true);
-        $user->telefone_pessoal_1 = $request->input('telefone_pessoal_1')??null;
-        $user->telefone_pessoal_2 = $request->input('telefone_pessoal_2')??null;
+        if (!$shouldReverifyPhone1 && $requestedPhone1 !== '') {
+            $user->telefone_pessoal_1 = $requestedPhone1;
+        }
+        $user->telefone_pessoal_2 = preg_replace('/\D/', '', (string) $request->input('telefone_pessoal_2')) ?: null;
         $user->apelido = $request->input('apelido')??null;
         $user->meta_pixel_id = $request->input('meta_pixel_id')??null;
         $user->meta_pixel_api = $request->input('meta_pixel_api')??null;
@@ -350,6 +359,14 @@ class UserController extends Controller
         }
 
         $user->save();
+
+        if ($shouldReverifyPhone1) {
+            $phoneVerificationService->start($user, $requestedPhone1);
+
+            return redirect()
+                ->route('phone.verification.notice')
+                ->with('status', 'phone-code-sent');
+        }
 
         // Retornar resposta JSON
         return redirect()->back()->with('success', "Configurações alteradas com sucesso!");
