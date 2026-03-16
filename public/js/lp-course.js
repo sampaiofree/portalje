@@ -18,6 +18,7 @@
     var leadForm = document.getElementById('lead-form');
     var leadSubmit = document.getElementById('lead-submit');
     var leadError = document.getElementById('lead-form-error');
+    var leadEmail = document.getElementById('lead_email');
     var leadPhone = document.getElementById('lead_telefone');
     var selectedCheckoutInput = document.getElementById('selected_checkout_url');
     var testimonialsSection = document.getElementById('depoimentos');
@@ -210,7 +211,7 @@
         leadModal.setAttribute('aria-hidden', 'true');
     }
 
-    function prepareCheckoutUrl(baseUrl, buyerName, buyerDigits) {
+    function prepareCheckoutUrl(baseUrl, buyerName, buyerEmail, buyerDigits) {
         var checkoutUrl = decodeHtmlEntities(baseUrl || '').replace('{nome}', encodeURIComponent(buyerName));
         if (!checkoutUrl || checkoutUrl === '#') {
             return window.location.href;
@@ -218,12 +219,11 @@
 
         try {
             var parsed = new URL(checkoutUrl, window.location.origin);
-            var ddd = buyerDigits.slice(0, 2);
-            var phone = buyerDigits.slice(2);
 
             parsed.searchParams.set('name', buyerName);
-            parsed.searchParams.set('phoneac', ddd);
-            parsed.searchParams.set('phonenumber', phone);
+            parsed.searchParams.set('email', buyerEmail);
+            parsed.searchParams.set('phoneac', buyerDigits);
+            parsed.searchParams.delete('phonenumber');
 
             return parsed.toString();
         } catch (error) {
@@ -961,10 +961,17 @@
 
         var leadName = document.getElementById('lead_nome');
         var nameValue = (leadName ? leadName.value : '').trim();
+        var emailValue = (leadEmail ? leadEmail.value : '').trim();
         var phoneDigits = normalizeDigits(leadPhone ? leadPhone.value : '');
+        var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
         if (nameValue.length < 3) {
             showLeadError('Informe seu nome completo para continuar.');
+            return;
+        }
+
+        if (!emailRegex.test(emailValue)) {
+            showLeadError('Informe um e-mail válido para continuar.');
             return;
         }
 
@@ -984,6 +991,7 @@
         var payload = {
             _token: tokenField ? tokenField.value : (config.csrf_token || ''),
             nome: nameValue,
+            email: emailValue,
             telefone: phoneDigits,
             user_id: document.getElementById('lead_user_id') ? document.getElementById('lead_user_id').value : '',
             curso_id: document.getElementById('lead_curso_id') ? document.getElementById('lead_curso_id').value : '',
@@ -1001,7 +1009,7 @@
         sendLeadPayload(payload);
 
         var checkoutToUse = selectedCheckoutUrl || (selectedCheckoutInput ? selectedCheckoutInput.value : window.location.href);
-        var redirectUrl = prepareCheckoutUrl(checkoutToUse, nameValue, phoneDigits);
+        var redirectUrl = prepareCheckoutUrl(checkoutToUse, nameValue, emailValue, phoneDigits);
 
         window.setTimeout(function () {
             window.location.href = redirectUrl;

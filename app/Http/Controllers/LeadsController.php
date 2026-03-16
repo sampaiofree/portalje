@@ -72,11 +72,16 @@ class LeadsController extends Controller
         $telefone = preg_replace('/\D/', '', $request->input('telefone')) ?? null;
         Log::info('Telefone formatado.', ['telefone' => $telefone]);
 
+        $email = trim((string) $request->input('email', ''));
+        $email = $email !== '' ? $email : null;
+        Log::info('Email formatado.', ['email' => $email]);
+
         $curso = Curso::find($request->input('curso_id'));
         Log::info('Curso buscado.', ['curso' => $curso]);
 
         $data = [
             "id" => (string)Str::uuid(),
+            "buyer_email" => $email,
             "buyer_name" => $request->input('nome') ?? null,
             "buyer_checkout_phone" => $telefone ?? null,
             "product_id" => $curso->codigo_id_hotmart ?? null,
@@ -92,6 +97,7 @@ class LeadsController extends Controller
             ["buyer_checkout_phone" => $telefone],
             [
                 "id" => (string)Str::uuid(),
+                "buyer_email" => $email,
                 "buyer_name" => $request->input('nome') ?? null,
                 "buyer_checkout_phone" => $telefone ?? null,
                 "product_id" => $curso->codigo_id_hotmart ?? null,
@@ -136,13 +142,13 @@ class LeadsController extends Controller
                 "whatsapp_phone"=> "55".$telefone ?? "",
                 "cliente_telefone" =>"55".$telefone ?? "",
                 'cidade' => $request->input('cidade') ?? "",
-                "email"=> "",
+                "email"=> $email ?? "",
                 "gender"=> "string",
                 "has_opt_in_sms"=> true,
                 "has_opt_in_email"=> true,
                 "consent_phrase"=> "string",
                 "boleto_link" => "",
-                "cliente_email" => "",
+                "cliente_email" => $email ?? "",
                 "cliente_nome" => $request->input('nome'),
                 
                 "curso_nome" => $curso->titulo ?? "",
@@ -183,11 +189,11 @@ class LeadsController extends Controller
                 return json_encode($botconversa);
             }
         }
-   
 
-        exit;
-        
-        
+        return response()->json([
+            'success' => true,
+            'message' => 'Lead registrado com sucesso.',
+        ]);
     }
 
     public function curso_gratuito_lead(Request $request){ 

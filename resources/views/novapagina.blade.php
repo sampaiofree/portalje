@@ -755,12 +755,15 @@
         <div class="lp-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="lead-modal-title">
             <button type="button" class="lp-modal__close" data-close-modal aria-label="Fechar modal">×</button>
             <h2 id="lead-modal-title">Preencha para continuar</h2>
-            <p class="lp-modal__subtitle">Informe seus dados para seguir para o checkout com segurança.</p>
+            <p class="lp-modal__subtitle">Informe seu nome, e-mail e WhatsApp para seguir para o checkout com segurança.</p>
 
             <form id="lead-form" action="{{ route('lead_whatsapp') }}" method="POST" novalidate>
                 @csrf
                 <label for="lead_nome">Nome completo</label>
                 <input id="lead_nome" name="nome" type="text" autocomplete="name" required>
+
+                <label for="lead_email">E-mail</label>
+                <input id="lead_email" name="email" type="email" autocomplete="email" required>
 
                 <label for="lead_telefone">WhatsApp</label>
                 <input id="lead_telefone" name="telefone" type="tel" autocomplete="tel" inputmode="numeric" minlength="13" required>

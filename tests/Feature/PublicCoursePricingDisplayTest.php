@@ -177,6 +177,39 @@ class PublicCoursePricingDisplayTest extends TestCase
         $response->assertSee('data-requires-lead="1"', false);
     }
 
+    public function test_public_page_renders_required_email_field_in_lead_modal(): void
+    {
+        [$user, $curso] = $this->createAffiliateAndCurso('curso-form-email');
+
+        Codigo_ref::create([
+            'user_id' => $user->id,
+            'curso_id' => $curso->id,
+            'codigo_ref' => 'REFFORMEMAIL',
+            'mostrar_curso' => true,
+            'modo_precos' => 'padrao',
+            'formulario_pre_checkout' => true,
+        ]);
+
+        $response = $this->get('http://afiliado.test/' . $curso->url);
+
+        $response->assertOk();
+        $response->assertSee('id="lead_email"', false);
+        $response->assertSee('name="email"', false);
+        $response->assertSee('type="email"', false);
+        $this->assertMatchesRegularExpression('/id="lead_email"[^>]*required/u', $response->getContent());
+    }
+
+    public function test_lp_course_js_prefills_hotmart_checkout_with_email_and_single_phoneac(): void
+    {
+        $script = file_get_contents(public_path('js/lp-course.js'));
+
+        $this->assertIsString($script);
+        $this->assertStringContainsString("parsed.searchParams.set('email', buyerEmail);", $script);
+        $this->assertStringContainsString("parsed.searchParams.set('phoneac', buyerDigits);", $script);
+        $this->assertStringContainsString("parsed.searchParams.delete('phonenumber');", $script);
+        $this->assertStringNotContainsString("parsed.searchParams.set('phonenumber',", $script);
+    }
+
     public function test_public_page_bypasses_form_when_formulario_pre_checkout_is_disabled(): void
     {
         [$user, $curso] = $this->createAffiliateAndCurso('curso-form-off');
