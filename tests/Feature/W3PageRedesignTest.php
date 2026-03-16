@@ -29,7 +29,7 @@ class W3PageRedesignTest extends TestCase
         $response->assertOk();
         $response->assertSeeInOrder([
             '4 motivos para você fazer um curso profissionalizante',
-            'Por que estudar no Portal Jovem Empreendedor?',
+            'Por que estudar no Programa Jovem Empreendedor?',
             'Benefícios de você entrar no Programa',
             'Conheça o curso que vai fazer você entrar no mercado de trabalho mais rápido,',
             'São mais de 120 mil alunos no Brasil e em 14 países',
@@ -86,7 +86,7 @@ class W3PageRedesignTest extends TestCase
         $this->assertStringContainsString('sck=remarketing', $location);
     }
 
-    public function test_w3_uses_route_city_as_whatsapp_compat_and_query_city_as_course_mode(): void
+    public function test_w3_uses_route_city_and_query_city_with_the_same_whatsapp_behavior(): void
     {
         [$user, $curso] = $this->createAffiliateAndCursoForW3('curso-w3-destino');
 
@@ -99,9 +99,9 @@ class W3PageRedesignTest extends TestCase
 
         $courseResponse = $this->get('http://afiliado.test/w3?c=campinas');
         $courseResponse->assertOk();
-        $courseResponse->assertSee('Clique no curso para abrir a página do curso.');
-        $courseResponse->assertSee('data-origem="curso"', false);
-        $courseResponse->assertSee('data-link="https://afiliado.test/curso-w3-destino?c=campinas"', false);
+        $courseResponse->assertSee('Clique no curso para falar com nosso consultor no WhatsApp.');
+        $courseResponse->assertSee('data-origem="whatsapp"', false);
+        $courseResponse->assertSee('https://wa.me/', false);
 
         $whatsResponse = $this->get('http://afiliado.test/w3/campinas');
         $whatsResponse->assertOk();

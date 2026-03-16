@@ -228,7 +228,7 @@ class Home_e_cursosController extends Controller
         $this->aplicarConfiguracaoDePrecosPorCupom($curso, $dados, !empty($desconto_banner));
         $curso->origem = 'checkout_completo';
 
-        $curso->cidade = request()->get('c') ?? null;
+        $curso->cidade = $this->sanitizeCityName(request()->get('c'));
         $curso->v = request()->get('v') ?? "27 Bolsas de Estudo com Desconto!";
         $desconto = request()->get('wd') ? 'w' : $desconto ;
         //PAGINA DIRETO PARA O WHATSAPP
@@ -319,11 +319,15 @@ class Home_e_cursosController extends Controller
             if($verificar){
                 $whatsappSelecionado = $this->selecionarWhatsappAtendimento($verificar);
                 $whatsappAtendimento = $whatsappSelecionado['whatsapp'] ?? $verificar->whatsapp_atendimento;
+                $whatsappFloatSelecionado = $this->selecionarWhatsappAtendimentoParaBotaoFlutuante($verificar, $whatsappSelecionado);
+                $whatsappFloatAtendimento = $whatsappFloatSelecionado['whatsapp'] ?? $whatsappAtendimento;
 
                 //DADOS DO AFILIADO
                 $dados = [
                     'whatsapp_atendimento' => $whatsappAtendimento,
                     'whatsapp_atendimento_id' => $whatsappSelecionado['id'] ?? null,
+                    'whatsapp_float_atendimento' => $whatsappFloatAtendimento,
+                    'whatsapp_float_atendimento_id' => $whatsappFloatSelecionado['id'] ?? ($whatsappSelecionado['id'] ?? null),
                     'whatsapp_atendimento_tempo' => $verificar->whatsapp_atendimento_tempo,
                     'meta_pixel_id' => $verificar->meta_pixel_id,
                     'company_name' => $this->resolverNomeEmpresa($verificar),
@@ -513,7 +517,7 @@ class Home_e_cursosController extends Controller
 
         // Root portal domains should always use the W3 home unless an explicit legacy override is requested.
         if ($isRootPortalDomain && $isHomeOrCursosPath && !$hasPageOverride) {
-            $cidadeLayout = $cidade_desconto ?? $request->get('c') ?? null;
+            $cidadeLayout = $this->sanitizeCityName($cidade_desconto ?? $request->get('c'));
             $pagina = $this->dados_da_pagina(null, $cidadeLayout);
             $modoCardsW3 = $this->resolverModoCardsW3($request, null, 'curso');
             $pagina['cards_destino'] = $modoCardsW3;
@@ -531,6 +535,9 @@ class Home_e_cursosController extends Controller
         if (!$dados) {return redirect()->away('https://portalje.org');}
 
         $isRootRequest = $request->getPathInfo() === '/';
+        $layoutOverride = in_array((string) $request->query('layout'), ['padrao', 'w3'], true)
+            ? (string) $request->query('layout')
+            : null;
         $homePageLayout = $dados['dados']['home_page_layout'] ?? 'padrao';
         $homePageDestination = in_array((string) ($dados['dados']['home_page_destination'] ?? 'curso'), ['curso', 'whatsapp'], true)
             ? (string) $dados['dados']['home_page_destination']
@@ -538,13 +545,16 @@ class Home_e_cursosController extends Controller
         $homePageWhatsappFlow = in_array((string) ($dados['dados']['home_page_whatsapp_flow'] ?? 'formulario'), ['formulario', 'direto'], true)
             ? (string) $dados['dados']['home_page_whatsapp_flow']
             : 'formulario';
+        if ($layoutOverride !== null) {
+            $homePageLayout = $layoutOverride;
+        }
         if ($isRootRequest && !empty($dados['dados']['afiliado']) && $homePageLayout === 'w3') {
             $afiliadoUser = !empty($dados['dados']['user_id'])
                 ? User::find((int) $dados['dados']['user_id'])
                 : null;
 
             if ($afiliadoUser) {
-                $cidadeLayout = $cidade_desconto ?? request()->get('c') ?? null;
+                $cidadeLayout = $this->sanitizeCityName($cidade_desconto ?? request()->get('c'));
                 $pagina = $this->dados_da_pagina($afiliadoUser, $cidadeLayout);
                 $modoCardsW3 = $this->resolverModoCardsW3($request, null, $homePageDestination);
                 $pagina['cards_destino'] = $modoCardsW3;
@@ -590,8 +600,8 @@ class Home_e_cursosController extends Controller
        
         
         //NOME DA CIDADE
-        $info['cidade'] = request()->get('c') ?? null;
-        $info['cidade'] = $cidade_desconto ?? $info['cidade'];
+        $info['cidade'] = $this->sanitizeCityName(request()->get('c'));
+        $info['cidade'] = $this->sanitizeCityName($cidade_desconto) ?? $info['cidade'];
         $info['v'] = request()->get('v') ?? "27 Bolsas de Estudo com Desconto!";
         
 
@@ -643,6 +653,8 @@ class Home_e_cursosController extends Controller
             if($verificar){
                 $whatsappSelecionado = $this->selecionarWhatsappAtendimento($verificar);
                 $whatsappAtendimento = $whatsappSelecionado['whatsapp'] ?? $verificar->whatsapp_atendimento;
+                $whatsappFloatSelecionado = $this->selecionarWhatsappAtendimentoParaBotaoFlutuante($verificar, $whatsappSelecionado);
+                $whatsappFloatAtendimento = $whatsappFloatSelecionado['whatsapp'] ?? $whatsappAtendimento;
                 $whatsappDelaySeconds = isset($verificar->w3_whatsapp_float_delay_seconds)
                     ? max(0, (int) $verificar->w3_whatsapp_float_delay_seconds)
                     : 0;
@@ -655,6 +667,8 @@ class Home_e_cursosController extends Controller
                     'afiliado' => true,
                     'whatsapp_atendimento' => $whatsappAtendimento,
                     'whatsapp_atendimento_id' => $whatsappSelecionado['id'] ?? null,
+                    'whatsapp_float_atendimento' => $whatsappFloatAtendimento,
+                    'whatsapp_float_atendimento_id' => $whatsappFloatSelecionado['id'] ?? ($whatsappSelecionado['id'] ?? null),
                     'whatsapp_atendimento_tempo' => $whatsappDelaySeconds,
                     'whatsapp_mostrar' => $whatsappMostrar,
                     'meta_pixel_id' => $verificar->meta_pixel_id,
@@ -768,6 +782,7 @@ class Home_e_cursosController extends Controller
     }   
 
     public function carvalho_whatsapp(Request $request, $cidade = null, $w = 'w'){
+        $cidade = $this->sanitizeCityName($cidade) ?? $this->sanitizeCityName($request->query('c'));
 
         //Pegar dados do usuario pelo dominio
         $dados_afiliado = $this->listar_user_pelo_dominio($request->getHost());
@@ -837,7 +852,8 @@ class Home_e_cursosController extends Controller
 
 
     public function dados_da_pagina($user = null, $cidade = null, $curso = null){
-        
+        $cidade = $this->sanitizeCityName($cidade);
+
         $nome_cidade = null;
         $curso_id = null;
         $user_id = null;
@@ -872,6 +888,9 @@ class Home_e_cursosController extends Controller
             $whatsappSelecionado = $this->selecionarWhatsappAtendimento($user);
             $whatsapp_atendimento = $whatsappSelecionado['whatsapp'] ?? $user->whatsapp_atendimento ?? $this->dados_portal['telefone_suporte_alunos'];
             $whatsapp_atendimento_id = $whatsappSelecionado['id'] ?? null;
+            $whatsappFloatSelecionado = $this->selecionarWhatsappAtendimentoParaBotaoFlutuante($user, $whatsappSelecionado);
+            $whatsapp_float_atendimento = $whatsappFloatSelecionado['whatsapp'] ?? $whatsapp_atendimento;
+            $whatsapp_float_atendimento_id = $whatsappFloatSelecionado['id'] ?? $whatsapp_atendimento_id;
             $company_name = $this->resolverNomeEmpresa($user);
             $logo_padrao_url = $this->resolverLogoPadraoUrl($user);
             $logo_dark_url = $this->resolverLogoDarkUrl($user);
@@ -888,6 +907,8 @@ class Home_e_cursosController extends Controller
             $dados =  $this->dados_portal;
             $whatsapp_atendimento =  $dados['telefone_suporte_alunos'];
             $whatsapp_atendimento_id = null;
+            $whatsapp_float_atendimento = $whatsapp_atendimento;
+            $whatsapp_float_atendimento_id = null;
             $whatsapp_atendimento_tempo = (int) ($dados['whatsapp_atendimento_tempo'] ?? 0);
             $whatsapp_mostrar = true;
             $formulario_whatsapp = $dados['formulario_whatsapp'];
@@ -898,7 +919,8 @@ class Home_e_cursosController extends Controller
         $botao_whatsapp_flutuante_nome_curso = "os cursos do {$company_name}";
 
         if($nome_cidade){
-            $headline = "27 Bolsas de Estudo liberadas para <span style='color: rgb(13, 110, 253) !important;'>$nome_cidade</span>";
+            $cidadeDestacada = e($nome_cidade);
+            $headline = "27 Bolsas de Estudo liberadas para <span style='color: rgb(13, 110, 253) !important;'>$cidadeDestacada</span>";
             $headline_sub = "Escolha seu curso para falar com o nosso consultor pelo WhatsApp";
             $headline_botao = 'Escolher o meu curso agora!';
         }elseif($curso){
@@ -930,6 +952,8 @@ class Home_e_cursosController extends Controller
             "whatsapp_atendimento_tempo"=> $whatsapp_atendimento_tempo,
             "whatsapp"=>$whatsapp_atendimento,
             "whatsapp_atendimento_id" => $whatsapp_atendimento_id,
+            "whatsapp_float_atendimento" => $whatsapp_float_atendimento,
+            "whatsapp_float_atendimento_id" => $whatsapp_float_atendimento_id,
             "whatsapp_mostrar"=> $whatsapp_mostrar,
             "formulario_whatsapp"=> $formulario_whatsapp,
             "formulario_pre_checkout"=> $formulario_pre_checkout,
@@ -1082,8 +1106,8 @@ class Home_e_cursosController extends Controller
                             $curso->contador_destino_oferta = $codigo_ref->contador_destino_oferta ?? null;
                             $cursoEncontrado = true;
                             break;
-                        }
-                    }
+        }
+    }
                 }
                 
             }
@@ -1191,6 +1215,26 @@ class Home_e_cursosController extends Controller
             
         }
         return $cursos;
+    }
+
+    private function sanitizeCityName($city): ?string
+    {
+        $city = trim((string) ($city ?? ''));
+
+        if ($city === '') {
+            return null;
+        }
+
+        $city = strip_tags($city);
+        $city = preg_replace('/[\x00-\x1F\x7F]/u', ' ', $city);
+        $city = preg_replace('/\s+/u', ' ', $city);
+        $city = trim((string) $city);
+
+        if ($city === '') {
+            return null;
+        }
+
+        return mb_substr($city, 0, 80);
     }
 
     public function listar_todos_cursos(){
@@ -1399,6 +1443,35 @@ class Home_e_cursosController extends Controller
         }
 
         return ['id' => null, 'whatsapp' => $fallbackWhatsapp ?: null];
+    }
+
+    private function selecionarWhatsappAtendimentoParaBotaoFlutuante(?User $user, ?array $fallbackSelection = null): array
+    {
+        if (!$user) {
+            return ['id' => null, 'whatsapp' => null];
+        }
+
+        if (!Schema::hasTable('whatsapp_atendimento') || !Schema::hasColumn('users', 'w3_whatsapp_float_whatsapp_atendimento_id')) {
+            return $fallbackSelection ?? $this->selecionarWhatsappAtendimento($user);
+        }
+
+        $selectedId = (int) ($user->w3_whatsapp_float_whatsapp_atendimento_id ?? 0);
+
+        if ($selectedId > 0) {
+            $registro = $user->whatsappAtendimentos()
+                ->where('id', $selectedId)
+                ->where('is_active', true)
+                ->first();
+
+            if ($registro) {
+                return [
+                    'id' => $registro->id,
+                    'whatsapp' => (string) $registro->whatsapp,
+                ];
+            }
+        }
+
+        return $fallbackSelection ?? $this->selecionarWhatsappAtendimento($user);
     }
 
     public function preco_cheio_sem_desconto($preco=null){

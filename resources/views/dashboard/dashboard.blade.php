@@ -714,11 +714,13 @@
 
             get finalUrl() {
                 let url = this.baseUrl;
+                const params = new URLSearchParams();
+
                 if (this.homeModel === 'w3') {
                     url += '/w3';
+                } else {
+                    params.set('layout', 'padrao');
                 }
-
-                const params = new URLSearchParams();
 
                 if (this.destination === 'whatsapp') {
                     params.set('w', '1');

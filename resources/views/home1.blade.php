@@ -46,7 +46,7 @@
       $homeJsVersion = file_exists(public_path('js/home-course.js'))
         ? (string) filemtime(public_path('js/home-course.js'))
         : null;
-      $homeWhatsappNumber = preg_replace('/\D/', '', (string) ($info['whatsapp_atendimento'] ?? ''));
+      $homeWhatsappNumber = preg_replace('/\D/', '', (string) ($info['whatsapp_float_atendimento'] ?? ($info['whatsapp_atendimento'] ?? '')));
       $homeWhatsappMessage = rawurlencode("Olá quero saber sobre os cursos do {$homeCompanyName}");
       $homeWhatsappFloatUrl = $homeWhatsappNumber
         ? "https://api.whatsapp.com/send/?phone={$homeWhatsappNumber}&text={$homeWhatsappMessage}"

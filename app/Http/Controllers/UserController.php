@@ -239,6 +239,22 @@ class UserController extends Controller
             ->first();
 
         $user->whatsapp_atendimento = $principal ? (string) $principal->whatsapp : null;
+
+        if (Schema::hasColumn('users', 'w3_whatsapp_float_whatsapp_atendimento_id')) {
+            $selectedFloatWhatsappId = (int) ($user->w3_whatsapp_float_whatsapp_atendimento_id ?? 0);
+
+            if ($selectedFloatWhatsappId > 0) {
+                $selectedStillValid = $user->whatsappAtendimentos()
+                    ->where('id', $selectedFloatWhatsappId)
+                    ->where('is_active', true)
+                    ->exists();
+
+                if (!$selectedStillValid) {
+                    $user->w3_whatsapp_float_whatsapp_atendimento_id = null;
+                }
+            }
+        }
+
         $user->save();
     }
 
@@ -261,6 +277,7 @@ class UserController extends Controller
 
     public function afiliado_configurar_site(Request $request, PhoneVerificationService $phoneVerificationService)
     {
+        $user = Auth::user();
 
         //printf($request->input('formulario_whatsapp'));
        // exit;
@@ -276,6 +293,37 @@ class UserController extends Controller
             'telefone_pessoal_2' => 'nullable|regex:/^[0-9]{12,14}$/',
             'w3_whatsapp_float_enabled' => 'nullable|boolean',
             'w3_whatsapp_float_delay_seconds' => 'nullable|in:0,5,10,20,30,45,60,120',
+            'w3_whatsapp_float_channel' => [
+                'nullable',
+                'string',
+                function (string $attribute, mixed $value, \Closure $fail) use ($user) {
+                    $value = trim((string) $value);
+
+                    if ($value === '' || $value === 'rodizio') {
+                        return;
+                    }
+
+                    if (!ctype_digit($value)) {
+                        $fail('Selecione um WhatsApp válido para o botão flutuante.');
+                        return;
+                    }
+
+                    if (!Schema::hasTable('whatsapp_atendimento')) {
+                        $fail('Selecione um WhatsApp válido para o botão flutuante.');
+                        return;
+                    }
+
+                    $isValid = WhatsappAtendimento::query()
+                        ->where('id', (int) $value)
+                        ->where('user_id', $user->id)
+                        ->where('is_active', true)
+                        ->exists();
+
+                    if (!$isValid) {
+                        $fail('Selecione um WhatsApp válido para o botão flutuante.');
+                    }
+                },
+            ],
             'nome_empresa' => 'nullable|string|max:120',
             'logo_padrao' => 'nullable|image|mimes:png,jpg,jpeg,webp|max:1024',
             'logo_dark' => 'nullable|image|mimes:png,jpg,jpeg,webp|max:1024',
@@ -284,7 +332,6 @@ class UserController extends Controller
         ]);
 
         // Atualizar os dados do usuário
-        $user = Auth::user();
         $requestedPhone1 = preg_replace('/\D/', '', (string) $request->input('telefone_pessoal_1'));
         $currentPhone1 = preg_replace('/\D/', '', (string) $user->telefone_pessoal_1);
         $shouldReverifyPhone1 = $requestedPhone1 !== '' && $requestedPhone1 !== $currentPhone1;
@@ -318,6 +365,12 @@ class UserController extends Controller
         }
         if (Schema::hasColumn('users', 'w3_whatsapp_float_delay_seconds')) {
             $user->w3_whatsapp_float_delay_seconds = (int) $request->input('w3_whatsapp_float_delay_seconds', 0);
+        }
+        if (Schema::hasColumn('users', 'w3_whatsapp_float_whatsapp_atendimento_id')) {
+            $floatChannel = trim((string) $request->input('w3_whatsapp_float_channel', 'rodizio'));
+            $user->w3_whatsapp_float_whatsapp_atendimento_id = ($floatChannel !== '' && $floatChannel !== 'rodizio')
+                ? (int) $floatChannel
+                : null;
         }
 
         if (Schema::hasColumn('users', 'nome_empresa')) {

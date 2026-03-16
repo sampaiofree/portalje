@@ -200,6 +200,19 @@
                         <p class="mt-1 text-sm text-gray-600">Configuração aplicada à home (/) e /cursos, além da W3 (/w3 e /w3/{cidade}).</p>
 
                         <div class="mt-6 space-y-4">
+                            @php
+                                $w3FloatWhatsappOptions = Auth::user()->whatsappAtendimentos()
+                                    ->where('is_active', true)
+                                    ->orderByDesc('updated_at')
+                                    ->orderBy('id')
+                                    ->get();
+                                $w3FloatChannelAtual = old(
+                                    'w3_whatsapp_float_channel',
+                                    $w3FloatWhatsappOptions->contains('id', Auth::user()->w3_whatsapp_float_whatsapp_atendimento_id)
+                                        ? (string) Auth::user()->w3_whatsapp_float_whatsapp_atendimento_id
+                                        : 'rodizio'
+                                );
+                            @endphp
                             <div>
                                 <x-input-label for="w3_whatsapp_float_enabled" value="Exibir botão flutuante" />
                                 <select
@@ -228,6 +241,27 @@
                                         </option>
                                     @endforeach
                                 </select>
+                            </div>
+                            <div>
+                                <x-input-label for="w3_whatsapp_float_channel" value="Escolha o WhatsApp" />
+                                <select
+                                    id="w3_whatsapp_float_channel"
+                                    name="w3_whatsapp_float_channel"
+                                    class="mt-1 px-4 py-3 bg-gray-100 focus:bg-white block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
+                                >
+                                    <option value="rodizio" @selected($w3FloatChannelAtual === 'rodizio')>Rodízio (automático)</option>
+                                    @foreach($w3FloatWhatsappOptions as $w3FloatWhatsappOption)
+                                        <option value="{{ $w3FloatWhatsappOption->id }}" @selected($w3FloatChannelAtual === (string) $w3FloatWhatsappOption->id)>
+                                            {{ $w3FloatWhatsappOption->whatsapp }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                @if($w3FloatWhatsappOptions->isEmpty())
+                                    <p class="mt-1 text-xs text-yellow-700">Nenhum WhatsApp ativo encontrado. O botão flutuante continuará usando o rodízio atual.</p>
+                                @else
+                                    <p class="mt-1 text-xs text-gray-500">Escolha um número fixo ou mantenha em rodízio para usar a lógica automática já existente.</p>
+                                @endif
+                                <x-input-error :messages="$errors->get('w3_whatsapp_float_channel')" class="mt-2" />
                             </div>
                         </div>
                     </div>

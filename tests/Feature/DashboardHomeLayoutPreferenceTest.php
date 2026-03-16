@@ -23,12 +23,21 @@ class DashboardHomeLayoutPreferenceTest extends TestCase
             'w3_whatsapp_float_delay_seconds' => 0,
         ]);
 
+        WhatsappAtendimento::create([
+            'user_id' => $user->id,
+            'whatsapp' => '5511999991111',
+            'is_active' => true,
+        ]);
+
         $response = $this->actingAs($user)->get('/user/configurar_site2');
 
         $response->assertOk();
         $response->assertSee('Botão flutuante do WhatsApp');
         $response->assertSee('id="w3_whatsapp_float_enabled"', false);
         $response->assertSee('id="w3_whatsapp_float_delay_seconds"', false);
+        $response->assertSee('id="w3_whatsapp_float_channel"', false);
+        $response->assertSee('Rodízio (automático)');
+        $response->assertSee('5511999991111');
         $response->assertSee('Configuração aplicada à home (/) e /cursos, além da W3 (/w3 e /w3/{cidade}).', false);
     }
 
@@ -69,11 +78,18 @@ class DashboardHomeLayoutPreferenceTest extends TestCase
             'w3_whatsapp_float_delay_seconds' => 0,
         ]);
 
+        $whatsapp = WhatsappAtendimento::create([
+            'user_id' => $user->id,
+            'whatsapp' => '5511999991111',
+            'is_active' => true,
+        ]);
+
         $response = $this->actingAs($user)
             ->from('/user/configurar_site2')
             ->post('/user/configurar_site', [
                 'w3_whatsapp_float_enabled' => '0',
                 'w3_whatsapp_float_delay_seconds' => '45',
+                'w3_whatsapp_float_channel' => (string) $whatsapp->id,
             ]);
 
         $response->assertRedirect('/user/configurar_site2');
@@ -82,7 +98,59 @@ class DashboardHomeLayoutPreferenceTest extends TestCase
             'id' => $user->id,
             'w3_whatsapp_float_enabled' => 0,
             'w3_whatsapp_float_delay_seconds' => 45,
+            'w3_whatsapp_float_whatsapp_atendimento_id' => $whatsapp->id,
         ]);
+    }
+
+    public function test_configurar_site_post_persists_rodizio_for_w3_float_button_channel(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'w3_whatsapp_float_whatsapp_atendimento_id' => 999,
+        ]);
+
+        $response = $this->actingAs($user)
+            ->from('/user/configurar_site2')
+            ->post('/user/configurar_site', [
+                'w3_whatsapp_float_enabled' => '1',
+                'w3_whatsapp_float_delay_seconds' => '0',
+                'w3_whatsapp_float_channel' => 'rodizio',
+            ]);
+
+        $response->assertRedirect('/user/configurar_site2');
+        $response->assertSessionHas('success');
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'w3_whatsapp_float_whatsapp_atendimento_id' => null,
+        ]);
+    }
+
+    public function test_configurar_site_post_rejects_invalid_w3_float_button_channel(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+        ]);
+
+        $otherUser = User::factory()->create([
+            'email_verified_at' => now(),
+        ]);
+
+        $otherWhatsapp = WhatsappAtendimento::create([
+            'user_id' => $otherUser->id,
+            'whatsapp' => '5511999992222',
+            'is_active' => true,
+        ]);
+
+        $response = $this->actingAs($user)
+            ->from('/user/configurar_site2')
+            ->post('/user/configurar_site', [
+                'w3_whatsapp_float_enabled' => '1',
+                'w3_whatsapp_float_delay_seconds' => '0',
+                'w3_whatsapp_float_channel' => (string) $otherWhatsapp->id,
+            ]);
+
+        $response->assertRedirect('/user/configurar_site2');
+        $response->assertSessionHasErrors(['w3_whatsapp_float_channel']);
     }
 
     public function test_configurar_site_post_rejects_invalid_w3_float_button_delay(): void
@@ -386,6 +454,17 @@ class DashboardHomeLayoutPreferenceTest extends TestCase
         $response->assertSee('class="w3-course-card js-course-trigger"', false);
     }
 
+    public function test_root_can_force_home1_even_when_affiliate_home_layout_is_w3(): void
+    {
+        [$user, $curso] = $this->createAffiliateWithConfiguredCurso('afiliado-w3-force-home1.test', 'w3', 'curso-w3-force-home1');
+
+        $response = $this->get('http://afiliado-w3-force-home1.test/?layout=padrao');
+
+        $response->assertOk();
+        $response->assertViewIs('home1');
+        $response->assertSee('Escolha Sua Nova Profissão');
+    }
+
     public function test_root_w3_layout_uses_course_destination_by_default_and_whatsapp_with_w_query(): void
     {
         [$user, $curso] = $this->createAffiliateWithConfiguredCurso('afiliado-w3-modo.test', 'w3', 'curso-w3-modo', 'curso');
@@ -583,6 +662,65 @@ class DashboardHomeLayoutPreferenceTest extends TestCase
         $cursosResponse->assertSee('"whatsapp_delay_seconds":30', false);
     }
 
+    public function test_home1_float_button_can_use_specific_whatsapp_channel(): void
+    {
+        [$user, $curso] = $this->createAffiliateWithConfiguredCurso('afiliado-home1-float-specific.test', 'padrao', 'curso-home1-float-specific');
+
+        $rodizioA = WhatsappAtendimento::create([
+            'user_id' => $user->id,
+            'whatsapp' => '5511999991111',
+            'is_active' => true,
+            'last_lead_at' => now()->subHour(),
+        ]);
+
+        $fixo = WhatsappAtendimento::create([
+            'user_id' => $user->id,
+            'whatsapp' => '5511999992222',
+            'is_active' => true,
+            'last_lead_at' => now(),
+        ]);
+
+        $user->update([
+            'w3_whatsapp_float_whatsapp_atendimento_id' => $fixo->id,
+        ]);
+
+        $response = $this->get('http://afiliado-home1-float-specific.test/');
+
+        $response->assertOk();
+        $response->assertSee('https://api.whatsapp.com/send/?phone=5511999992222', false);
+        $response->assertDontSee('https://api.whatsapp.com/send/?phone=5511999991111', false);
+    }
+
+    public function test_w3_float_button_can_use_specific_whatsapp_channel(): void
+    {
+        [$user, $curso] = $this->createAffiliateWithConfiguredCurso('afiliado-w3-float-specific.test', 'w3', 'curso-w3-float-specific');
+
+        $rodizioA = WhatsappAtendimento::create([
+            'user_id' => $user->id,
+            'whatsapp' => '5511999993333',
+            'is_active' => true,
+            'last_lead_at' => now()->subHour(),
+        ]);
+
+        $fixo = WhatsappAtendimento::create([
+            'user_id' => $user->id,
+            'whatsapp' => '5511999994444',
+            'is_active' => true,
+            'last_lead_at' => now(),
+        ]);
+
+        $user->update([
+            'w3_whatsapp_float_whatsapp_atendimento_id' => $fixo->id,
+        ]);
+
+        $response = $this->get('http://afiliado-w3-float-specific.test/');
+
+        $response->assertOk();
+        $response->assertViewIs('home_e_cursos.w3');
+        $response->assertSee('https://api.whatsapp.com/send/?phone=5511999994444', false);
+        $response->assertDontSee('https://api.whatsapp.com/send/?phone=5511999993333', false);
+    }
+
     public function test_portal_and_jovem_domains_render_w3_on_root_and_cursos_paths(): void
     {
         $this->createPublishedCourse('curso-raiz-w3');
@@ -612,6 +750,33 @@ class DashboardHomeLayoutPreferenceTest extends TestCase
 
         $response->assertOk();
         $response->assertViewIs('home_e_cursos.w3');
+    }
+
+    public function test_w3_root_accepts_city_query_parameter_without_rendering_html_from_it(): void
+    {
+        $this->createPublishedCourse('curso-raiz-cidade');
+
+        $response = $this->get('http://jovemempreendedor.org/?c=<mark%20class=x>Goiania</mark>');
+
+        $response->assertOk();
+        $response->assertViewIs('home_e_cursos.w3');
+        $response->assertSee('Goiania');
+        $response->assertDontSee('mark class=x', false);
+    }
+
+    public function test_w3_route_accepts_query_city_like_path_city(): void
+    {
+        $this->createPublishedCourse('curso-raiz-cidade-w3');
+
+        $queryResponse = $this->get('http://portalje.org/w3/?c=Goiania');
+        $queryResponse->assertOk();
+        $queryResponse->assertViewIs('home_e_cursos.w3');
+        $queryResponse->assertSee('Goiania');
+
+        $pathResponse = $this->get('http://portalje.org/w3/Goiania');
+        $pathResponse->assertOk();
+        $pathResponse->assertViewIs('home_e_cursos.w3');
+        $pathResponse->assertSee('Goiania');
     }
 
     public function test_jovem_domain_page_overrides_are_preserved_without_forcing_w3(): void
