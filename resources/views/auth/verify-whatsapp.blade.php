@@ -12,7 +12,7 @@
         </p>
     </div>
 
-    <form method="POST" action="{{ route('phone.verification.send') }}" class="space-y-4">
+    <form id="phone-verification-send-form" method="POST" action="{{ route('phone.verification.send') }}" class="space-y-4">
         @csrf
 
         <div>
@@ -32,7 +32,25 @@
             <x-input-error :messages="$errors->get('telefone_pessoal_1')" class="mt-2" />
         </div>
 
-        <x-primary-button class="w-full justify-center">
+        <div
+            id="ddi-warning-card"
+            tabindex="-1"
+            class="hidden rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 focus:outline-none focus:ring-2 focus:ring-amber-300"
+        >
+            <p class="font-semibold">Confira o DDI do seu WhatsApp</p>
+            <p class="mt-1">
+                Para numeros do Brasil, comece com 55 (DDI). Exemplo: 5562999998888.
+            </p>
+            <button
+                id="ddi-continue-button"
+                type="button"
+                class="mt-3 inline-flex items-center rounded-md bg-amber-600 px-3 py-2 text-xs font-semibold uppercase tracking-widest text-white hover:bg-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-300"
+            >
+                Continuar mesmo assim
+            </button>
+        </div>
+
+        <x-primary-button id="phone-verification-submit-button" class="w-full justify-center">
             Gerar codigo de verificacao
         </x-primary-button>
     </form>
@@ -90,3 +108,63 @@
         </form>
     </div>
 </x-guest-layout>
+
+@push('scripts')
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const form = document.getElementById('phone-verification-send-form');
+            const phoneInput = document.getElementById('telefone_pessoal_1');
+            const warningCard = document.getElementById('ddi-warning-card');
+            const continueButton = document.getElementById('ddi-continue-button');
+
+            if (!form || !phoneInput || !warningCard || !continueButton) {
+                return;
+            }
+
+            let confirmedNonBrazilPhone = null;
+
+            const digitsOnly = (value) => value.replace(/\D/g, '');
+            const hideWarning = () => warningCard.classList.add('hidden');
+            const showWarning = () => {
+                warningCard.classList.remove('hidden');
+                warningCard.focus();
+            };
+
+            phoneInput.addEventListener('input', function () {
+                const sanitized = digitsOnly(phoneInput.value);
+
+                if (phoneInput.value !== sanitized) {
+                    phoneInput.value = sanitized;
+                }
+
+                if (sanitized.startsWith('55')) {
+                    confirmedNonBrazilPhone = null;
+                    hideWarning();
+                    return;
+                }
+
+                if (confirmedNonBrazilPhone !== null && sanitized !== confirmedNonBrazilPhone) {
+                    confirmedNonBrazilPhone = null;
+                }
+            });
+
+            form.addEventListener('submit', function (event) {
+                const sanitized = digitsOnly(phoneInput.value);
+                phoneInput.value = sanitized;
+
+                if (sanitized === '' || sanitized.startsWith('55') || sanitized === confirmedNonBrazilPhone) {
+                    return;
+                }
+
+                event.preventDefault();
+                showWarning();
+            });
+
+            continueButton.addEventListener('click', function () {
+                confirmedNonBrazilPhone = digitsOnly(phoneInput.value);
+                hideWarning();
+                form.requestSubmit();
+            });
+        });
+    </script>
+@endpush
