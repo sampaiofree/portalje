@@ -111,15 +111,11 @@ class AdminController extends Controller
         $baseQuery = $this->buildDashboardUsersQuery($filters);
         $healthSnapshot = $healthService->buildSnapshot($baseQuery, $filters);
 
-        $queueRows = $this->selectQueueRowsForFilter(
-            collect($healthSnapshot['queue_setup_rows'] ?? []),
-            collect($healthSnapshot['queue_lead_rows'] ?? []),
-            (string) ($filters['fila'] ?? 'all')
-        )->values();
+        $exportRows = $this->buildDashboardExportRows($healthSnapshot);
 
         $fileName = 'dashboard_usuarios_' . now()->format('Ymd_His') . '.csv';
 
-        return response()->streamDownload(function () use ($queueRows) {
+        return response()->streamDownload(function () use ($exportRows) {
             $output = fopen('php://output', 'w');
             if ($output === false) {
                 return;
@@ -128,6 +124,8 @@ class AdminController extends Controller
             fwrite($output, "\xEF\xBB\xBF");
             fputcsv($output, [
                 'Nome',
+                'Primeiro nome',
+                'Sobrenome',
                 'Telefone de contato',
                 'Email',
                 'Telefone de atendimento',
@@ -138,9 +136,11 @@ class AdminController extends Controller
                 'Fila',
             ], ';');
 
-            foreach ($queueRows as $row) {
+            foreach ($exportRows as $row) {
                 fputcsv($output, [
                     (string) ($row['name'] ?? ''),
+                    (string) ($row['primeiro_nome'] ?? ''),
+                    (string) ($row['sobrenome'] ?? ''),
                     (string) ($row['telefone_contato'] ?? ''),
                     (string) ($row['email'] ?? ''),
                     (string) ($row['telefone_atendimento'] ?? ''),
@@ -268,19 +268,57 @@ class AdminController extends Controller
         );
     }
 
-    private function selectQueueRowsForFilter(Collection $setupRows, Collection $leadRows, string $queueFilter): Collection
+    private function buildDashboardExportRows(array $healthSnapshot): Collection
     {
-        if ($queueFilter === 'setup_sem_lead') {
-            return $setupRows;
+        $queueMembershipByUserId = [];
+
+        foreach (collect($healthSnapshot['queue_setup_rows'] ?? []) as $row) {
+            $userId = (int) ($row['id'] ?? 0);
+            if ($userId <= 0) {
+                continue;
+            }
+
+            $queueMembershipByUserId[$userId][] = 'setup_sem_lead';
         }
 
-        if ($queueFilter === 'lead_sem_venda') {
-            return $leadRows;
+        foreach (collect($healthSnapshot['queue_lead_rows'] ?? []) as $row) {
+            $userId = (int) ($row['id'] ?? 0);
+            if ($userId <= 0) {
+                continue;
+            }
+
+            $queueMembershipByUserId[$userId][] = 'lead_sem_venda';
         }
 
-        return $setupRows
-            ->concat($leadRows)
+        return collect($healthSnapshot['users_rows'] ?? [])
+            ->map(function ($row) use ($queueMembershipByUserId) {
+                $userId = (int) ($row['id'] ?? 0);
+                [$primeiroNome, $sobrenome] = $this->splitDashboardUserName((string) ($row['name'] ?? ''));
+
+                $row['primeiro_nome'] = $primeiroNome;
+                $row['sobrenome'] = $sobrenome;
+                $row['fila'] = implode(',', $queueMembershipByUserId[$userId] ?? []);
+
+                return $row;
+            })
             ->values();
+    }
+
+    private function splitDashboardUserName(string $name): array
+    {
+        $name = trim($name);
+        if ($name === '') {
+            return ['', ''];
+        }
+
+        $parts = preg_split('/\s+/', $name) ?: [];
+        if ($parts === []) {
+            return ['', ''];
+        }
+
+        $primeiroNome = (string) array_shift($parts);
+
+        return [$primeiroNome, implode(' ', $parts)];
     }
 
     private function normalizeCsvNumericValue($value): string

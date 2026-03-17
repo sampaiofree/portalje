@@ -92,7 +92,7 @@ class AdminDashboardActivationFunnelTest extends TestCase
         $this->assertSame(0, $strictThresholds->viewData('queueLeadRows')->total());
     }
 
-    public function test_dashboard_export_csv_respects_selected_queue_and_columns(): void
+    public function test_dashboard_export_csv_always_exports_all_filtered_users(): void
     {
         [$admin, $users] = $this->seedHealthScenario();
 
@@ -104,30 +104,48 @@ class AdminDashboardActivationFunnelTest extends TestCase
             'dias_sem_venda' => 7,
         ];
 
-        $leadOnlyResponse = $this->actingAs($admin)->get(route('dashboard_adm_export_csv', array_merge($query, [
+        $response = $this->actingAs($admin)->get(route('dashboard_adm_export_csv', array_merge($query, [
             'fila' => 'lead_sem_venda',
         ])));
 
-        $leadOnlyResponse->assertOk();
-        $leadOnlyResponse->assertHeader('content-type', 'text/csv; charset=UTF-8');
-        $leadOnlyResponse->assertHeader('content-disposition');
+        $response->assertOk();
+        $response->assertHeader('content-type', 'text/csv; charset=UTF-8');
+        $response->assertHeader('content-disposition');
 
-        $csvLeadOnly = str_replace("\xEF\xBB\xBF", '', $leadOnlyResponse->streamedContent());
-        $this->assertStringContainsString('Nome;"Telefone de contato";Email;"Telefone de atendimento";"Data cadastro";"Dias desde cadastro";"Total leads";"Total vendas";Fila', $csvLeadOnly);
-        $this->assertStringContainsString($users['lead_sem_venda']->name, $csvLeadOnly);
-        $this->assertStringContainsString('lead_sem_venda', $csvLeadOnly);
-        $this->assertStringNotContainsString($users['setup_sem_lead']->name, $csvLeadOnly);
+        $rows = $this->parseCsvRows(str_replace("\xEF\xBB\xBF", '', $response->streamedContent()));
 
-        $allQueuesResponse = $this->actingAs($admin)->get(route('dashboard_adm_export_csv', array_merge($query, [
-            'fila' => 'all',
-        ])));
+        $this->assertSame([
+            'Nome',
+            'Primeiro nome',
+            'Sobrenome',
+            'Telefone de contato',
+            'Email',
+            'Telefone de atendimento',
+            'Data cadastro',
+            'Dias desde cadastro',
+            'Total leads',
+            'Total vendas',
+            'Fila',
+        ], array_keys($rows[0]));
 
-        $allQueuesResponse->assertOk();
-        $csvAll = str_replace("\xEF\xBB\xBF", '', $allQueuesResponse->streamedContent());
-        $this->assertStringContainsString($users['setup_sem_lead']->name, $csvAll);
-        $this->assertStringContainsString($users['lead_sem_venda']->name, $csvAll);
-        $this->assertStringContainsString('setup_sem_lead', $csvAll);
-        $this->assertStringContainsString('lead_sem_venda', $csvAll);
+        $rowsByName = collect($rows)->keyBy('Nome');
+
+        $this->assertSame('Afiliado', $rowsByName[$users['setup_sem_lead']->name]['Primeiro nome']);
+        $this->assertSame('Setup Sem Lead', $rowsByName[$users['setup_sem_lead']->name]['Sobrenome']);
+        $this->assertSame('setup_sem_lead', $rowsByName[$users['setup_sem_lead']->name]['Fila']);
+
+        $this->assertSame('Afiliado', $rowsByName[$users['lead_sem_venda']->name]['Primeiro nome']);
+        $this->assertSame('Lead Sem Venda', $rowsByName[$users['lead_sem_venda']->name]['Sobrenome']);
+        $this->assertSame('lead_sem_venda', $rowsByName[$users['lead_sem_venda']->name]['Fila']);
+
+        $this->assertSame('Mononome', $rowsByName[$users['sem_setup']->name]['Primeiro nome']);
+        $this->assertSame('', $rowsByName[$users['sem_setup']->name]['Sobrenome']);
+
+        $this->assertArrayHasKey($users['com_venda_completed']->name, $rowsByName->all());
+        $this->assertArrayHasKey($users['com_venda_approved']->name, $rowsByName->all());
+        $this->assertArrayHasKey($users['sem_setup']->name, $rowsByName->all());
+        $this->assertSame('', $rowsByName[$users['com_venda_completed']->name]['Fila']);
+        $this->assertSame('', $rowsByName[$users['com_venda_approved']->name]['Fila']);
     }
 
     public function test_dashboard_yes_no_filters_still_drive_results_consistently(): void
@@ -276,7 +294,7 @@ class AdminDashboardActivationFunnelTest extends TestCase
         ]);
 
         $semSetup = User::factory()->create([
-            'name' => 'Afiliado Sem Setup',
+            'name' => 'Mononome',
             'email' => 'afiliado-sem-setup@example.com',
             'nivel_acesso' => User::NIVEL_ACESSO_USER,
             'telefone_pessoal_1' => '444',
@@ -398,5 +416,27 @@ class AdminDashboardActivationFunnelTest extends TestCase
             'url' => 'curso-' . $suffix . '-' . Str::lower(Str::random(6)),
             'codigo_id_hotmart' => 'HOT-' . strtoupper($suffix),
         ]);
+    }
+
+    private function parseCsvRows(string $csv): array
+    {
+        $lines = preg_split('/\r\n|\r|\n/', trim($csv)) ?: [];
+        if ($lines === []) {
+            return [];
+        }
+
+        $header = str_getcsv(array_shift($lines), ';');
+        $rows = [];
+
+        foreach ($lines as $line) {
+            if ($line === '') {
+                continue;
+            }
+
+            $values = str_getcsv($line, ';');
+            $rows[] = array_combine($header, $values);
+        }
+
+        return $rows;
     }
 }

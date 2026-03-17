@@ -58,18 +58,10 @@
             'no' => 'Não',
         ];
 
-        $filaOptions = [
-            'all' => 'Todas as filas',
-            'setup_sem_lead' => 'Setup sem lead',
-            'lead_sem_venda' => 'Lead sem venda',
-        ];
-
         $activeQueueTab = ($filters['fila'] ?? 'all') === 'lead_sem_venda' ? 'lead_sem_venda' : 'setup_sem_lead';
-        if (($filters['fila'] ?? 'all') === 'all') {
-            $tabFromQuery = (string) request()->query('aba_fila', 'setup_sem_lead');
-            if (in_array($tabFromQuery, ['setup_sem_lead', 'lead_sem_venda'], true)) {
-                $activeQueueTab = $tabFromQuery;
-            }
+        $tabFromQuery = (string) request()->query('aba_fila', $activeQueueTab);
+        if (in_array($tabFromQuery, ['setup_sem_lead', 'lead_sem_venda'], true)) {
+            $activeQueueTab = $tabFromQuery;
         }
 
         $formatPercent = static fn ($value) => number_format((float) $value, 2, ',', '.') . '%';
@@ -218,18 +210,6 @@
                             >
                         </div>
 
-                        <div>
-                            <label for="fila" class="block text-sm text-gray-600 mb-1">Fila para exportação</label>
-                            <select
-                                id="fila"
-                                name="fila"
-                                class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                            >
-                                @foreach ($filaOptions as $value => $label)
-                                    <option value="{{ $value }}" @selected(($filters['fila'] ?? 'all') === $value)>{{ $label }}</option>
-                                @endforeach
-                            </select>
-                        </div>
                     </div>
 
                     <div class="flex flex-wrap gap-2">
@@ -240,7 +220,7 @@
                             Limpar filtros
                         </a>
                         <a href="{{ route('dashboard_adm_export_csv', request()->query()) }}" class="inline-flex items-center px-4 py-2 bg-emerald-600 border border-emerald-700 rounded-md text-sm text-white hover:bg-emerald-700">
-                            Exportar fila filtrada (CSV)
+                            Exportar usuários filtrados (CSV)
                         </a>
                     </div>
                 </form>
