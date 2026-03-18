@@ -117,6 +117,7 @@
                         <x-responsive-nav-link :href="route('aulas_gratuitas_index')">Aulas Gratuitas</x-responsive-nav-link>
                         <x-responsive-nav-link :href="route('combo.index')">Combos</x-responsive-nav-link>
                         <x-responsive-nav-link :href="route('admin.cupons.index')">Cupons</x-responsive-nav-link>
+                        <x-responsive-nav-link :href="route('admin.journey.index')">Jornada</x-responsive-nav-link>
                         <x-responsive-nav-link :href="route('admin.logs.index')">Logs</x-responsive-nav-link>
                         <x-responsive-nav-link :href="route('admin.purchase_events')">Purchase Events</x-responsive-nav-link>
                     </div>

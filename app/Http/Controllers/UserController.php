@@ -14,6 +14,7 @@ use App\Http\Controllers\Home_e_cursosController;
 use App\Models\PurchaseEvent;
 use App\Models\WhatsappAtendimento;
 use App\Services\PhoneVerificationService;
+use App\Services\JourneyProgressService;
 
 class UserController extends Controller 
 {
@@ -63,8 +64,27 @@ class UserController extends Controller
 
     public function ranking(Request $request)
     {
+        $activeTab = $request->query('tab', 'xp');
+        if (!in_array($activeTab, ['sales', 'xp'], true)) {
+            $activeTab = 'xp';
+        }
+
+        $xpRows = [];
+        $xpTotals = [
+            'participants' => 0,
+            'xp_total' => 0,
+        ];
+
         // Obtém o valor do mês enviado pelo GET
-        $mes = $request->query('mes') ?? date('Y-m'); // formato esperado: 'Y-m'
+        $mes = $request->query('mes');
+        if (!is_string($mes) || trim($mes) === '') {
+            $mes = date('Y-m');
+        }
+
+        if (!preg_match('/^\d{4}-\d{2}$/', $mes)) {
+            $mes = date('Y-m');
+        }
+
         list($ano, $mesNumero) = explode('-', $mes);
 
         // Define $dataInicio e $dataFim com base no mês e ano
@@ -80,32 +100,83 @@ class UserController extends Controller
         $dataInicioTimestamp = $this->timestamp($dataInicio);
         $dataFimTimestamp = $this->timestamp($dataFim);
 
-        // Filtra os dados pelo intervalo de datas e pelo ID do usuário logado
-        if(!$request->query('mes')){
-            $mes = null;
-            $dataInicioTimestamp = Carbon::now()->startOfYear()->toDateTimeString(); // Início do ano atual
-            $dataFimTimestamp = Carbon::now()->endOfYear()->toDateTimeString(); // Fim do ano atual
-            $dataInicioTimestamp = $this->timestamp($dataInicioTimestamp);
-            $dataFimTimestamp = $this->timestamp($dataFimTimestamp);
-            $dados = PurchaseEvent::whereIn('purchase_status', ['APPROVED', 'COMPLETED'])
+        $d = [];
+        if ($activeTab === 'sales') {
+            // Filtra os dados pelo intervalo de datas e pelo ID do usuário logado
+            if(!$request->query('mes')){
+                $mes = null;
+                $dataInicioTimestamp = Carbon::now()->startOfYear()->toDateTimeString(); // Início do ano atual
+                $dataFimTimestamp = Carbon::now()->endOfYear()->toDateTimeString(); // Fim do ano atual
+                $dataInicioTimestamp = $this->timestamp($dataInicioTimestamp);
+                $dataFimTimestamp = $this->timestamp($dataFimTimestamp);
+                $dados = PurchaseEvent::whereIn('purchase_status', ['APPROVED', 'COMPLETED'])
+                    ->whereBetween('purchase_approved_date', [$dataInicioTimestamp, $dataFimTimestamp])
+                    ->get();
+            }else{
+                $dados = PurchaseEvent::whereIn('purchase_status', ['APPROVED', 'COMPLETED'])
                 ->whereBetween('purchase_approved_date', [$dataInicioTimestamp, $dataFimTimestamp])
                 ->get();
-        }else{
-            $dados = PurchaseEvent::whereIn('purchase_status', ['APPROVED', 'COMPLETED'])
-            ->whereBetween('purchase_approved_date', [$dataInicioTimestamp, $dataFimTimestamp])
-            ->get();
-        }    
+            }
 
-        // Agrupando os dados como no seu código original
-        $dadosAgrupados = $dados->groupBy(function($item) {
-            return data_get($item, 'affiliate_name');
-        }); 
+            // Agrupando os dados como no seu código original
+            $dadosAgrupados = $dados->groupBy(function($item) {
+                return data_get($item, 'affiliate_name');
+            });
 
-        // Converte para um array associativo, se necessário
-        $d = $dadosAgrupados->toArray();
+            // Converte para um array associativo, se necessário
+            $d = $dadosAgrupados->toArray();
+        } else {
+            $journeyProgressService = app(JourneyProgressService::class);
+            $users = User::query()
+                ->orderBy('name')
+                ->get(['id', 'name', 'apelido']);
+
+            foreach ($users as $user) {
+                $payload = $journeyProgressService->buildForUser($user);
+                $summary = $payload['dashboard_jornada_summary'] ?? [];
+                $xpTotal = (int) ($summary['xp_total'] ?? 0);
+
+                if ($xpTotal <= 0) {
+                    continue;
+                }
+
+                $xpRows[] = [
+                    'user_id' => $user->id,
+                    'display_name' => $this->resolveRankingDisplayName($user),
+                    'xp_total' => $xpTotal,
+                ];
+            }
+
+            usort($xpRows, function (array $a, array $b): int {
+                if (($a['xp_total'] ?? 0) !== ($b['xp_total'] ?? 0)) {
+                    return ($b['xp_total'] ?? 0) <=> ($a['xp_total'] ?? 0);
+                }
+
+                return strcasecmp((string) ($a['display_name'] ?? ''), (string) ($b['display_name'] ?? ''));
+            });
+
+            $xpTotals['participants'] = count($xpRows);
+            $xpTotals['xp_total'] = array_sum(array_map(fn ($row) => (int) ($row['xp_total'] ?? 0), $xpRows));
+        }
 
         // Retorna a view com os dados
-        return view('adm.ranking.ranking', compact('d', 'mes', 'dataInicio', 'dataFim'));
+        return view('adm.ranking.ranking', compact('d', 'mes', 'dataInicio', 'dataFim', 'activeTab', 'xpRows', 'xpTotals'));
+    }
+
+    private function resolveRankingDisplayName(User $user): string
+    {
+        $apelido = trim((string) ($user->apelido ?? ''));
+        if ($apelido !== '') {
+            return $apelido;
+        }
+
+        $nome = trim((string) ($user->name ?? ''));
+        if ($nome === '') {
+            return 'Sem nome';
+        }
+
+        $partes = preg_split('/\s+/', $nome);
+        return (string) ($partes[0] ?? $nome);
     }
 
 

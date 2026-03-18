@@ -61,15 +61,35 @@
                 {{-- Aqui vai a lógica do seu foreach para a jornada --}}
                 @isset($minha_jornada)
                     @foreach($minha_jornada as $tarefa)
+                        @php
+                            $tarefaConcluida = (bool) ($tarefa['concluido'] ?? false);
+                            $tarefaEmFoco = (bool) ($tarefa['em_foco'] ?? false);
+                            $tarefaBloqueada = (bool) ($tarefa['bloqueado'] ?? false);
+                            $tarefaPodeAbrir = (bool) ($tarefa['pode_abrir'] ?? false);
+                            $tarefaStatus = $tarefa['status_label'] ?? ($tarefaConcluida ? 'Meta concluída' : 'Pendente');
+                            $tarefaStatusClasses = $tarefaConcluida
+                                ? 'text-green-700 bg-green-100'
+                                : ($tarefaEmFoco ? 'text-amber-700 bg-amber-100' : ($tarefaBloqueada ? 'text-slate-600 bg-slate-200' : 'text-red-600 bg-red-200'));
+                            $tarefaIconClasses = $tarefaConcluida
+                                ? 'ri-checkbox-circle-fill text-green-500'
+                                : ($tarefaEmFoco ? 'ri-sparkling-2-fill text-amber-500' : ($tarefaBloqueada ? 'ri-lock-2-fill text-slate-400' : 'ri-youtube-fill text-red-500'));
+                        @endphp
                         <div class="border-b pb-2">
-                            <span class="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full {{ $tarefa['concluido'] ? 'text-green-600 bg-green-200' : 'text-red-600 bg-red-200' }}">
-                                {{ $tarefa['concluido'] ? 'Concluído' : 'Pendente' }}
+                            <span class="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full {{ $tarefaStatusClasses }}">
+                                {{ $tarefaStatus }}
                             </span>
-                            <a href="#" @click.prevent="window.video_de_ajuda('{{ $tarefa['link'] }}', '{{ $tarefa['titulo'] }}', '{{ addslashes($tarefa['texto']) }}')"
-                               class="flex items-center gap-2 mt-1 text-gray-700 dark:text-gray-300 hover:text-blue-500">
-                                <i class="ri-{{ $tarefa['concluido'] ? 'checkbox-circle-fill' : 'youtube-fill' }} {{ $tarefa['concluido'] ? 'text-green-500' : 'text-red-500' }}"></i>
-                                <span>{{ $tarefa['titulo'] }}</span>
-                            </a>
+                            @if ($tarefaPodeAbrir && !empty($tarefa['link']))
+                                <a href="#" @click.prevent="window.video_de_ajuda('{{ $tarefa['link'] }}', '{{ $tarefa['titulo'] }}', '{{ addslashes($tarefa['texto']) }}')"
+                                   class="flex items-center gap-2 mt-1 text-gray-700 dark:text-gray-300 hover:text-blue-500">
+                                    <i class="{{ $tarefaIconClasses }}"></i>
+                                    <span>{{ $tarefa['titulo'] }}</span>
+                                </a>
+                            @else
+                                <div class="flex items-center gap-2 mt-1 {{ $tarefaBloqueada ? 'text-gray-400' : 'text-gray-700 dark:text-gray-300' }}">
+                                    <i class="{{ $tarefaIconClasses }}"></i>
+                                    <span>{{ $tarefa['titulo'] }}</span>
+                                </div>
+                            @endif
                         </div>
                     @endforeach
                 @endisset

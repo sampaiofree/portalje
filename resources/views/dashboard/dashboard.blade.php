@@ -7,7 +7,30 @@
     </x-slot>
 
     {{-- O conteúdo principal da página --}}
-    <div class="py-12">
+    @php
+        $whatsappAtendimentos = $whatsappAtendimentos ?? collect();
+        $temWhatsappAtendimento = $whatsappAtendimentos->isNotEmpty();
+        $whatsappAtivos = $whatsappAtendimentos->where('is_active', true)->values();
+        $homePageLayoutAtual = in_array((string) Auth::user()->home_page_layout, ['padrao', 'w3'], true)
+            ? (string) Auth::user()->home_page_layout
+            : 'padrao';
+        $homePageDestinationAtual = in_array((string) Auth::user()->home_page_destination, ['curso', 'whatsapp'], true)
+            ? (string) Auth::user()->home_page_destination
+            : 'curso';
+        $homePageWhatsappFlowAtual = in_array((string) Auth::user()->home_page_whatsapp_flow, ['formulario', 'direto'], true)
+            ? (string) Auth::user()->home_page_whatsapp_flow
+            : 'formulario';
+        $dashboardJornada = array_values($dashboard_jornada ?? []);
+        $dashboardJornadaSummary = array_merge([
+            'completed_count' => 0,
+            'progress_percent' => 0,
+            'xp_total' => 0,
+            'xp_max' => 0,
+            'level_label' => 'Nível 1 · Em ativação',
+            'reward_unlocked' => false,
+        ], $dashboard_jornada_summary ?? []);
+    @endphp
+    <div class="py-12" x-data="dashboardJourney(@js($dashboardJornada))">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-8">
 
             <!-- SEÇÃO 1: BOAS-VINDAS E PRIMEIROS PASSOS -->
@@ -16,41 +39,196 @@
                 <p class="mt-2 text-lg text-gray-600 text-gray-400">Sua jornada para o sucesso como afiliado começa agora. Siga os passos abaixo.</p>
             </div>
 
-            @php
-                $whatsappAtendimentos = $whatsappAtendimentos ?? collect();
-                $temWhatsappAtendimento = $whatsappAtendimentos->isNotEmpty();
-                $whatsappAtivos = $whatsappAtendimentos->where('is_active', true)->values();
-                $homePageLayoutAtual = in_array((string) Auth::user()->home_page_layout, ['padrao', 'w3'], true)
-                    ? (string) Auth::user()->home_page_layout
-                    : 'padrao';
-                $homePageDestinationAtual = in_array((string) Auth::user()->home_page_destination, ['curso', 'whatsapp'], true)
-                    ? (string) Auth::user()->home_page_destination
-                    : 'curso';
-                $homePageWhatsappFlowAtual = in_array((string) Auth::user()->home_page_whatsapp_flow, ['formulario', 'direto'], true)
-                    ? (string) Auth::user()->home_page_whatsapp_flow
-                    : 'formulario';
-            @endphp
-
-            <!-- BOX DE ALERTA PRINCIPAL -->
-            @if(!Auth::user()->dominio && !Auth::user()->dominio_externo)
-                <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 text-center rounded-md" role="alert">
-                    <h4 class="font-bold text-lg flex items-center justify-center"><i class="ri-error-warning-line mr-2"></i>Ação Necessária!</h4>
-                    <p>Você ainda não configurou seu site. Este é o passo mais importante para começar a vender.</p>
-                    <hr class="my-3 border-red-300">
-                    <x-danger-button x-data @click.prevent="$dispatch('open-modal', 'dominio-form-modal')">
-                        <i class="ri-global-line mr-2"></i>Configurar Meu Site Agora
-                    </x-danger-button>
-                </div>
-            @elseif(!$temWhatsappAtendimento)
-                <div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 p-4 text-center rounded-md" role="alert">
-                    <h4 class="font-bold text-lg flex items-center justify-center"><i class="ri-whatsapp-line mr-2"></i>Quase lá!</h4>
-                    <p>Seu site está no ar, mas você precisa cadastrar seu WhatsApp de atendimento para não perder vendas.</p>
-                    <hr class="my-3 border-yellow-300">
-                    <x-primary-button type="button" onclick="openWhatsappModal()" class="bg-yellow-500 hover:bg-yellow-600 focus:bg-yellow-600 active:bg-yellow-700">
-                        <i class="ri-edit-2-line mr-2"></i>Cadastrar Meu WhatsApp
-                    </x-primary-button>
+            @if (session('success'))
+                <div class="rounded-lg border border-green-200 bg-green-50 p-4 text-green-800">
+                    {{ session('success') }}
                 </div>
             @endif
+
+            @if (session('error'))
+                <div class="rounded-lg border border-red-200 bg-red-50 p-4 text-red-800">
+                    {{ session('error') }}
+                </div>
+            @endif
+
+            <section class="bg-gradient-to-r from-indigo-900 to-blue-900 rounded-xl p-6 shadow-xl border border-indigo-500/30 mb-8">
+                <div class="flex flex-col gap-5 md:flex-row md:items-start md:justify-between mb-6">
+                    <div class="max-w-2xl">
+                        <h3 class="text-2xl font-bold text-white flex items-center gap-2">
+                            <i class="ri-medal-line text-yellow-400"></i>
+                            Sua Jornada de Sucesso
+                        </h3>
+                        <p class="mt-2 text-sm text-indigo-200">
+                            Complete as missões para ativar sua estrutura de forma progressiva.
+                        </p>
+                    </div>
+
+                    <div class="md:min-w-[280px] md:text-right">
+                        <div class="mt-3 flex md:justify-end">
+                            <div class="inline-flex items-center gap-3 rounded-2xl border border-amber-300/30 bg-slate-950/35 px-4 py-3 shadow-[0_0_26px_rgba(251,191,36,0.2)]">
+                                <span class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-amber-300/20 text-amber-200">
+                                    <i class="ri-flashlight-line text-xl"></i>
+                                </span>
+                                <div class="leading-tight text-left md:text-right">
+                                    <div class="text-2xl font-black text-amber-100">{{ $dashboardJornadaSummary['xp_total'] }} XP</div>
+                                    <div class="text-[11px] uppercase tracking-[0.14em] text-amber-200/80">Experiência acumulada</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <button
+                        type="button"
+                        @click="prevCarousel()"
+                        :disabled="carouselStart === 0"
+                        x-show="steps.length > cardsPerView"
+                        x-cloak
+                        class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white transition"
+                        :class="carouselStart === 0 ? 'cursor-not-allowed opacity-40' : 'hover:bg-white/20 hover:shadow-[0_0_14px_rgba(148,163,184,0.35)]'"
+                    >
+                        <i class="ri-arrow-left-s-line text-xl"></i>
+                    </button>
+
+                    <div class="min-w-0 flex-1 overflow-hidden">
+                        <div
+                            class="flex flex-nowrap transition-transform duration-300 ease-out will-change-transform"
+                            :style="trackStyle()"
+                        >
+                            @forelse ($dashboardJornada as $step)
+                        @php
+                            $stepIsCompleted = (bool) ($step['concluido'] ?? false);
+                            $stepIsFocused = (bool) ($step['em_foco'] ?? false);
+                            $stepIsBlocked = (bool) ($step['bloqueado'] ?? false);
+                            $stepCanOpen = (bool) ($step['pode_abrir'] ?? false);
+                            $stepCardClasses = $stepIsCompleted
+                                ? 'bg-emerald-400/10 border-emerald-300/30'
+                                : ($stepIsFocused
+                                    ? 'bg-gradient-to-br from-amber-300/35 via-yellow-300/30 to-amber-500/25 border-amber-200/80 shadow-[0_0_34px_rgba(251,191,36,0.38)] ring-1 ring-amber-100/35'
+                                    : ($stepIsBlocked ? 'bg-slate-950/25 border-slate-400/20 opacity-80' : 'bg-white/5 border-white/10'));
+                            $stepTitleClasses = $stepIsCompleted
+                                ? 'text-emerald-50'
+                                : ($stepIsFocused ? 'text-amber-50' : ($stepIsBlocked ? 'text-slate-100' : 'text-white'));
+                            $stepStatusClasses = $stepIsCompleted
+                                ? 'text-emerald-200'
+                                : ($stepIsFocused ? 'text-amber-100' : ($stepIsBlocked ? 'text-slate-300' : 'text-indigo-200'));
+                            $stepIconClasses = $stepIsCompleted
+                                ? 'ri-checkbox-circle-fill text-emerald-300'
+                                : ($stepIsFocused ? 'ri-sparkling-2-fill text-amber-300' : ($stepIsBlocked ? 'ri-lock-2-fill text-slate-300' : 'ri-time-line text-indigo-300 opacity-70'));
+                            $stepStatusText = (string) ($step['status_label'] ?? 'Pendente');
+                            $stepGoalLabel = trim((string) ($step['goal_label'] ?? ''));
+                            $stepDescription = $stepIsCompleted
+                                ? 'O sistema já confirmou essa meta.'
+                                : ($stepIsFocused
+                                    ? 'Conclua esta missão para liberar a próxima etapa da jornada.'
+                                    : ($stepIsBlocked
+                                        ? 'Essa missão será liberada quando você concluir a etapa atual.'
+                                        : 'A etapa segue disponível com aulas e status automático.'));
+                            $stepButtonClasses = $stepIsBlocked
+                                ? 'bg-slate-700/40 text-slate-300 cursor-not-allowed'
+                                : ($stepIsFocused
+                                    ? 'bg-amber-300 text-slate-950 hover:bg-amber-200 shadow-[0_0_18px_rgba(251,191,36,0.25)]'
+                                    : 'bg-white/10 hover:bg-white/20 text-white');
+                            $stepButtonLabel = $stepIsBlocked ? 'Bloqueada' : 'Instruções';
+                        @endphp
+                            <div class="w-full shrink-0 px-2 sm:w-1/2 lg:w-1/3">
+                                <div class="relative h-full border rounded-xl p-4 transition-all duration-200 {{ $stepCanOpen ? 'hover:scale-[1.02]' : '' }} {{ $stepCardClasses }}">
+                                    <span class="absolute top-2 right-2 bg-yellow-500 text-black text-[10px] font-black px-2 py-0.5 rounded-full shadow-lg">
+                                        +{{ $step['xp'] }} XP
+                                    </span>
+
+                                    <div class="flex flex-col h-full justify-between min-h-[210px]">
+                                        <div>
+                                            @if ($stepIsCompleted)
+                                                <div class="mb-2 flex items-center justify-start">
+                                                    <span class="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/40 bg-emerald-400/20 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-100">
+                                                        <i class="ri-checkbox-circle-fill text-sm"></i>
+                                                        Meta concluída
+                                                    </span>
+                                                </div>
+                                            @elseif ($stepIsFocused)
+                                                <div class="mb-2 flex items-center justify-start">
+                                                    <span class="inline-flex items-center gap-1.5 rounded-full border border-amber-200/55 bg-amber-300/25 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-amber-50">
+                                                        <i class="ri-sparkling-2-fill text-sm"></i>
+                                                        {{ $stepStatusText }}
+                                                    </span>
+                                                </div>
+                                            @elseif ($stepIsBlocked)
+                                                <div class="mb-2 flex items-center justify-start">
+                                                    <span class="inline-flex items-center gap-1.5 rounded-full border border-slate-300/30 bg-slate-400/15 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-100">
+                                                        <i class="ri-lock-2-fill text-sm"></i>
+                                                        {{ $stepStatusText }}
+                                                    </span>
+                                                </div>
+                                            @else
+                                                <div class="mb-2 flex items-center justify-between gap-2">
+                                                    <i class="{{ $stepIconClasses }} text-2xl"></i>
+                                                    <span class="text-[11px] font-semibold uppercase tracking-[0.16em] {{ $stepStatusClasses }}">
+                                                        {{ $stepStatusText }}
+                                                    </span>
+                                                </div>
+                                            @endif
+                                            <div class="text-xs font-semibold uppercase tracking-wider text-indigo-300/80">
+                                                Etapa {{ $step['numero'] ?? $step['id'] }}
+                                            </div>
+                                            @if ($stepIsFocused)
+                                                <span class="mt-3 inline-flex items-center gap-2 rounded-full bg-amber-300 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-slate-950 shadow-[0_0_16px_rgba(251,191,36,0.28)]">
+                                                    <i class="ri-focus-3-line"></i>
+                                                    Etapa atual
+                                                </span>
+                                            @endif
+                                            <h4 class="mt-2 font-bold text-sm leading-tight {{ $stepTitleClasses }}">
+                                                {{ $step['titulo'] }}
+                                            </h4>
+                                            @if ($stepGoalLabel !== '')
+                                                <p class="mt-2 text-[11px] font-semibold uppercase tracking-[0.14em] {{ $stepStatusClasses }}">
+                                                    {{ $stepGoalLabel }}
+                                                </p>
+                                            @endif
+                                            <p class="mt-3 text-xs leading-5 {{ $stepStatusClasses }}">
+                                                {{ $stepDescription }}
+                                            </p>
+                                        </div>
+
+                                        <button
+                                            type="button"
+                                            @click="openStepAction({{ $step['id'] }})"
+                                            @disabled($stepIsBlocked)
+                                            class="mt-4 text-[11px] font-bold uppercase tracking-wider py-2 rounded transition {{ $stepButtonClasses }}"
+                                        >
+                                            {{ $stepButtonLabel }}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            @empty
+                                <div class="w-full shrink-0 px-2">
+                                    <div class="rounded-xl border border-dashed border-white/15 bg-white/5 p-5 text-sm leading-6 text-indigo-100/85">
+                                        Nenhuma missão ativa foi configurada para a sua jornada no momento.
+                                    </div>
+                                </div>
+                            @endforelse
+                        </div>
+                    </div>
+
+                    <button
+                        type="button"
+                        @click="nextCarousel()"
+                        :disabled="carouselStart >= maxCarouselStart()"
+                        x-show="steps.length > cardsPerView"
+                        x-cloak
+                        class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white transition"
+                        :class="carouselStart >= maxCarouselStart() ? 'cursor-not-allowed opacity-40' : 'hover:bg-white/20 hover:shadow-[0_0_14px_rgba(148,163,184,0.35)]'"
+                    >
+                        <i class="ri-arrow-right-s-line text-xl"></i>
+                    </button>
+                </div>
+
+                <p class="mt-4 text-sm text-indigo-100/80">
+                    Clique em instruções para saber como concluir a etapa.
+                </p>
+            </section>
 
             <!-- SEÇÕES GUIADAS -->
             <div class="space-y-8">
@@ -382,6 +560,86 @@
                 </div>
             </div>
         </div>
+
+        <div
+            x-show="isStepVideosOpen"
+            x-cloak
+            class="fixed inset-0 z-50"
+            style="display: none;"
+            x-on:keydown.escape.window="closeStepVideos()"
+        >
+            <div class="absolute inset-0 bg-slate-950/70 backdrop-blur-sm" @click="closeStepVideos()"></div>
+            <div class="absolute inset-y-0 right-0 flex w-full justify-end">
+                <div
+                    x-show="isStepVideosOpen"
+                    x-transition:enter="transform transition ease-out duration-300"
+                    x-transition:enter-start="translate-x-full"
+                    x-transition:enter-end="translate-x-0"
+                    x-transition:leave="transform transition ease-in duration-200"
+                    x-transition:leave-start="translate-x-0"
+                    x-transition:leave-end="translate-x-full"
+                    class="relative flex h-full w-full max-w-xl flex-col overflow-y-auto border-l border-white/10 bg-slate-950 text-white shadow-2xl"
+                >
+                    <div class="border-b border-white/10 px-6 py-5">
+                        <div class="flex items-start justify-between gap-4">
+                            <div>
+                                <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-200/80">Aulas da missão</div>
+                                <h3 class="mt-2 text-2xl font-semibold" x-text="selectedStepTitle()"></h3>
+                                <p class="mt-2 text-sm leading-6 text-slate-300">
+                                    Assista às aulas desta etapa e depois conclua a ação usando os blocos do dashboard.
+                                </p>
+                            </div>
+                            <button type="button" class="rounded-full border border-white/10 bg-white/5 p-2 text-slate-300 transition hover:bg-white/10 hover:text-white" @click="closeStepVideos()">
+                                <i class="ri-close-line text-xl"></i>
+                            </button>
+                        </div>
+
+                        <div class="mt-4 flex flex-wrap items-center gap-3 text-sm text-slate-300">
+                            <span class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1">
+                                <i class="ri-flashlight-line text-amber-200"></i>
+                                <span x-text="selectedStepXp()"></span>
+                            </span>
+                            <span
+                                class="inline-flex items-center gap-2 rounded-full border px-3 py-1"
+                                :class="selectedStepStatusClass()"
+                            >
+                                <i :class="selectedStepStatusIcon()"></i>
+                                <span x-text="selectedStepStatusLabel()"></span>
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="flex-1 space-y-3 px-6 py-5">
+                        <template x-if="selectedStep && selectedStep.videos && selectedStep.videos.length">
+                            <template x-for="(video, index) in selectedStep.videos" :key="`${selectedStep.id}-${index}`">
+                                <button
+                                    type="button"
+                                    class="flex w-full items-start gap-4 rounded-2xl border border-white/10 bg-white/5 px-4 py-4 text-left transition hover:border-cyan-300/25 hover:bg-cyan-400/10"
+                                    @click="openJourneyVideo(video)"
+                                >
+                                    <span class="mt-1 inline-flex h-11 w-11 flex-none items-center justify-center rounded-2xl bg-cyan-400/10 text-cyan-200">
+                                        <i class="ri-youtube-line text-2xl"></i>
+                                    </span>
+                                    <span class="min-w-0 flex-1">
+                                        <span class="block text-sm font-semibold text-white" x-text="video.titulo"></span>
+                                        <span class="mt-1 block text-sm leading-6 text-slate-300" x-text="video.texto ? 'Abrir aula e materiais dessa etapa.' : 'Abrir aula em vídeo no modal de ajuda.'"></span>
+                                    </span>
+                                    <span class="pt-1 text-slate-400">
+                                        <i class="ri-arrow-right-up-line text-lg"></i>
+                                    </span>
+                                </button>
+                            </template>
+                        </template>
+
+                        <template x-if="!selectedStep || !selectedStep.videos || !selectedStep.videos.length">
+                            <div class="rounded-2xl border border-dashed border-white/10 bg-white/5 px-4 py-6 text-sm text-slate-300">
+                                Nenhuma aula cadastrada para esta missão.
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Modal do Formulário de WhatsApp -->
@@ -495,6 +753,187 @@
         </form>
     </x-modal>
 <script>
+    function dashboardJourney(steps = []) {
+        return {
+            steps: Array.isArray(steps) ? steps : [],
+            carouselStart: 0,
+            cardsPerView: 1,
+            resizeHandler: null,
+            isStepVideosOpen: false,
+            selectedStep: null,
+
+            init() {
+                this.cardsPerView = this.resolveCardsPerView();
+                this.carouselStart = this.initialCarouselStart();
+                this.resizeHandler = () => {
+                    this.cardsPerView = this.resolveCardsPerView();
+                    this.carouselStart = Math.min(this.carouselStart, this.maxCarouselStart());
+                };
+                window.addEventListener('resize', this.resizeHandler);
+            },
+
+            resolveCardsPerView() {
+                const width = window.innerWidth || 0;
+                if (width >= 1024) {
+                    return 3;
+                }
+
+                if (width >= 640) {
+                    return 2;
+                }
+
+                return 1;
+            },
+
+            maxCarouselStart() {
+                return Math.max(0, this.steps.length - this.cardsPerView);
+            },
+
+            initialCarouselStart() {
+                const totalSteps = this.steps.length;
+                if (totalSteps <= this.cardsPerView) {
+                    return 0;
+                }
+
+                const focusedIndex = this.steps.findIndex(step => Boolean(step && step.em_foco));
+                if (focusedIndex < 0) {
+                    return 0;
+                }
+
+                if (focusedIndex === 0) {
+                    return 0;
+                }
+
+                if (focusedIndex === totalSteps - 1) {
+                    return this.maxCarouselStart();
+                }
+
+                const centeredStart = focusedIndex - Math.floor(this.cardsPerView / 2);
+                return Math.max(0, Math.min(centeredStart, this.maxCarouselStart()));
+            },
+
+            trackStyle() {
+                if (this.steps.length <= this.cardsPerView) {
+                    return 'transform: translateX(0%);';
+                }
+
+                const translatePercent = (100 / this.cardsPerView) * this.carouselStart;
+                return `transform: translateX(-${translatePercent}%);`;
+            },
+
+            prevCarousel() {
+                if (this.carouselStart <= 0) {
+                    return;
+                }
+
+                this.carouselStart -= 1;
+            },
+
+            nextCarousel() {
+                const maxStart = this.maxCarouselStart();
+                if (this.carouselStart >= maxStart) {
+                    return;
+                }
+
+                this.carouselStart += 1;
+            },
+
+            openStepVideos(stepId) {
+                const selected = this.steps.find(step => Number(step.id) === Number(stepId));
+                if (!selected || selected.pode_abrir === false) {
+                    return;
+                }
+
+                this.selectedStep = selected;
+                this.isStepVideosOpen = true;
+            },
+
+            openStepAction(stepId) {
+                const selected = this.steps.find(step => Number(step.id) === Number(stepId));
+                if (!selected || selected.pode_abrir === false) {
+                    return;
+                }
+
+                const videos = Array.isArray(selected.videos) ? selected.videos : [];
+                if (videos.length === 1) {
+                    this.openJourneyVideo(videos[0]);
+                    return;
+                }
+
+                this.openStepVideos(stepId);
+            },
+
+            closeStepVideos() {
+                this.isStepVideosOpen = false;
+                this.selectedStep = null;
+            },
+
+            openJourneyVideo(video) {
+                if (!video || !video.link) {
+                    return;
+                }
+
+                const title = typeof video.titulo === 'string' ? video.titulo : '';
+                const text = typeof video.texto === 'string' ? video.texto : '';
+
+                this.closeStepVideos();
+                window.video_de_ajuda(video.link, title, text);
+            },
+
+            selectedStepTitle() {
+                return this.selectedStep && this.selectedStep.titulo
+                    ? this.selectedStep.titulo
+                    : 'Missão';
+            },
+
+            selectedStepXp() {
+                const xp = this.selectedStep && this.selectedStep.xp
+                    ? Number(this.selectedStep.xp)
+                    : 0;
+
+                return `${xp} XP`;
+            },
+
+            selectedStepStatusClass() {
+                if (this.selectedStep && this.selectedStep.concluido) {
+                    return 'border-emerald-300/20 bg-emerald-400/10 text-emerald-100';
+                }
+
+                if (this.selectedStep && this.selectedStep.em_foco) {
+                    return 'border-amber-300/30 bg-amber-300/15 text-amber-100';
+                }
+
+                if (this.selectedStep && this.selectedStep.bloqueado) {
+                    return 'border-slate-400/20 bg-slate-400/10 text-slate-200';
+                }
+
+                return 'border-white/10 bg-white/5 text-slate-200';
+            },
+
+            selectedStepStatusIcon() {
+                if (this.selectedStep && this.selectedStep.concluido) {
+                    return 'ri-checkbox-circle-fill';
+                }
+
+                if (this.selectedStep && this.selectedStep.em_foco) {
+                    return 'ri-sparkling-2-fill';
+                }
+
+                if (this.selectedStep && this.selectedStep.bloqueado) {
+                    return 'ri-lock-2-fill';
+                }
+
+                return 'ri-time-line';
+            },
+
+            selectedStepStatusLabel() {
+                return this.selectedStep && this.selectedStep.status_label
+                    ? this.selectedStep.status_label
+                    : 'Pendente';
+            }
+        };
+    }
+
     function openWhatsappModal(payload = null) {
         const form = document.getElementById('form_whatsapp_atendimento');
         if (!form) return;

@@ -10,7 +10,9 @@ use App\Models\Codigo_ref;
 use App\Models\Leads;
 use App\Models\PurchaseEvent;
 use App\Models\WhatsappAtendimento;
+use App\Models\JourneyRewardClaim;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Carbon\Carbon;
@@ -230,6 +232,11 @@ class User extends Authenticatable implements MustVerifyEmail
     public function whatsappAtendimentos(): HasMany
     {
         return $this->hasMany(WhatsappAtendimento::class, 'user_id', 'id');
+    }
+
+    public function journeyRewardClaim(): HasOne
+    {
+        return $this->hasOne(JourneyRewardClaim::class, 'user_id', 'id');
     }
     
     public function purchaseEvents() //PEGAR OS LEADS DO AFILIADO

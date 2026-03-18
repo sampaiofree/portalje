@@ -23,6 +23,8 @@ use App\Http\Controllers\OpenAIController;
 use App\Http\Controllers\FormacaoEmpresarialController;
 use App\Http\Controllers\DadosPortalController;
 use App\Http\Controllers\CupomController;
+use App\Http\Controllers\JourneyAdminController;
+use App\Http\Controllers\JourneyRewardController;
 use App\Exports\TabelaExport;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Http\Controllers\Auth\LoginController;
@@ -194,6 +196,8 @@ Route::middleware(['auth', 'verified', 'verified.phone', 'minha_jornada'])->grou
         }); 
         
     });
+
+    Route::post('/jornada/premio/resgatar', [JourneyRewardController::class, 'store'])->name('journey.reward.claim');
 });
 
 
@@ -232,6 +236,14 @@ Route::prefix('administrador')->group(function () {
         Route::post('/cupons', [CupomController::class, 'store'])->name('admin.cupons.store');
         Route::put('/cupons/{cupom}', [CupomController::class, 'update'])->name('admin.cupons.update');
         Route::delete('/cupons/{cupom}', [CupomController::class, 'destroy'])->name('admin.cupons.destroy');
+        Route::get('/jornada', [JourneyAdminController::class, 'index'])->name('admin.journey.index');
+        Route::post('/jornada/etapas', [JourneyAdminController::class, 'storeStep'])->name('admin.journey.steps.store');
+        Route::put('/jornada/etapas/{step}', [JourneyAdminController::class, 'updateStep'])->name('admin.journey.steps.update');
+        Route::delete('/jornada/etapas/{step}', [JourneyAdminController::class, 'destroyStep'])->name('admin.journey.steps.destroy');
+        Route::post('/jornada/etapas/{step}/videos', [JourneyAdminController::class, 'storeVideo'])->name('admin.journey.videos.store');
+        Route::put('/jornada/videos/{video}', [JourneyAdminController::class, 'updateVideo'])->name('admin.journey.videos.update');
+        Route::delete('/jornada/videos/{video}', [JourneyAdminController::class, 'destroyVideo'])->name('admin.journey.videos.destroy');
+        Route::put('/jornada/premio', [JourneyAdminController::class, 'updateReward'])->name('admin.journey.reward.update');
         Route::get('/logs', [AdminController::class, 'logsIndex'])->name('admin.logs.index');
         Route::get('/logs/{logFile}/view', [AdminController::class, 'logsView'])->name('admin.logs.view');
         Route::get('/logs/{logFile}/download', [AdminController::class, 'logsDownload'])->name('admin.logs.download');
