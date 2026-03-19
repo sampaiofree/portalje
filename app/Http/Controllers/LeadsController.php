@@ -716,15 +716,19 @@ class LeadsController extends Controller
         }
         
 
-        $data = $query->orderBy('created_at', 'desc')->paginate(150)->appends($request->query());     
-
-        $hotmart_leads = $data;
-
         if (isset($queryParams['excel']) && !empty($queryParams['excel'])) {
-            $export = new TabelaExport($data->items());
+            $exportData = (clone $query)
+                ->orderBy('created_at', 'desc')
+                ->get();
+
+            $export = new TabelaExport($exportData);
     
             return Excel::download($export, 'tabela.xlsx');
         }
+
+        $data = $query->orderBy('created_at', 'desc')->paginate(150)->appends($request->query());     
+
+        $hotmart_leads = $data;
 
         return view('dashboard.leads.index', compact('hotmart_leads', 'btn_leads_portal_hotmart', 'btn_atendimento', 'btn_data', 'btn_status', 'btn_fim'));
         // Retorna a view com os leads paginados
