@@ -172,6 +172,7 @@ Route::middleware(['auth', 'verified', 'verified.phone', 'minha_jornada'])->grou
         });
 
         Route::get('/ranking', [UserController::class, 'ranking'])->name('ranking');   
+        Route::get('/ranking/xp/load-more', [UserController::class, 'rankingXpLoadMore'])->name('ranking.xp.load_more');
 
         Route::post('/leads/alterar_atendimento', [LeadsController::class, 'alterar_atendimento'])->name('alterar_atendimento'); //LEADS ALTERAR ATENDIMENTO
         Route::post('/dominio', [UserController::class, 'update_dominio'])->name('alterar_dominio'); //MENU > MINHA ESTRUTURA > MEU SITE || SUBMETENDO O FORMULÁRIO

@@ -3,8 +3,10 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use App\Models\User;
@@ -18,6 +20,10 @@ use App\Services\JourneyProgressService;
 
 class UserController extends Controller 
 {
+    private const XP_RANKING_MAX_ROWS = 100;
+    private const XP_RANKING_PAGE_SIZE = 10;
+    private const XP_RANKING_CACHE_SECONDS = 300;
+
     public function __construct()
     {
         // Aplica o middleware de autenticação a todas as ações do controlador
@@ -73,6 +79,15 @@ class UserController extends Controller
         $xpTotals = [
             'participants' => 0,
             'xp_total' => 0,
+            'xp_average' => 0,
+        ];
+        $xpMeta = [
+            'page_size' => self::XP_RANKING_PAGE_SIZE,
+            'next_offset' => 0,
+            'has_more' => false,
+            'max' => self::XP_RANKING_MAX_ROWS,
+            'max_visible' => 0,
+            'load_more_url' => route('ranking.xp.load_more'),
         ];
 
         // Obtém o valor do mês enviado pelo GET
@@ -126,41 +141,38 @@ class UserController extends Controller
             // Converte para um array associativo, se necessário
             $d = $dadosAgrupados->toArray();
         } else {
-            $journeyProgressService = app(JourneyProgressService::class);
-            $users = User::query()
-                ->orderBy('name')
-                ->get(['id', 'name', 'apelido']);
+            $xpDataset = $this->getCachedXpRankingDataset();
+            $xpAllRows = $xpDataset['rows'] ?? [];
 
-            foreach ($users as $user) {
-                $payload = $journeyProgressService->buildForUser($user);
-                $summary = $payload['dashboard_jornada_summary'] ?? [];
-                $xpTotal = (int) ($summary['xp_total'] ?? 0);
-
-                if ($xpTotal <= 0) {
-                    continue;
-                }
-
-                $xpRows[] = [
-                    'user_id' => $user->id,
-                    'display_name' => $this->resolveRankingDisplayName($user),
-                    'xp_total' => $xpTotal,
-                ];
-            }
-
-            usort($xpRows, function (array $a, array $b): int {
-                if (($a['xp_total'] ?? 0) !== ($b['xp_total'] ?? 0)) {
-                    return ($b['xp_total'] ?? 0) <=> ($a['xp_total'] ?? 0);
-                }
-
-                return strcasecmp((string) ($a['display_name'] ?? ''), (string) ($b['display_name'] ?? ''));
-            });
-
-            $xpTotals['participants'] = count($xpRows);
-            $xpTotals['xp_total'] = array_sum(array_map(fn ($row) => (int) ($row['xp_total'] ?? 0), $xpRows));
+            $xpRows = array_slice($xpAllRows, 0, self::XP_RANKING_PAGE_SIZE);
+            $xpTotals = array_merge($xpTotals, $xpDataset['totals'] ?? []);
+            $xpMeta['next_offset'] = count($xpRows);
+            $xpMeta['has_more'] = count($xpAllRows) > count($xpRows);
+            $xpMeta['max_visible'] = count($xpAllRows);
         }
 
         // Retorna a view com os dados
-        return view('adm.ranking.ranking', compact('d', 'mes', 'dataInicio', 'dataFim', 'activeTab', 'xpRows', 'xpTotals'));
+        return view('adm.ranking.ranking', compact('d', 'mes', 'dataInicio', 'dataFim', 'activeTab', 'xpRows', 'xpTotals', 'xpMeta'));
+    }
+
+    public function rankingXpLoadMore(Request $request): JsonResponse
+    {
+        $offset = max(0, (int) $request->query('offset', 0));
+        $limit = max(1, min(self::XP_RANKING_PAGE_SIZE, (int) $request->query('limit', self::XP_RANKING_PAGE_SIZE)));
+
+        $xpDataset = $this->getCachedXpRankingDataset();
+        $xpAllRows = $xpDataset['rows'] ?? [];
+
+        $rows = array_values(array_slice($xpAllRows, $offset, $limit));
+        $nextOffset = $offset + count($rows);
+        $hasMore = $nextOffset < count($xpAllRows);
+
+        return response()->json([
+            'rows' => $rows,
+            'next_offset' => $nextOffset,
+            'has_more' => $hasMore,
+            'shown_count' => $nextOffset,
+        ]);
     }
 
     private function resolveRankingDisplayName(User $user): string
@@ -177,6 +189,64 @@ class UserController extends Controller
 
         $partes = preg_split('/\s+/', $nome);
         return (string) ($partes[0] ?? $nome);
+    }
+
+    private function getCachedXpRankingDataset(): array
+    {
+        return Cache::remember(
+            'ranking:xp:v1:max_' . self::XP_RANKING_MAX_ROWS,
+            now()->addSeconds(self::XP_RANKING_CACHE_SECONDS),
+            function (): array {
+                $journeyProgressService = app(JourneyProgressService::class);
+                $users = User::query()
+                    ->orderBy('name')
+                    ->get(['id', 'name', 'apelido']);
+
+                $rows = [];
+                foreach ($users as $user) {
+                    $payload = $journeyProgressService->buildForUser($user);
+                    $summary = $payload['dashboard_jornada_summary'] ?? [];
+                    $xpTotal = (int) ($summary['xp_total'] ?? 0);
+
+                    if ($xpTotal <= 0) {
+                        continue;
+                    }
+
+                    $rows[] = [
+                        'user_id' => $user->id,
+                        'display_name' => $this->resolveRankingDisplayName($user),
+                        'xp_total' => $xpTotal,
+                    ];
+                }
+
+                usort($rows, function (array $a, array $b): int {
+                    if (($a['xp_total'] ?? 0) !== ($b['xp_total'] ?? 0)) {
+                        return ($b['xp_total'] ?? 0) <=> ($a['xp_total'] ?? 0);
+                    }
+
+                    return strcasecmp((string) ($a['display_name'] ?? ''), (string) ($b['display_name'] ?? ''));
+                });
+
+                $participants = count($rows);
+                $xpTotal = array_sum(array_map(fn ($row) => (int) ($row['xp_total'] ?? 0), $rows));
+                $xpAverage = $participants > 0 ? (int) round($xpTotal / $participants) : 0;
+
+                $rows = array_slice($rows, 0, self::XP_RANKING_MAX_ROWS);
+                $rows = array_values(array_map(function (array $row, int $index): array {
+                    $row['position'] = $index + 1;
+                    return $row;
+                }, $rows, array_keys($rows)));
+
+                return [
+                    'rows' => $rows,
+                    'totals' => [
+                        'participants' => $participants,
+                        'xp_total' => $xpTotal,
+                        'xp_average' => $xpAverage,
+                    ],
+                ];
+            }
+        );
     }
 
 

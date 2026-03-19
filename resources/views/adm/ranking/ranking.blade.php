@@ -26,7 +26,16 @@
                 $xpTotals = array_merge([
                     'participants' => 0,
                     'xp_total' => 0,
+                    'xp_average' => 0,
                 ], $xpTotals ?? []);
+                $xpMeta = array_merge([
+                    'page_size' => 10,
+                    'next_offset' => count($xpRows),
+                    'has_more' => false,
+                    'max' => 100,
+                    'max_visible' => count($xpRows),
+                    'load_more_url' => route('ranking.xp.load_more'),
+                ], $xpMeta ?? []);
             @endphp
 
             <div class="mb-6 inline-flex rounded-xl bg-gray-100 p-1 shadow-sm">
@@ -287,163 +296,230 @@
             @else
                 @php
                     $xpParticipants = (int) ($xpTotals['participants'] ?? 0);
-                    $xpTotalSum = (int) ($xpTotals['xp_total'] ?? 0);
-                    $xpAverage = $xpParticipants > 0 ? (int) round($xpTotalSum / $xpParticipants) : 0;
+                    $xpAverage = (int) ($xpTotals['xp_average'] ?? 0);
                 @endphp
 
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                    <div class="bg-gradient-to-r from-indigo-500 to-indigo-600 overflow-hidden shadow-lg rounded-xl">
-                        <div class="p-6 text-white">
-                            <div class="flex items-center">
-                                <div class="flex-shrink-0">
-                                    <svg class="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0"></path>
-                                    </svg>
+                <div
+                    x-data="xpRankingList({
+                        initialRows: @js($xpRows),
+                        nextOffset: {{ (int) ($xpMeta['next_offset'] ?? count($xpRows)) }},
+                        hasMore: @js((bool) ($xpMeta['has_more'] ?? false)),
+                        maxVisible: {{ (int) ($xpMeta['max_visible'] ?? count($xpRows)) }},
+                        pageSize: {{ (int) ($xpMeta['page_size'] ?? 10) }},
+                        loadMoreUrl: @js($xpMeta['load_more_url'] ?? route('ranking.xp.load_more')),
+                    })"
+                >
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                        <div class="bg-gradient-to-r from-indigo-500 to-indigo-600 overflow-hidden shadow-lg rounded-xl">
+                            <div class="p-6 text-white">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0">
+                                        <svg class="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0"></path>
+                                        </svg>
+                                    </div>
+                                    <div class="ml-4">
+                                        <p class="text-sm font-medium text-indigo-100">Afiliados com XP</p>
+                                        <p class="text-2xl font-bold">{{ number_format($xpParticipants) }}</p>
+                                    </div>
                                 </div>
-                                <div class="ml-4">
-                                    <p class="text-sm font-medium text-indigo-100">Afiliados com XP</p>
-                                    <p class="text-2xl font-bold">{{ number_format($xpParticipants) }}</p>
+                            </div>
+                        </div>
+
+                        <div class="bg-gradient-to-r from-emerald-500 to-teal-600 overflow-hidden shadow-lg rounded-xl">
+                            <div class="p-6 text-white">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0">
+                                        <svg class="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"></path>
+                                        </svg>
+                                    </div>
+                                    <div class="ml-4">
+                                        <p class="text-sm font-medium text-emerald-100">Média de XP</p>
+                                        <p class="text-2xl font-bold">{{ number_format($xpAverage) }}</p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="bg-gradient-to-r from-amber-500 to-orange-500 overflow-hidden shadow-lg rounded-xl">
-                        <div class="p-6 text-white">
+                    <div class="bg-white overflow-hidden shadow-xl sm:rounded-xl">
+                        <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
                             <div class="flex items-center">
-                                <div class="flex-shrink-0">
-                                    <svg class="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l2.035 6.258a1 1 0 00.95.69h6.58c.969 0 1.371 1.24.588 1.81l-5.323 3.868a1 1 0 00-.364 1.118l2.034 6.258c.3.922-.755 1.688-1.54 1.118l-5.322-3.868a1 1 0 00-1.176 0l-5.322 3.868c-.785.57-1.84-.196-1.54-1.118l2.034-6.258a1 1 0 00-.364-1.118L2.364 11.685c-.783-.57-.38-1.81.588-1.81h6.58a1 1 0 00.95-.69l2.035-6.258z"></path>
-                                    </svg>
-                                </div>
-                                <div class="ml-4">
-                                    <p class="text-sm font-medium text-amber-100">XP Total</p>
-                                    <p class="text-2xl font-bold">{{ number_format($xpTotalSum) }}</p>
-                                </div>
+                                <svg class="w-6 h-6 text-gray-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2a4 4 0 014-4h8m0 0l-3-3m3 3l-3 3M5 3v18"></path>
+                                </svg>
+                                <h3 class="text-lg font-semibold text-gray-900">Ranking por XP</h3>
                             </div>
                         </div>
-                    </div>
 
-                    <div class="bg-gradient-to-r from-emerald-500 to-teal-600 overflow-hidden shadow-lg rounded-xl">
-                        <div class="p-6 text-white">
-                            <div class="flex items-center">
-                                <div class="flex-shrink-0">
-                                    <svg class="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"></path>
-                                    </svg>
-                                </div>
-                                <div class="ml-4">
-                                    <p class="text-sm font-medium text-emerald-100">Média de XP</p>
-                                    <p class="text-2xl font-bold">{{ number_format($xpAverage) }}</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="bg-white overflow-hidden shadow-xl sm:rounded-xl">
-                    <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
-                        <div class="flex items-center">
-                            <svg class="w-6 h-6 text-gray-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2a4 4 0 014-4h8m0 0l-3-3m3 3l-3 3M5 3v18"></path>
-                            </svg>
-                            <h3 class="text-lg font-semibold text-gray-900">Ranking por XP</h3>
-                        </div>
-                    </div>
-
-                    <div class="overflow-hidden">
-                        <div class="overflow-x-auto">
-                            <table class="min-w-full divide-y divide-gray-200">
-                                <thead class="bg-gray-50">
-                                    <tr>
-                                        <th scope="col" class="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                                            <div class="flex items-center">
-                                                <span class="mr-2">🏆</span>
-                                                Posição
-                                            </div>
-                                        </th>
-                                        <th scope="col" class="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                                            <div class="flex items-center">
-                                                <span class="mr-2">👤</span>
-                                                Afiliado
-                                            </div>
-                                        </th>
-                                        <th scope="col" class="px-6 py-4 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                                            <div class="flex items-center justify-end">
-                                                <span class="mr-2">⚡</span>
-                                                XP
-                                            </div>
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody class="bg-white divide-y divide-gray-200">
-                                    @forelse ($xpRows as $index => $row)
-                                        @php
-                                            $posicao = $index + 1;
-                                            $displayName = (string) ($row['display_name'] ?? 'Sem nome');
-                                            $iniciais = strtoupper(substr($displayName, 0, 2));
-                                        @endphp
-                                        <tr class="hover:bg-gray-50 transition-colors duration-200">
-                                            <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="overflow-hidden">
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th scope="col" class="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                                                 <div class="flex items-center">
-                                                    @if($posicao === 1)
-                                                        <span class="inline-flex items-center justify-center w-8 h-8 bg-yellow-100 text-yellow-800 text-sm font-bold rounded-full">🥇</span>
-                                                    @elseif($posicao === 2)
-                                                        <span class="inline-flex items-center justify-center w-8 h-8 bg-gray-100 text-gray-800 text-sm font-bold rounded-full">🥈</span>
-                                                    @elseif($posicao === 3)
-                                                        <span class="inline-flex items-center justify-center w-8 h-8 bg-orange-100 text-orange-800 text-sm font-bold rounded-full">🥉</span>
-                                                    @else
-                                                        <span class="inline-flex items-center justify-center w-8 h-8 bg-gray-100 text-gray-600 text-sm font-medium rounded-full">{{ $posicao }}</span>
-                                                    @endif
+                                                    <span class="mr-2">🏆</span>
+                                                    Posição
                                                 </div>
-                                            </td>
-                                            <td class="px-6 py-4 whitespace-nowrap">
+                                            </th>
+                                            <th scope="col" class="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                                                 <div class="flex items-center">
-                                                    <div class="flex-shrink-0 h-10 w-10">
-                                                        <div class="h-10 w-10 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 flex items-center justify-center">
-                                                            <span class="text-sm font-medium text-white uppercase">{{ $iniciais }}</span>
+                                                    <span class="mr-2">👤</span>
+                                                    Afiliado
+                                                </div>
+                                            </th>
+                                            <th scope="col" class="px-6 py-4 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                                <div class="flex items-center justify-end">
+                                                    <span class="mr-2">⚡</span>
+                                                    XP
+                                                </div>
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="bg-white divide-y divide-gray-200">
+                                        <template x-if="rows.length === 0">
+                                            <tr>
+                                                <td colspan="3" class="text-center py-16">
+                                                    <div class="flex flex-col items-center justify-center">
+                                                        <svg class="w-16 h-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"></path>
+                                                        </svg>
+                                                        <h3 class="text-lg font-medium text-gray-900 mb-2">Nenhum afiliado com XP</h3>
+                                                        <p class="text-gray-500">Ainda não há afiliados com XP acumulado para exibir no ranking.</p>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </template>
+
+                                        <template x-for="row in rows" :key="row.position">
+                                            <tr class="hover:bg-gray-50 transition-colors duration-200">
+                                                <td class="px-6 py-4 whitespace-nowrap">
+                                                    <div class="flex items-center">
+                                                        <template x-if="row.position === 1">
+                                                            <span class="inline-flex items-center justify-center w-8 h-8 bg-yellow-100 text-yellow-800 text-sm font-bold rounded-full">🥇</span>
+                                                        </template>
+                                                        <template x-if="row.position === 2">
+                                                            <span class="inline-flex items-center justify-center w-8 h-8 bg-gray-100 text-gray-800 text-sm font-bold rounded-full">🥈</span>
+                                                        </template>
+                                                        <template x-if="row.position === 3">
+                                                            <span class="inline-flex items-center justify-center w-8 h-8 bg-orange-100 text-orange-800 text-sm font-bold rounded-full">🥉</span>
+                                                        </template>
+                                                        <template x-if="row.position > 3">
+                                                            <span class="inline-flex items-center justify-center w-8 h-8 bg-gray-100 text-gray-600 text-sm font-medium rounded-full" x-text="row.position"></span>
+                                                        </template>
+                                                    </div>
+                                                </td>
+                                                <td class="px-6 py-4 whitespace-nowrap">
+                                                    <div class="flex items-center">
+                                                        <div class="flex-shrink-0 h-10 w-10">
+                                                            <div class="h-10 w-10 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 flex items-center justify-center">
+                                                                <span class="text-sm font-medium text-white uppercase" x-text="initials(row.display_name)"></span>
+                                                            </div>
+                                                        </div>
+                                                        <div class="ml-4">
+                                                            <div class="text-sm font-medium text-gray-900 uppercase" x-text="row.display_name || 'Sem nome'"></div>
+                                                            <template x-if="row.position <= 3">
+                                                                <div class="text-xs text-gray-500">Top XP</div>
+                                                            </template>
                                                         </div>
                                                     </div>
-                                                    <div class="ml-4">
-                                                        <div class="text-sm font-medium text-gray-900 uppercase">{{ $displayName }}</div>
-                                                        @if($posicao <= 3)
-                                                            <div class="text-xs text-gray-500">Top XP</div>
-                                                        @endif
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-right">
-                                                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-amber-100 text-amber-800">
-                                                    {{ number_format((int) ($row['xp_total'] ?? 0)) }} XP
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    @empty
-                                        <tr>
-                                            <td colspan="3" class="text-center py-16">
-                                                <div class="flex flex-col items-center justify-center">
-                                                    <svg class="w-16 h-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"></path>
-                                                    </svg>
-                                                    <h3 class="text-lg font-medium text-gray-900 mb-2">Nenhum afiliado com XP</h3>
-                                                    <p class="text-gray-500">Ainda não há afiliados com XP acumulado para exibir no ranking.</p>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    @endforelse
-                                </tbody>
-                            </table>
+                                                </td>
+                                                <td class="px-6 py-4 whitespace-nowrap text-right">
+                                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-amber-100 text-amber-800">
+                                                        <span x-text="formatNumber(row.xp_total)"></span> XP
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
-                    </div>
 
-                    <div class="bg-gray-50 px-6 py-3 border-t border-gray-200">
-                        <div class="flex items-center justify-between text-sm text-gray-500">
-                            <span>Exibindo {{ number_format($xpParticipants) }} afiliados</span>
-                            <span>Última atualização: {{ now()->format('d/m/Y H:i') }}</span>
+                        <div class="px-6 py-4 border-t border-gray-200 bg-white" x-show="hasMore || loading">
+                            <div class="flex flex-col items-center gap-2">
+                                <button
+                                    type="button"
+                                    class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                                    :disabled="loading || !hasMore"
+                                    @click="loadMore"
+                                >
+                                    <span x-show="!loading">Mostrar mais (+10)</span>
+                                    <span x-show="loading">Carregando...</span>
+                                </button>
+                                <p class="text-sm text-red-600" x-show="errorMessage" x-text="errorMessage"></p>
+                            </div>
+                        </div>
+
+                        <div class="bg-gray-50 px-6 py-3 border-t border-gray-200">
+                            <div class="flex items-center justify-between text-sm text-gray-500">
+                                <span x-text="`Exibindo ${formatNumber(rows.length)} de ${formatNumber(maxVisible)} afiliados`"></span>
+                                <span>Última atualização: {{ now()->format('d/m/Y H:i') }}</span>
+                            </div>
                         </div>
                     </div>
                 </div>
             @endif
         </div>
     </div>
+
+    <script>
+        function xpRankingList(config) {
+            return {
+                rows: Array.isArray(config.initialRows) ? config.initialRows : [],
+                nextOffset: Number(config.nextOffset || 0),
+                hasMore: Boolean(config.hasMore),
+                maxVisible: Number(config.maxVisible || 0),
+                pageSize: Number(config.pageSize || 10),
+                loadMoreUrl: config.loadMoreUrl || '',
+                loading: false,
+                errorMessage: '',
+                formatNumber(value) {
+                    return Number(value || 0).toLocaleString('pt-BR');
+                },
+                initials(name) {
+                    const text = String(name || 'Sem nome').trim();
+                    return text.slice(0, 2).toUpperCase();
+                },
+                async loadMore() {
+                    if (this.loading || !this.hasMore || !this.loadMoreUrl) {
+                        return;
+                    }
+
+                    this.loading = true;
+                    this.errorMessage = '';
+
+                    try {
+                        const url = new URL(this.loadMoreUrl, window.location.origin);
+                        url.searchParams.set('offset', String(this.nextOffset));
+                        url.searchParams.set('limit', String(this.pageSize));
+
+                        const response = await fetch(url.toString(), {
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest',
+                            },
+                        });
+
+                        if (!response.ok) {
+                            throw new Error('Falha ao carregar mais itens.');
+                        }
+
+                        const data = await response.json();
+                        const newRows = Array.isArray(data.rows) ? data.rows : [];
+
+                        this.rows.push(...newRows);
+                        this.nextOffset = Number(data.next_offset || this.nextOffset + newRows.length);
+                        this.hasMore = Boolean(data.has_more);
+                    } catch (error) {
+                        this.errorMessage = 'Não foi possível carregar mais agora. Tente novamente.';
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+            };
+        }
+    </script>
 </x-app-layout>
