@@ -59,11 +59,19 @@ class AdminController extends Controller
         $meses = [];
         $totalCadastros = [];
         $totalComDominio = [];
+        $totalComWhatsapp = [];
+        $totalComProduto = [];
+        $totalComLead = [];
+        $totalComVenda = [];
 
         foreach ($series as $row) {
             $meses[] = sprintf('%02d/%04d', (int) $row['month'], (int) $row['year']);
             $totalCadastros[] = (int) $row['total'];
             $totalComDominio[] = (int) $row['total_with_dominio'];
+            $totalComWhatsapp[] = (int) $row['total_with_whatsapp'];
+            $totalComProduto[] = (int) $row['total_with_product'];
+            $totalComLead[] = (int) $row['total_with_lead'];
+            $totalComVenda[] = (int) $row['total_with_sale'];
         }
 
         $dailySeries = $this->affiliateDailyRegistrationsForDateRange(
@@ -98,6 +106,10 @@ class AdminController extends Controller
             'meses' => $meses,
             'totalCadastros' => $totalCadastros,
             'totalComDominio' => $totalComDominio,
+            'totalComWhatsapp' => $totalComWhatsapp,
+            'totalComProduto' => $totalComProduto,
+            'totalComLead' => $totalComLead,
+            'totalComVenda' => $totalComVenda,
             'dailyLabels' => $dailyLabels,
             'dailyCadastros' => $dailyCadastros,
             'showDailyChart' => $showDailyChart,
@@ -395,35 +407,15 @@ class AdminController extends Controller
 
     private function calculateDashboardMetrics(Builder $baseQuery): array
     {
-        $hasCodigoRef = Schema::hasTable('codigo_ref');
-        $hasPurchaseEvents = Schema::hasTable('purchase_events');
-        $hasWhatsappTable = Schema::hasTable('whatsapp_atendimento');
-
-        $domainCondition = "((users.dominio IS NOT NULL AND TRIM(users.dominio) <> '') OR (users.dominio_externo IS NOT NULL AND TRIM(users.dominio_externo) <> ''))";
-
-        $productExistsCondition = $hasCodigoRef
-            ? "EXISTS (SELECT 1 FROM codigo_ref cr WHERE cr.user_id = users.id)"
-            : '0 = 1';
-
-        $leadExistsCondition = ($hasCodigoRef && $hasPurchaseEvents)
-            ? "EXISTS (SELECT 1 FROM codigo_ref cr JOIN purchase_events pe ON pe.affiliate_code = cr.codigo_ref WHERE cr.user_id = users.id AND cr.codigo_ref IS NOT NULL AND TRIM(cr.codigo_ref) <> '')"
-            : '0 = 1';
-
-        $saleLeadExistsCondition = ($hasCodigoRef && $hasPurchaseEvents)
-            ? "EXISTS (SELECT 1 FROM codigo_ref cr JOIN purchase_events pe ON pe.affiliate_code = cr.codigo_ref WHERE cr.user_id = users.id AND cr.codigo_ref IS NOT NULL AND TRIM(cr.codigo_ref) <> '' AND UPPER(TRIM(COALESCE(pe.purchase_status, ''))) IN ('APPROVED', 'COMPLETED'))"
-            : '0 = 1';
-
-        $whatsappCondition = $hasWhatsappTable
-            ? "((users.whatsapp_atendimento IS NOT NULL AND TRIM(users.whatsapp_atendimento) <> '') OR EXISTS (SELECT 1 FROM whatsapp_atendimento wa WHERE wa.user_id = users.id))"
-            : "(users.whatsapp_atendimento IS NOT NULL AND TRIM(users.whatsapp_atendimento) <> '')";
+        $conditions = $this->dashboardMetricSqlConditions();
 
         $row = (clone $baseQuery)
             ->selectRaw('COUNT(users.id) as total_cadastros')
-            ->selectRaw("SUM(CASE WHEN {$domainCondition} THEN 1 ELSE 0 END) as com_dominio")
-            ->selectRaw("SUM(CASE WHEN {$leadExistsCondition} THEN 1 ELSE 0 END) as com_lead")
-            ->selectRaw("SUM(CASE WHEN {$saleLeadExistsCondition} THEN 1 ELSE 0 END) as com_lead_venda")
-            ->selectRaw("SUM(CASE WHEN {$productExistsCondition} THEN 1 ELSE 0 END) as com_produto")
-            ->selectRaw("SUM(CASE WHEN {$whatsappCondition} THEN 1 ELSE 0 END) as com_whatsapp")
+            ->selectRaw("SUM(CASE WHEN {$conditions['domain']} THEN 1 ELSE 0 END) as com_dominio")
+            ->selectRaw("SUM(CASE WHEN {$conditions['lead']} THEN 1 ELSE 0 END) as com_lead")
+            ->selectRaw("SUM(CASE WHEN {$conditions['sale']} THEN 1 ELSE 0 END) as com_lead_venda")
+            ->selectRaw("SUM(CASE WHEN {$conditions['product']} THEN 1 ELSE 0 END) as com_produto")
+            ->selectRaw("SUM(CASE WHEN {$conditions['whatsapp']} THEN 1 ELSE 0 END) as com_whatsapp")
             ->first();
 
         return [
@@ -605,11 +597,45 @@ class AdminController extends Controller
         return trim((string) ($registro->whatsapp ?? ''));
     }
 
+    private function dashboardMetricSqlConditions(): array
+    {
+        $hasCodigoRef = Schema::hasTable('codigo_ref');
+        $hasPurchaseEvents = Schema::hasTable('purchase_events');
+        $hasWhatsappTable = Schema::hasTable('whatsapp_atendimento');
+
+        $domainCondition = "((users.dominio IS NOT NULL AND TRIM(users.dominio) <> '') OR (users.dominio_externo IS NOT NULL AND TRIM(users.dominio_externo) <> ''))";
+
+        $productCondition = $hasCodigoRef
+            ? "EXISTS (SELECT 1 FROM codigo_ref cr WHERE cr.user_id = users.id)"
+            : '0 = 1';
+
+        $leadCondition = ($hasCodigoRef && $hasPurchaseEvents)
+            ? "EXISTS (SELECT 1 FROM codigo_ref cr JOIN purchase_events pe ON pe.affiliate_code = cr.codigo_ref WHERE cr.user_id = users.id AND cr.codigo_ref IS NOT NULL AND TRIM(cr.codigo_ref) <> '')"
+            : '0 = 1';
+
+        $saleCondition = ($hasCodigoRef && $hasPurchaseEvents)
+            ? "EXISTS (SELECT 1 FROM codigo_ref cr JOIN purchase_events pe ON pe.affiliate_code = cr.codigo_ref WHERE cr.user_id = users.id AND cr.codigo_ref IS NOT NULL AND TRIM(cr.codigo_ref) <> '' AND UPPER(TRIM(COALESCE(pe.purchase_status, ''))) IN ('APPROVED', 'COMPLETED'))"
+            : '0 = 1';
+
+        $whatsappCondition = $hasWhatsappTable
+            ? "((users.whatsapp_atendimento IS NOT NULL AND TRIM(users.whatsapp_atendimento) <> '') OR EXISTS (SELECT 1 FROM whatsapp_atendimento wa WHERE wa.user_id = users.id))"
+            : "(users.whatsapp_atendimento IS NOT NULL AND TRIM(users.whatsapp_atendimento) <> '')";
+
+        return [
+            'domain' => $domainCondition,
+            'whatsapp' => $whatsappCondition,
+            'product' => $productCondition,
+            'lead' => $leadCondition,
+            'sale' => $saleCondition,
+        ];
+    }
+
     private function affiliateMonthlyRegistrationsLastFiveMonths(): array
     {
         $now = now();
         $startDate = $now->copy()->subMonths(4)->startOfMonth();
         $endDate = $now->copy()->endOfMonth();
+        $conditions = $this->dashboardMetricSqlConditions();
 
         $driver = DB::connection()->getDriverName();
         $yearExpression = $driver === 'sqlite'
@@ -625,7 +651,11 @@ class AdminController extends Controller
             ->selectRaw("$yearExpression as year")
             ->selectRaw("$monthExpression as month")
             ->selectRaw('COUNT(*) as total')
-            ->selectRaw("COUNT(CASE WHEN ((users.dominio IS NOT NULL AND TRIM(users.dominio) <> '') OR (users.dominio_externo IS NOT NULL AND TRIM(users.dominio_externo) <> '')) THEN 1 END) as total_with_dominio")
+            ->selectRaw("COUNT(CASE WHEN {$conditions['domain']} THEN 1 END) as total_with_dominio")
+            ->selectRaw("COUNT(CASE WHEN {$conditions['whatsapp']} THEN 1 END) as total_with_whatsapp")
+            ->selectRaw("COUNT(CASE WHEN {$conditions['product']} THEN 1 END) as total_with_product")
+            ->selectRaw("COUNT(CASE WHEN {$conditions['lead']} THEN 1 END) as total_with_lead")
+            ->selectRaw("COUNT(CASE WHEN {$conditions['sale']} THEN 1 END) as total_with_sale")
             ->groupByRaw("$yearExpression, $monthExpression")
             ->orderBy('year')
             ->orderBy('month')
@@ -636,6 +666,10 @@ class AdminController extends Controller
                     'month' => (int) $row->month,
                     'total' => (int) $row->total,
                     'total_with_dominio' => (int) $row->total_with_dominio,
+                    'total_with_whatsapp' => (int) $row->total_with_whatsapp,
+                    'total_with_product' => (int) $row->total_with_product,
+                    'total_with_lead' => (int) $row->total_with_lead,
+                    'total_with_sale' => (int) $row->total_with_sale,
                 ];
             })
             ->toArray();

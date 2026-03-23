@@ -467,6 +467,10 @@
                     const monthlyLabels = @json($meses);
                     const monthlyCadastros = @json($totalCadastros);
                     const monthlyComDominio = @json($totalComDominio);
+                    const monthlyComWhatsapp = @json($totalComWhatsapp);
+                    const monthlyComProduto = @json($totalComProduto);
+                    const monthlyComLead = @json($totalComLead);
+                    const monthlyComVenda = @json($totalComVenda);
 
                     if (!hasApex) {
                         chartElement.innerHTML = '<p class="text-sm text-gray-500">Não foi possível carregar a biblioteca de gráfico.</p>';
@@ -480,16 +484,39 @@
                             }, {
                                 name: 'Cadastros com Domínio',
                                 data: monthlyComDominio
+                            }, {
+                                name: 'Cadastros com WhatsApp',
+                                data: monthlyComWhatsapp
+                            }, {
+                                name: 'Cadastros com Produto',
+                                data: monthlyComProduto
+                            }, {
+                                name: 'Cadastros com Lead',
+                                data: monthlyComLead
+                            }, {
+                                name: 'Cadastros com Venda',
+                                data: monthlyComVenda
                             }],
                             chart: {
                                 type: 'bar',
-                                height: 350
+                                height: 380,
+                                toolbar: {
+                                    show: false
+                                }
                             },
                             plotOptions: {
                                 bar: {
                                     horizontal: false,
-                                    columnWidth: '45%',
+                                    columnWidth: '52%',
                                     endingShape: 'rounded'
+                                }
+                            },
+                            legend: {
+                                position: 'top',
+                                horizontalAlign: 'left',
+                                fontSize: '12px',
+                                markers: {
+                                    radius: 12
                                 }
                             },
                             dataLabels: {
@@ -503,6 +530,7 @@
                             xaxis: {
                                 categories: monthlyLabels
                             },
+                            colors: ['#2563eb', '#16a34a', '#0891b2', '#7c3aed', '#f59e0b', '#dc2626'],
                             yaxis: {
                                 title: {
                                     text: 'Número de Cadastros'
