@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
@@ -42,6 +43,10 @@ class LoginController extends Controller
 
     public function showLoginForm(Request $request)
     {
+        if ($redirect = $this->legacyLoginRedirect($request)) {
+            return $redirect;
+        }
+
         // Always issue a fresh CSRF token for the login form.
         $request->session()->regenerateToken();
 
@@ -58,6 +63,24 @@ class LoginController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect('/login'); // Altere para a rota desejada
+        return $this->legacyLoginRedirect($request) ?? redirect('/login');
+    }
+
+    private function legacyLoginRedirect(Request $request): ?RedirectResponse
+    {
+        $host = preg_replace('/^www\./', '', strtolower(trim((string) $request->getHost())));
+
+        if ($host !== 'jovemempreendedor.org') {
+            return null;
+        }
+
+        $target = 'https://portalje.org/login';
+        $query = $request->getQueryString();
+
+        if (!empty($query)) {
+            $target .= '?' . $query;
+        }
+
+        return redirect()->away($target);
     }
 }
