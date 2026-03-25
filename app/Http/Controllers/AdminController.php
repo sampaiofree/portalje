@@ -12,10 +12,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
-use Illuminate\View\View;
 use Carbon\Carbon;
 
 use App\Models\User;
@@ -25,164 +21,6 @@ use App\Services\AdminAffiliateHealthService;
 
 class AdminController extends Controller
 {
-    public function usersIndex(Request $request): View
-    {
-        $filters = $this->parseAdminUsersFilters($request);
-        $baseQuery = $this->buildAdminUsersIndexQuery($filters);
-
-        $usuarios = (clone $baseQuery)
-            ->with(['whatsappAtendimentos' => function ($query) {
-                $query->orderByDesc('is_active')->orderByDesc('updated_at');
-            }])
-            ->orderByDesc('users.created_at')
-            ->paginate(50)
-            ->appends($request->query());
-
-        $summary = (clone $baseQuery)
-            ->selectRaw('COUNT(users.id) as total')
-            ->selectRaw("SUM(CASE WHEN users.nivel_acesso = ? THEN 1 ELSE 0 END) as total_admins", [User::NIVEL_ACESSO_ADMIN])
-            ->selectRaw("SUM(CASE WHEN users.nivel_acesso = ? THEN 1 ELSE 0 END) as total_usuarios", [User::NIVEL_ACESSO_USER])
-            ->selectRaw('SUM(CASE WHEN users.email_verified_at IS NOT NULL THEN 1 ELSE 0 END) as emails_verificados')
-            ->selectRaw("SUM(CASE WHEN users.telefone_pessoal_1_verified_at IS NOT NULL AND users.telefone_pessoal_1 IS NOT NULL AND TRIM(users.telefone_pessoal_1) <> '' THEN 1 ELSE 0 END) as telefones_verificados")
-            ->first();
-
-        return view('dashboard.admin.users.index', [
-            'usuarios' => $usuarios,
-            'filters' => $filters,
-            'summary' => [
-                'total' => (int) ($summary->total ?? 0),
-                'total_admins' => (int) ($summary->total_admins ?? 0),
-                'total_usuarios' => (int) ($summary->total_usuarios ?? 0),
-                'emails_verificados' => (int) ($summary->emails_verificados ?? 0),
-                'telefones_verificados' => (int) ($summary->telefones_verificados ?? 0),
-            ],
-        ]);
-    }
-
-    public function editUser(User $user): View
-    {
-        return view('dashboard.admin.users.edit', [
-            'editingUser' => $user,
-            'baseDomain' => $this->adminBaseDomain(),
-        ]);
-    }
-
-    public function updateUser(Request $request, User $user): RedirectResponse
-    {
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
-            'nivel_acesso' => ['required', Rule::in([User::NIVEL_ACESSO_ADMIN, User::NIVEL_ACESSO_USER])],
-            'email_verified' => ['required', 'boolean'],
-            'telefone_pessoal_1' => ['nullable', 'regex:/^[0-9]{12,14}$/'],
-            'telefone_pessoal_1_verified' => ['required', 'boolean'],
-            'telefone_pessoal_2' => ['nullable', 'regex:/^[0-9]{12,14}$/'],
-            'apelido' => ['nullable', 'string', 'max:255'],
-            'nome_empresa' => ['nullable', 'string', 'max:120'],
-            'dominio' => ['nullable', 'string', 'max:255'],
-            'dominio_externo' => ['nullable', 'string', 'max:255'],
-            'whatsapp_atendimento' => ['nullable', 'regex:/^[0-9]{12,14}$/'],
-            'meta_pixel_id' => ['nullable', 'string', 'max:255'],
-        ]);
-
-        if ((int) $user->id === (int) Auth::id() && $validated['nivel_acesso'] !== User::NIVEL_ACESSO_ADMIN) {
-            throw ValidationException::withMessages([
-                'nivel_acesso' => 'Você não pode remover seu próprio acesso de administrador.',
-            ]);
-        }
-
-        $dominioInput = trim((string) ($validated['dominio'] ?? ''));
-        $dominioExternoInput = trim((string) ($validated['dominio_externo'] ?? ''));
-
-        $dominio = $dominioInput !== '' ? $this->normalizeAdminInternalDomain($dominioInput) : null;
-        $dominioExterno = $dominioExternoInput !== '' ? $this->normalizeAdminExternalDomain($dominioExternoInput) : null;
-
-        if ($dominioInput !== '' && $dominio === null) {
-            throw ValidationException::withMessages([
-                'dominio' => 'Informe um subdomínio válido para o portal.',
-            ]);
-        }
-
-        if ($dominioExternoInput !== '' && $dominioExterno === null) {
-            throw ValidationException::withMessages([
-                'dominio_externo' => 'Informe um domínio externo válido.',
-            ]);
-        }
-
-        if ($dominio !== null) {
-            $dominioEmUso = User::query()
-                ->where('dominio', $dominio)
-                ->where('id', '!=', $user->id)
-                ->exists();
-
-            if ($dominioEmUso) {
-                throw ValidationException::withMessages([
-                    'dominio' => 'Esse subdomínio já está em uso por outro usuário.',
-                ]);
-            }
-        }
-
-        if ($dominioExterno !== null) {
-            $dominioExternoEmUso = User::query()
-                ->where('dominio_externo', $dominioExterno)
-                ->where('id', '!=', $user->id)
-                ->exists();
-
-            if ($dominioExternoEmUso) {
-                throw ValidationException::withMessages([
-                    'dominio_externo' => 'Esse domínio externo já está em uso por outro usuário.',
-                ]);
-            }
-        }
-
-        $email = strtolower(trim((string) $validated['email']));
-        $telefonePessoal1 = preg_replace('/\D/', '', (string) ($validated['telefone_pessoal_1'] ?? '')) ?: null;
-        $telefonePessoal2 = preg_replace('/\D/', '', (string) ($validated['telefone_pessoal_2'] ?? '')) ?: null;
-        $whatsappAtendimento = preg_replace('/\D/', '', (string) ($validated['whatsapp_atendimento'] ?? '')) ?: null;
-        $emailChanged = strcasecmp((string) $user->email, $email) !== 0;
-        $telefoneChanged = preg_replace('/\D/', '', (string) $user->telefone_pessoal_1) !== ($telefonePessoal1 ?? '');
-        $emailVerified = $request->boolean('email_verified');
-        $telefoneVerified = $request->boolean('telefone_pessoal_1_verified');
-
-        $user->name = trim((string) $validated['name']);
-        $user->email = $email;
-        $user->nivel_acesso = $validated['nivel_acesso'];
-        $user->telefone_pessoal_1 = $telefonePessoal1;
-        $user->telefone_pessoal_2 = $telefonePessoal2;
-        $user->apelido = $this->nullableTrimmedString($validated['apelido'] ?? null);
-        $user->nome_empresa = $this->nullableTrimmedString($validated['nome_empresa'] ?? null);
-        $user->dominio = $dominio;
-        $user->dominio_externo = $dominioExterno;
-        $user->whatsapp_atendimento = $whatsappAtendimento;
-        $user->meta_pixel_id = $this->nullableTrimmedString($validated['meta_pixel_id'] ?? null);
-
-        if ($emailChanged) {
-            $user->email_verified_at = $emailVerified ? now() : null;
-            $user->email_verification_code_hash = null;
-            $user->email_verification_code_expires_at = null;
-            $user->email_verification_code_sent_at = null;
-        } else {
-            $user->email_verified_at = $emailVerified ? ($user->email_verified_at ?? now()) : null;
-        }
-
-        if ($telefoneChanged) {
-            $user->telefone_pessoal_1_pending = null;
-            $user->telefone_pessoal_1_verification_code_hash = null;
-            $user->telefone_pessoal_1_verification_code_expires_at = null;
-            $user->telefone_pessoal_1_verification_code_sent_at = null;
-            $user->telefone_pessoal_1_verified_at = ($telefoneVerified && $telefonePessoal1 !== null) ? now() : null;
-        } else {
-            $user->telefone_pessoal_1_verified_at = ($telefoneVerified && $telefonePessoal1 !== null)
-                ? ($user->telefone_pessoal_1_verified_at ?? now())
-                : null;
-        }
-
-        $user->save();
-
-        return redirect()
-            ->route('admin.users.edit', $user)
-            ->with('success', 'Usuário atualizado com sucesso.');
-    }
 
     public function dashboard(Request $request, AdminAffiliateHealthService $healthService)
     {
@@ -348,35 +186,6 @@ class AdminController extends Controller
             'dias_sem_venda' => 7,
             'fila' => 'all',
         ];
-    }
-
-    private function adminUsersFilterDefaults(): array
-    {
-        return [
-            'search' => '',
-            'nivel_acesso' => 'all',
-            'email_verificado' => 'all',
-            'telefone_verificado' => 'all',
-        ];
-    }
-
-    private function parseAdminUsersFilters(Request $request): array
-    {
-        $filters = $this->adminUsersFilterDefaults();
-
-        $filters['search'] = trim((string) $request->query('search', ''));
-
-        $nivelAcesso = strtolower(trim((string) $request->query('nivel_acesso', 'all')));
-        $filters['nivel_acesso'] = in_array($nivelAcesso, ['all', User::NIVEL_ACESSO_ADMIN, User::NIVEL_ACESSO_USER], true)
-            ? $nivelAcesso
-            : 'all';
-
-        foreach (['email_verificado', 'telefone_verificado'] as $field) {
-            $value = strtolower(trim((string) $request->query($field, 'all')));
-            $filters[$field] = in_array($value, ['all', 'yes', 'no'], true) ? $value : 'all';
-        }
-
-        return $filters;
     }
 
     private function parseDashboardFilters(Request $request): array
@@ -579,58 +388,6 @@ class AdminController extends Controller
             $filters['tem_whatsapp'] ?? 'all',
             fn (Builder $q) => $this->applyHasWhatsappCondition($q, true),
             fn (Builder $q) => $this->applyHasWhatsappCondition($q, false)
-        );
-
-        return $query;
-    }
-
-    private function buildAdminUsersIndexQuery(array $filters): Builder
-    {
-        $query = User::query();
-
-        $search = trim((string) ($filters['search'] ?? ''));
-        if ($search !== '') {
-            $searchLike = '%' . $search . '%';
-
-            $query->where(function (Builder $subQuery) use ($searchLike) {
-                $subQuery
-                    ->where('users.name', 'like', $searchLike)
-                    ->orWhere('users.email', 'like', $searchLike)
-                    ->orWhere('users.apelido', 'like', $searchLike)
-                    ->orWhere('users.nome_empresa', 'like', $searchLike)
-                    ->orWhere('users.telefone_pessoal_1', 'like', $searchLike)
-                    ->orWhere('users.telefone_pessoal_2', 'like', $searchLike)
-                    ->orWhere('users.whatsapp_atendimento', 'like', $searchLike)
-                    ->orWhere('users.dominio', 'like', $searchLike)
-                    ->orWhere('users.dominio_externo', 'like', $searchLike);
-            });
-        }
-
-        $nivelAcesso = $filters['nivel_acesso'] ?? 'all';
-        if (in_array($nivelAcesso, [User::NIVEL_ACESSO_ADMIN, User::NIVEL_ACESSO_USER], true)) {
-            $query->where('users.nivel_acesso', $nivelAcesso);
-        }
-
-        $this->applyTriStateFilter(
-            $query,
-            $filters['email_verificado'] ?? 'all',
-            fn (Builder $q) => $q->whereNotNull('users.email_verified_at'),
-            fn (Builder $q) => $q->whereNull('users.email_verified_at')
-        );
-
-        $this->applyTriStateFilter(
-            $query,
-            $filters['telefone_verificado'] ?? 'all',
-            fn (Builder $q) => $q
-                ->whereNotNull('users.telefone_pessoal_1_verified_at')
-                ->whereNotNull('users.telefone_pessoal_1')
-                ->whereRaw("TRIM(users.telefone_pessoal_1) <> ''"),
-            fn (Builder $q) => $q->where(function (Builder $subQuery) {
-                $subQuery
-                    ->whereNull('users.telefone_pessoal_1_verified_at')
-                    ->orWhereNull('users.telefone_pessoal_1')
-                    ->orWhereRaw("TRIM(users.telefone_pessoal_1) = ''");
-            })
         );
 
         return $query;
@@ -1026,77 +783,6 @@ class AdminController extends Controller
             'maxBytes' => $maxBytes,
             'fileSize' => $fileSize,
         ]);
-    }
-
-    private function adminBaseDomain(): string
-    {
-        $baseDomain = (string) (parse_url(config('app.url'), PHP_URL_HOST) ?: 'portalje.org');
-        $baseDomain = preg_replace('/^www\./', '', strtolower(trim($baseDomain)));
-
-        return $baseDomain !== '' ? $baseDomain : 'portalje.org';
-    }
-
-    private function normalizeAdminInternalDomain(string $domain): ?string
-    {
-        $baseDomain = $this->adminBaseDomain();
-        $host = $this->extractNormalizedHost($domain);
-
-        if ($host === null || $host === $baseDomain) {
-            return null;
-        }
-
-        $suffix = '.' . $baseDomain;
-
-        if (str_contains($host, '.')) {
-            if (!str_ends_with($host, $suffix)) {
-                return null;
-            }
-
-            $host = substr($host, 0, -strlen($suffix));
-
-            if (str_contains($host, '.')) {
-                return null;
-            }
-        }
-
-        $subdomain = preg_replace('/[^a-z0-9]/', '', strtolower(trim($host)));
-
-        if ($subdomain === '') {
-            return null;
-        }
-
-        return $subdomain . '.' . $baseDomain;
-    }
-
-    private function normalizeAdminExternalDomain(string $domain): ?string
-    {
-        $host = $this->extractNormalizedHost($domain);
-
-        return $host !== null && str_contains($host, '.') ? $host : null;
-    }
-
-    private function extractNormalizedHost(string $domain): ?string
-    {
-        $domain = strtolower(trim($domain));
-        if ($domain === '') {
-            return null;
-        }
-
-        if (!str_contains($domain, '://')) {
-            $domain = 'https://' . $domain;
-        }
-
-        $host = (string) (parse_url($domain, PHP_URL_HOST) ?? '');
-        $host = preg_replace('/^www\./', '', strtolower(trim($host)));
-
-        return $host !== '' ? $host : null;
-    }
-
-    private function nullableTrimmedString(?string $value): ?string
-    {
-        $value = trim((string) $value);
-
-        return $value !== '' ? $value : null;
     }
 
     public function logsDownload(string $logFile)

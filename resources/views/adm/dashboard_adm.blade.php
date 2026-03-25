@@ -392,14 +392,8 @@
             </div>
 
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                <div class="p-6 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
+                <div class="p-6 border-b border-gray-100">
                     <h3 class="text-lg font-semibold text-gray-900">Usuários filtrados ({{ number_format((int) $usuarios->total(), 0, ',', '.') }})</h3>
-                    <a
-                        href="{{ route('admin.users.index') }}"
-                        class="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                    >
-                        Abrir lista exclusiva
-                    </a>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200">
@@ -410,7 +404,6 @@
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Telefone de atendimento</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data de cadastro</th>
-                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
@@ -432,18 +425,10 @@
                                     <td class="px-4 py-3 text-sm text-gray-700">{{ $usuario->email }}</td>
                                     <td class="px-4 py-3 text-sm text-gray-700">{{ $telefoneAtendimento !== '' ? $telefoneAtendimento : '-' }}</td>
                                     <td class="px-4 py-3 text-sm text-gray-700">{{ optional($usuario->created_at)->format('d/m/Y') }}</td>
-                                    <td class="px-4 py-3 text-sm text-gray-700">
-                                        <a
-                                            href="{{ route('admin.users.edit', $usuario) }}"
-                                            class="inline-flex items-center rounded-md border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100"
-                                        >
-                                            Editar
-                                        </a>
-                                    </td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="6" class="px-4 py-8 text-center text-sm text-gray-500">Nenhum usuário encontrado para os filtros informados.</td>
+                                    <td colspan="5" class="px-4 py-8 text-center text-sm text-gray-500">Nenhum usuário encontrado para os filtros informados.</td>
                                 </tr>
                             @endforelse
                         </tbody>
