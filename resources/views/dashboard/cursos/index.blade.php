@@ -447,9 +447,9 @@
                 <div
                     x-show="bulkPublicConfigModalOpen"
                     x-transition
-                    class="fixed inset-0 z-50 flex items-center justify-center p-4"
+                    class="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 sm:p-6"
                 >
-                    <div @click.stop class="je-dark-surface w-full max-w-2xl overflow-hidden rounded-xl border shadow-xl">
+                    <div @click.stop class="je-dark-surface flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-xl border shadow-xl sm:max-h-[calc(100vh-3rem)]">
                         <div class="je-dark-divider flex items-center justify-between border-b px-6 py-4">
                             <h3 class="text-lg font-semibold text-white">Configurações da página pública em massa</h3>
                             <button
@@ -462,47 +462,48 @@
                             </button>
                         </div>
 
-                        <div class="space-y-5 px-6 py-5">
-                            <p class="je-dark-muted text-sm">
-                                Esta configuração será aplicada a todos os cursos com Código REF preenchido.
-                            </p>
+                        <div class="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+                            <div class="space-y-5">
+                                <p class="je-dark-muted text-sm">
+                                    Esta configuração será aplicada a todos os cursos com Código REF preenchido.
+                                </p>
 
-                            <p
-                                x-show="bulkPublicConfigError"
-                                x-text="bulkPublicConfigError"
-                                class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
-                            ></p>
+                                <p
+                                    x-show="bulkPublicConfigError"
+                                    x-text="bulkPublicConfigError"
+                                    class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+                                ></p>
 
-                            <div>
-                                <x-input-label for="bulk_formulario_pre_checkout" value="Formulário antes de continuar" class="je-dark-label text-sm font-medium" />
-                                <div class="relative mt-1">
-                                    <select
-                                        id="bulk_formulario_pre_checkout"
-                                        x-model="bulkPublicConfigFormularioPreCheckout"
-                                        :disabled="isBulkPublicConfigLoading"
-                                        class="je-dark-field block w-full appearance-none rounded-lg px-3 py-2.5 pr-10 text-sm shadow-sm transition"
-                                    >
-                                        <option value="1">Com formulário antes de continuar</option>
-                                        <option value="0">Sem formulário (ir direto)</option>
-                                    </select>
-                                    <i class="ri-arrow-down-s-line pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                <div>
+                                    <x-input-label for="bulk_formulario_pre_checkout" value="Formulário antes de continuar" class="je-dark-label text-sm font-medium" />
+                                    <div class="relative mt-1">
+                                        <select
+                                            id="bulk_formulario_pre_checkout"
+                                            x-model="bulkPublicConfigFormularioPreCheckout"
+                                            :disabled="isBulkPublicConfigLoading"
+                                            class="je-dark-field block w-full appearance-none rounded-lg px-3 py-2.5 pr-10 text-sm shadow-sm transition"
+                                        >
+                                            <option value="1">Com formulário antes de continuar</option>
+                                            <option value="0">Sem formulário (ir direto)</option>
+                                        </select>
+                                        <i class="ri-arrow-down-s-line pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                    </div>
+                                    <p class="je-dark-muted mt-1 text-xs">Esta opção vale para botões de checkout e WhatsApp da página pública.</p>
                                 </div>
-                                <p class="je-dark-muted mt-1 text-xs">Esta opção vale para botões de checkout e WhatsApp da página pública.</p>
-                            </div>
 
-                            <div>
-                                <p class="text-sm font-medium text-white">Preços na página pública</p>
-                                <p class="je-dark-muted text-xs">Defina se as páginas terão o modelo padrão, 1 plano ou 2 planos com cupons.</p>
-                            </div>
-
-                            <template x-if="!hasCuponsDisponiveis">
-                                <div class="rounded-md border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs text-yellow-800">
-                                    Nenhum cupom disponível. A configuração de preço será aplicada no modo padrão.
+                                <div>
+                                    <p class="text-sm font-medium text-white">Preços na página pública</p>
+                                    <p class="je-dark-muted text-xs">Defina se as páginas terão o modelo padrão, 1 plano ou 2 planos com cupons.</p>
                                 </div>
-                            </template>
 
-                            <template x-if="hasCuponsDisponiveis">
-                                <div class="space-y-4">
+                                <template x-if="!hasCuponsDisponiveis">
+                                    <div class="rounded-md border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs text-yellow-800">
+                                        Nenhum cupom disponível. A configuração de preço será aplicada no modo padrão.
+                                    </div>
+                                </template>
+
+                                <template x-if="hasCuponsDisponiveis">
+                                    <div class="space-y-4">
                                     <div>
                                         <x-input-label for="bulk_modo_precos" value="Tipo de página" class="je-dark-label text-sm font-medium" />
                                         <div class="relative mt-1">
@@ -590,97 +591,99 @@
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                            </template>
-
-                            <div class="space-y-4">
-                                <div>
-                                    <p class="text-sm font-medium text-white">Contador da página pública</p>
-                                    <p class="je-dark-muted text-xs">O contador começa ao carregar a página e continua de onde parou no mesmo navegador.</p>
-                                </div>
-
-                                <div>
-                                    <x-input-label for="bulk_usar_contador" value="Usar contador?" class="je-dark-label text-sm font-medium" />
-                                    <div class="relative mt-1">
-                                        <select
-                                            id="bulk_usar_contador"
-                                            x-model="bulkPublicConfigUsarContador"
-                                            @change="
-                                                if (bulkPublicConfigUsarContador !== '1') {
-                                                    bulkPublicConfigContadorMinutos = '';
-                                                    bulkPublicConfigContadorAcao = '';
-                                                    bulkPublicConfigContadorDestinoOferta = '';
-                                                }
-                                            "
-                                            :disabled="isBulkPublicConfigLoading"
-                                            class="je-dark-field block w-full appearance-none rounded-lg px-3 py-2.5 pr-10 text-sm shadow-sm transition"
-                                        >
-                                            <option value="0">Não</option>
-                                            <option value="1">Sim</option>
-                                        </select>
-                                        <i class="ri-arrow-down-s-line pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
                                     </div>
-                                </div>
+                                </template>
 
-                                <div x-show="bulkPublicConfigUsarContador === '1'" x-transition class="space-y-4">
+                                <div class="space-y-4">
                                     <div>
-                                        <x-input-label for="bulk_contador_minutos" value="Minutos" class="je-dark-label text-sm font-medium" />
-                                        <div class="relative mt-1">
-                                            <select
-                                                id="bulk_contador_minutos"
-                                                x-model="bulkPublicConfigContadorMinutos"
-                                                :disabled="isBulkPublicConfigLoading"
-                                                class="je-dark-field block w-full appearance-none rounded-lg px-3 py-2.5 pr-10 text-sm shadow-sm transition"
-                                            >
-                                                <option value="">Selecione</option>
-                                                <option value="1">1 minuto</option>
-                                                <option value="5">5 minutos</option>
-                                                <option value="10">10 minutos</option>
-                                                <option value="20">20 minutos</option>
-                                                <option value="30">30 minutos</option>
-                                                <option value="50">50 minutos</option>
-                                            </select>
-                                            <i class="ri-arrow-down-s-line pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
-                                        </div>
+                                        <p class="text-sm font-medium text-white">Contador da página pública</p>
+                                        <p class="je-dark-muted text-xs">O contador começa ao carregar a página e continua de onde parou no mesmo navegador.</p>
                                     </div>
 
                                     <div>
-                                        <x-input-label for="bulk_contador_acao" value="Após o contador" class="je-dark-label text-sm font-medium" />
+                                        <x-input-label for="bulk_usar_contador" value="Usar contador?" class="je-dark-label text-sm font-medium" />
                                         <div class="relative mt-1">
                                             <select
-                                                id="bulk_contador_acao"
-                                                x-model="bulkPublicConfigContadorAcao"
-                                                @change="normalizeBulkPublicConfigSelections()"
+                                                id="bulk_usar_contador"
+                                                x-model="bulkPublicConfigUsarContador"
+                                                @change="
+                                                    if (bulkPublicConfigUsarContador !== '1') {
+                                                        bulkPublicConfigContadorMinutos = '';
+                                                        bulkPublicConfigContadorAcao = '';
+                                                        bulkPublicConfigContadorDestinoOferta = '';
+                                                    }
+                                                "
                                                 :disabled="isBulkPublicConfigLoading"
                                                 class="je-dark-field block w-full appearance-none rounded-lg px-3 py-2.5 pr-10 text-sm shadow-sm transition"
                                             >
-                                                <option value="">Selecione</option>
-                                                <template x-for="option in bulkCountdownActionOptions" :key="option.value">
-                                                    <option :value="option.value" x-text="option.label"></option>
-                                                </template>
+                                                <option value="0">Não</option>
+                                                <option value="1">Sim</option>
                                             </select>
                                             <i class="ri-arrow-down-s-line pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
                                         </div>
                                     </div>
 
-                                    <div x-show="bulkPublicConfigContadorAcao === 'alterar_preco'" x-transition>
-                                        <x-input-label for="bulk_contador_destino_oferta" value="Alterar o preço para" class="je-dark-label text-sm font-medium" />
-                                        <div class="relative mt-1">
-                                            <select
-                                                id="bulk_contador_destino_oferta"
-                                                x-model="bulkPublicConfigContadorDestinoOferta"
-                                                :disabled="isBulkPublicConfigLoading"
-                                                class="je-dark-field block w-full appearance-none rounded-lg px-3 py-2.5 pr-10 text-sm shadow-sm transition"
-                                            >
-                                                <option value="">Selecione um preço</option>
-                                                <template x-for="option in activeBulkCountdownDestinationOptions" :key="option.value">
-                                                    <option :value="option.value" x-text="option.label"></option>
-                                                </template>
-                                            </select>
-                                            <i class="ri-arrow-down-s-line pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                    <div x-show="bulkPublicConfigUsarContador === '1'" x-transition class="space-y-4">
+                                        <div>
+                                            <x-input-label for="bulk_contador_minutos" value="Minutos" class="je-dark-label text-sm font-medium" />
+                                            <div class="relative mt-1">
+                                                <select
+                                                    id="bulk_contador_minutos"
+                                                    x-model="bulkPublicConfigContadorMinutos"
+                                                    :disabled="isBulkPublicConfigLoading"
+                                                    class="je-dark-field block w-full appearance-none rounded-lg px-3 py-2.5 pr-10 text-sm shadow-sm transition"
+                                                >
+                                                    <option value="">Selecione</option>
+                                                    <option value="1">1 minuto</option>
+                                                    <option value="5">5 minutos</option>
+                                                    <option value="10">10 minutos</option>
+                                                    <option value="20">20 minutos</option>
+                                                    <option value="30">30 minutos</option>
+                                                    <option value="50">50 minutos</option>
+                                                </select>
+                                                <i class="ri-arrow-down-s-line pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <x-input-label for="bulk_contador_acao" value="Após o contador" class="je-dark-label text-sm font-medium" />
+                                            <div class="relative mt-1">
+                                                <select
+                                                    id="bulk_contador_acao"
+                                                    x-model="bulkPublicConfigContadorAcao"
+                                                    @change="normalizeBulkPublicConfigSelections()"
+                                                    :disabled="isBulkPublicConfigLoading"
+                                                    class="je-dark-field block w-full appearance-none rounded-lg px-3 py-2.5 pr-10 text-sm shadow-sm transition"
+                                                >
+                                                    <option value="">Selecione</option>
+                                                    <template x-for="option in bulkCountdownActionOptions" :key="option.value">
+                                                        <option :value="option.value" x-text="option.label"></option>
+                                                    </template>
+                                                </select>
+                                                <i class="ri-arrow-down-s-line pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                            </div>
+                                        </div>
+
+                                        <div x-show="bulkPublicConfigContadorAcao === 'alterar_preco'" x-transition>
+                                            <x-input-label for="bulk_contador_destino_oferta" value="Alterar o preço para" class="je-dark-label text-sm font-medium" />
+                                            <div class="relative mt-1">
+                                                <select
+                                                    id="bulk_contador_destino_oferta"
+                                                    x-model="bulkPublicConfigContadorDestinoOferta"
+                                                    :disabled="isBulkPublicConfigLoading"
+                                                    class="je-dark-field block w-full appearance-none rounded-lg px-3 py-2.5 pr-10 text-sm shadow-sm transition"
+                                                >
+                                                    <option value="">Selecione um preço</option>
+                                                    <template x-for="option in activeBulkCountdownDestinationOptions" :key="option.value">
+                                                        <option :value="option.value" x-text="option.label"></option>
+                                                    </template>
+                                                </select>
+                                                <i class="ri-arrow-down-s-line pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
+                            </div>
                             </div>
                         </div>
 
