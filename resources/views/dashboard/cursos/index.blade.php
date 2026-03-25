@@ -448,6 +448,7 @@
                     x-show="bulkPublicConfigModalOpen"
                     x-transition
                     class="fixed inset-0 z-50 flex items-center justify-center p-4"
+                    style="overflow: scroll"
                 >
                     <div @click.stop class="je-dark-surface w-full max-w-2xl rounded-xl border shadow-xl">
                         <div class="je-dark-divider flex items-center justify-between border-b px-6 py-4">
