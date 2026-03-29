@@ -740,16 +740,6 @@
         </div>
     </footer>
 
-    <div class="lp-sticky-cta">
-        <a
-            href="#planos"
-            class="lp-btn js-anchor-scroll"
-            data-lp-primary-scroll-cta
-        >
-            Garantir minha vaga
-        </a>
-    </div>
-
     <div id="lead-modal" class="lp-modal" aria-hidden="true">
         <div class="lp-modal__backdrop" data-close-modal></div>
         <div class="lp-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="lead-modal-title">
