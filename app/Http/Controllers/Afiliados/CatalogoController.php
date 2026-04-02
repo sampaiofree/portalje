@@ -26,10 +26,6 @@ class CatalogoController extends Controller
             $ref = $refsPorCurso[$curso->id] ?? null;
             $link = rtrim($baseUrl, '/') . '/' . ltrim((string) $curso->url, '/');
 
-            if ($ref) {
-                $link .= '?ref=' . urlencode((string) $ref->codigo_ref);
-            }
-
             return [
                 'id' => 'curso_' . $curso->id,
                 'title' => (string) ($curso->titulo ?? ''),
