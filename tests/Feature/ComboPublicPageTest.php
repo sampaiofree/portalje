@@ -48,12 +48,16 @@ class ComboPublicPageTest extends TestCase
         $response->assertOk();
         $response->assertSee('Combo Profissoes');
         $response->assertSee('Aprenda com dois cursos completos e acelere sua qualificacao.');
-        $response->assertSee('2 cursos incluidos');
-        $response->assertSee('Carga horaria total de ate 200 horas');
+        $response->assertSee('css/lp-course.css', false);
+        $response->assertSee('class="lp-hero"', false);
+        $response->assertSee('class="lp-price-card lp-price-card--primary"', false);
+        $response->assertSee('2 cursos inclusos');
+        $response->assertSee('Carga horária total de até 200 horas');
         $response->assertSee('Atendimento');
         $response->assertSee('Administrativo');
-        $response->assertSee('Modulo de Atendimento');
-        $response->assertSee('Modulo Administrativo');
+        $response->assertSee('Aprenda a lidar com clientes e rotinas de atendimento.');
+        $response->assertSee('Entenda os processos essenciais da rotina administrativa.');
+        $response->assertSee('"course_title":"Combo Profissoes"', false);
         $response->assertSee('https://checkout.test/combo?origem=meta&amp;sck=plano_completo', false);
     }
 
@@ -89,10 +93,9 @@ class ComboPublicPageTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Conheca o combo inicial.');
-        $response->assertSee('Este combo reune cursos com aplicacao pratica em diferentes frentes do mercado de trabalho.');
-        $response->assertSee('Conteudo detalhado nao informado.');
-        $response->assertSee('1 curso incluido');
-        $response->assertDontSee('Carga horaria total de ate');
+        $response->assertSee('class="lp-module-empty"', false);
+        $response->assertSee('1 curso incluso');
+        $response->assertDontSee('Carga horária total de até');
         $response->assertSee('https://checkout.test/combo-inicial?sck=plano_completo', false);
     }
 }

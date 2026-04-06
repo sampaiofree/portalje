@@ -111,13 +111,14 @@ class ComboController extends Controller
                 ? $this->lista_conteudo($curso->conteudo_principal)
                 : [];
             $curso->areas_de_atuacao_lista = $this->parseAreas($curso->areas_de_atuacao);
+            $curso->bonus_titulos = $this->parseBonusTitles($curso->conteudo_bonus);
         }
 
         $comboResumo = $this->buildComboResumo($combo);
-        $pagina = $this->buildPaginaPublica($combo);
         $comboCheckoutUrl = $this->buildCheckoutUrl($combo->link_checkout);
+        $comboLp = $this->buildComboLpContext();
 
-        return view('home_e_cursos.combo_individual', compact('combo', 'comboResumo', 'pagina', 'comboCheckoutUrl'));
+        return view('novapagina_combo', compact('combo', 'comboResumo', 'comboCheckoutUrl', 'comboLp'));
     }
 
     private function buildComboResumo(Combo $combo): array
@@ -125,6 +126,9 @@ class ComboController extends Controller
         $uniqueAreas = [];
         $totalHours = 0;
         $courseNames = [];
+        $moduleGroups = [];
+        $bonusTitles = [];
+        $heroImagePath = null;
 
         foreach ($combo->cursos as $curso) {
             $titulo = trim((string) $curso->titulo);
@@ -146,6 +150,40 @@ class ComboController extends Controller
                     $uniqueAreas[$normalizedArea] = $area;
                 }
             }
+
+            if ($heroImagePath === null) {
+                $heroImagePath = $this->resolveHeroImagePath($curso);
+            }
+
+            $moduleTopics = [];
+            $headline = trim(str_replace('"', '', (string) ($curso->headline ?? '')));
+            if ($headline !== '') {
+                $moduleTopics[] = $headline;
+            }
+
+            foreach ($curso->conteudo ?? [] as $conteudo) {
+                $moduleTitle = trim((string) ($conteudo['title'] ?? ''));
+                if ($moduleTitle !== '') {
+                    $moduleTopics[] = $moduleTitle;
+                }
+            }
+
+            $moduleTopics = array_values(array_unique(array_slice($moduleTopics, 0, 4)));
+
+            $moduleGroups[] = [
+                'title' => $titulo !== '' ? $titulo : 'Curso do combo',
+                'topics' => $moduleTopics,
+            ];
+
+            foreach ($curso->bonus_titulos ?? [] as $bonusTitle) {
+                $normalizedBonus = function_exists('mb_strtolower')
+                    ? mb_strtolower($bonusTitle, 'UTF-8')
+                    : strtolower($bonusTitle);
+
+                if (!array_key_exists($normalizedBonus, $bonusTitles)) {
+                    $bonusTitles[$normalizedBonus] = $bonusTitle;
+                }
+            }
         }
 
         return [
@@ -154,42 +192,26 @@ class ComboController extends Controller
             'has_total_hours' => $totalHours > 0,
             'unique_areas' => array_values($uniqueAreas),
             'course_names' => $courseNames,
+            'module_groups' => $moduleGroups,
+            'bonus_titles' => array_values($bonusTitles),
+            'hero_image_path' => $heroImagePath,
         ];
     }
 
-    private function buildPaginaPublica(Combo $combo): array
+    private function buildComboLpContext(): array
     {
         $portalData = $this->rootDomainCoursePublicStateService->portalData();
-        $companyName = 'Programa Jovem Empreendedor';
-        $logoPadraoUrl = asset('img/home_page/logojecolor.webp');
-        $logoDarkUrl = asset('img/home_page/logowhite.png');
-        $whatsappAtendimento = (string) ($portalData['telefone_suporte_alunos'] ?? '5511982671533');
-        $comboTitle = trim((string) $combo->titulo);
-        $comboContext = $comboTitle !== '' ? "sobre o combo de {$comboTitle}" : "sobre os combos do {$companyName}";
-        $imgBotaoWhatsapp = asset('img/home_page/whatsapp.gif');
-        $whatsappMessage = rawurlencode("Ola quero saber {$comboContext}");
+        $pixelIds = array_values(array_unique(array_filter([
+            env('META_PIXEL_ID_PRIMARY', '419961365827965'),
+            env('META_PIXEL_ID_SECONDARY', '948808649224691'),
+        ])));
 
         return [
-            'headline' => $comboTitle !== '' ? $comboTitle : 'Combo de cursos profissionalizantes',
-            'headline_sub' => trim((string) $combo->headline) !== ''
-                ? (string) $combo->headline
-                : 'Conheca os cursos incluidos e comece sua qualificacao hoje.',
-            'headline_botao' => 'Conhecer o combo',
-            'whatsapp_atendimento_tempo' => (int) ($portalData['whatsapp_atendimento_tempo'] ?? 0),
-            'whatsapp' => $whatsappAtendimento,
-            'whatsapp_atendimento_id' => null,
-            'whatsapp_float_atendimento' => $whatsappAtendimento,
-            'whatsapp_float_atendimento_id' => null,
-            'whatsapp_mostrar' => true,
-            'formulario_whatsapp' => (bool) ($portalData['formulario_whatsapp'] ?? true),
-            'formulario_pre_checkout' => (bool) ($portalData['formulario_pre_checkout'] ?? true),
-            'botao_whatsapp_flutuante' => "<a id=\"whatsapp_botao\" href=\"https://api.whatsapp.com/send/?phone={$whatsappAtendimento}&text={$whatsappMessage}\" target=\"_blank\" class=\"jump bg-success rounded-circle d-flex justify-content-center align-items-center position-fixed bottom-0 end-0 m-3\" style=\"width: 70px; height: 70px; z-index: 9; visibility:hidden;\"><img alt='Portal Jovem Empreendedor' loading='lazy' src=\"{$imgBotaoWhatsapp}\" width='70' height='70'></a>",
-            'form_lead_titulo' => 'Para receber mais informacoes sobre o combo, preencha o formulario abaixo.',
-            'form_lead_botao' => 'Continuar',
-            'pidel_id' => null,
-            'company_name' => $companyName,
-            'logo_padrao_url' => $logoPadraoUrl,
-            'logo_dark_url' => $logoDarkUrl,
+            'company_name' => 'Programa Jovem Empreendedor',
+            'logo_padrao_url' => asset('img/home_page/logojecolor.webp'),
+            'logo_dark_url' => asset('img/home_page/logowhite.png'),
+            'whatsapp_atendimento' => (string) ($portalData['telefone_suporte_alunos'] ?? '5511982671533'),
+            'pixel_ids' => $pixelIds,
         ];
     }
 
@@ -227,6 +249,37 @@ class ComboController extends Controller
             static fn ($area) => trim((string) $area),
             explode('/', $areas)
         )));
+    }
+
+    private function parseBonusTitles(?string $html): array
+    {
+        if (empty($html)) {
+            return [];
+        }
+
+        $conteudos = $this->lista_conteudo($html) ?? [];
+
+        $titles = [];
+        foreach ($conteudos as $conteudo) {
+            $title = trim((string) ($conteudo['title'] ?? ''));
+            if ($title !== '') {
+                $titles[] = $title;
+            }
+        }
+
+        return array_values(array_unique($titles));
+    }
+
+    private function resolveHeroImagePath(object $curso): ?string
+    {
+        foreach (['capa_horizontal', 'capa_vertical', 'capa_quadrada'] as $field) {
+            $path = trim((string) ($curso->{$field} ?? ''));
+            if ($path !== '') {
+                return $path;
+            }
+        }
+
+        return null;
     }
 
     public function lista_conteudo($html)
