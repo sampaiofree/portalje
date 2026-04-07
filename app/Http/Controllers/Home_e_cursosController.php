@@ -1390,6 +1390,11 @@ class Home_e_cursosController extends Controller
 
     private function resolverModoCardsW3(Request $request, ?string $cidade = null, string $defaultDestination = 'curso'): string
     {
+        $queryDestination = (string) $request->query('destination');
+        if (in_array($queryDestination, ['curso', 'whatsapp'], true)) {
+            return $queryDestination;
+        }
+
         if (!empty($cidade)) {
             return 'whatsapp';
         }
@@ -1404,7 +1409,7 @@ class Home_e_cursosController extends Controller
     private function montarLinkCursoCardW3(Request $request, Curso $curso): string
     {
         $query = $request->query();
-        unset($query['w'], $query['t']);
+        unset($query['w'], $query['t'], $query['destination']);
 
         $url = 'https://' . $request->getHost() . '/' . ltrim((string) $curso->url, '/');
         $queryString = http_build_query($query);

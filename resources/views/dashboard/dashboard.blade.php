@@ -1157,6 +1157,9 @@
 
                 if (this.homeModel === 'w3') {
                     url += '/w3';
+                    if (this.destination === 'curso') {
+                        params.set('destination', 'curso');
+                    }
                 } else {
                     params.set('layout', 'padrao');
                 }
