@@ -20,6 +20,8 @@
         $homePageWhatsappFlowAtual = in_array((string) Auth::user()->home_page_whatsapp_flow, ['formulario', 'direto'], true)
             ? (string) Auth::user()->home_page_whatsapp_flow
             : 'formulario';
+        $dashboardBaseDomain = trim((string) (Auth::user()->dominio_externo ?? Auth::user()->dominio ?? ''));
+        $dashboardBaseUrl = $dashboardBaseDomain !== '' ? 'https://' . $dashboardBaseDomain : '';
         $dashboardJornada = array_values($dashboard_jornada ?? []);
         $dashboardJornadaSummary = array_merge([
             'completed_count' => 0,
@@ -253,7 +255,6 @@
                     <p class="text-sm text-gray-600 mb-6">Complete estes passos para ativar todas as funcionalidades da sua conta.</p>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div class="space-y-6">
                             <!-- Bloco de Ação do Domínio (Condicional) -->
                             @if (!Auth::user()->dominio_externo)
                                 <div class="p-4 border rounded-lg flex flex-col items-start">
@@ -333,131 +334,80 @@
                                 {{ $temWhatsappAtendimento ? 'Adicionar WhatsApp' : 'Cadastrar WhatsApp' }}
                             </x-secondary-button>
                         </div>
-                        </div>
-
-                        <div>
-                            <div
-                                x-data="configureHomeSettings($el)"
-                                data-home-model="{{ $homePageLayoutAtual }}"
-                                data-home-destination="{{ $homePageDestinationAtual }}"
-                                data-home-whatsapp-flow="{{ $homePageWhatsappFlowAtual }}"
-                                data-layout-endpoint="{{ route('alterar_home_page_layout') }}"
-                                class="p-4 border rounded-lg flex flex-col items-start"
-                            >
-                                <div class="flex items-center">
-                                    <i class="ri-home-gear-line text-2xl text-indigo-500 mr-3"></i>
-                                    <div>
-                                        <h4 class="font-semibold text-gray-800">Configure sua home</h4>
-                                        <p class="text-xs text-gray-500">Defina o modelo e o destino padrão da sua página inicial.</p>
-                                    </div>
-                                </div>
-
-                                <div class="mt-4 w-full space-y-4">
-                                    <div>
-                                        <x-input-label for="home_settings_model_select" value="Escolha o modelo da sua home" />
-                                        <select
-                                            id="home_settings_model_select"
-                                            x-model="homeModel"
-                                            class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm text-sm"
-                                            style="padding: 15px;"
-                                        >
-                                            <option value="padrao">Modelo 1</option>
-                                            <option value="w3">Modelo 2</option>
-                                        </select>
-                                    </div>
-
-                                    <div>
-                                        <x-input-label for="home_settings_destination_select" value="Escolha o destino da home" />
-                                        <select
-                                            id="home_settings_destination_select"
-                                            x-model="homeDestination"
-                                            class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm text-sm"
-                                            style="padding: 15px;"
-                                        >
-                                            <option value="curso">Página do curso</option>
-                                            <option value="whatsapp">WhatsApp</option>
-                                        </select>
-                                    </div>
-
-                                    <div x-show="homeDestination === 'whatsapp'" x-cloak>
-                                        <x-input-label for="home_settings_whatsapp_flow_select" value="Fluxo do WhatsApp na home" />
-                                        <select
-                                            id="home_settings_whatsapp_flow_select"
-                                            x-model="homeWhatsappFlow"
-                                            class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm text-sm"
-                                            style="padding: 15px;"
-                                        >
-                                            <option value="formulario">Mostrar formulário</option>
-                                            <option value="direto">Ir direto para o WhatsApp</option>
-                                        </select>
-                                    </div>
-                                </div>
-
-                                <div class="mt-4 flex items-center gap-3">
-                                    <x-primary-button type="button" @click="saveHomeSettings()" x-bind:disabled="isSaving">
-                                        <span x-show="!isSaving">Salvar</span>
-                                        <span x-show="isSaving" x-cloak>Salvando...</span>
-                                    </x-primary-button>
-                                    <p x-show="saveSuccess" x-cloak class="text-sm text-green-700">Salvo</p>
-                                    <p x-show="saveError" x-text="saveError" x-cloak class="text-sm text-red-600"></p>
-                                </div>
-                            </div>
-                        </div>
-
                     </div>
                 </div>
 
-                <!-- PASSO 3: GERADOR DE LINKS -->
-                <div class="bg-white bg-gray-800 p-6 rounded-lg shadow-sm">
-                    <h3 class="text-xl font-semibold mb-4 flex items-center text-gray-900 text-gray-100"><span class="bg-blue-500 text-white rounded-full h-8 w-8 flex items-center justify-center mr-3 text-sm">3</span>Gerador de links</h3>
-                   @if(Auth::user()->dominio || Auth::user()->dominio_externo)
-                        @php $dominio = Auth::user()->dominio_externo ?? Auth::user()->dominio; @endphp
+                <!-- PASSO 3: CONFIGURE SEU LINK -->
+                <div class="bg-white p-6 rounded-lg shadow-sm">
+                    <h3 class="text-xl font-semibold mb-2 flex items-center text-gray-900">
+                        <span class="bg-blue-500 text-white rounded-full h-8 w-8 flex items-center justify-center mr-3 text-sm">3</span>
+                        Configure seu link
+                    </h3>
+                    <p class="text-sm text-gray-600 mb-6">Defina o padrão da sua home e gere o link personalizado com os parâmetros desejados.</p>
 
-                        <!-- NOVO GERADOR DE LINKS DA HOME PAGE -->
-                        <div
-                            x-data="configureHomeBuilder($el)"
-                            data-base-url="https://{{ $dominio }}"
-                            data-home-model="{{ $homePageLayoutAtual }}"
-                            data-home-destination="{{ $homePageDestinationAtual }}"
-                            class="bg-gray-100 p-4 rounded-lg border mb-6"
-                        >
-                            <h5 class="font-semibold text-gray-800 flex items-center gap-2"><i class="ri-links-line"></i>Gerador de links da home</h5>
-                            <p class="text-sm text-gray-600">Ajuste as opções para gerar o link na hora. Esta seção não salva configurações.</p>
-                            
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                                <div>
-                                    <x-input-label for="home_model_select" value="Escolha o modelo da sua home" />
-                                    <select
-                                        id="home_model_select"
-                                        x-model="homeModel"
-                                        class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm text-sm"
-                                        style="padding: 15px;"
-                                    >
-                                        <option value="padrao">Modelo 1</option>
-                                        <option value="w3">Modelo 2</option>
-                                    </select>
-                                </div>
+                    <div
+                        x-data="configureHomeLinkCard($el)"
+                        data-home-model="{{ $homePageLayoutAtual }}"
+                        data-home-destination="{{ $homePageDestinationAtual }}"
+                        data-home-whatsapp-flow="{{ $homePageWhatsappFlowAtual }}"
+                        data-layout-endpoint="{{ route('alterar_home_page_layout') }}"
+                        data-base-url="{{ $dashboardBaseUrl }}"
+                        class="p-4 border rounded-lg flex flex-col items-start"
+                    >
+                        <div class="flex items-center">
+                            <i class="ri-home-gear-line text-2xl text-indigo-500 mr-3"></i>
+                            <div>
+                                <h4 class="font-semibold text-gray-800">Configure seu link</h4>
+                                <p class="text-xs text-gray-500">Defina o padrão da home e gere seu link personalizado na hora.</p>
+                            </div>
+                        </div>
 
-                                <div>
-                                    <x-input-label for="home_destination_select" value="Escolha o destino da home" />
-                                    <select
-                                        id="home_destination_select"
-                                        x-model="destination"
-                                        @change="updateWhatsappDestination()"
-                                        class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm text-sm"
-                                        style="padding: 15px;"
-                                    >
-                                        <option value="curso">Página do curso</option>
-                                        <option value="whatsapp">WhatsApp</option>
-                                    </select>
-                                </div>
+                        <div class="mt-4 w-full space-y-4">
+                            <div>
+                                <x-input-label for="home_link_model_select" value="Escolha o modelo da sua home" />
+                                <select
+                                    id="home_link_model_select"
+                                    x-model="homeModel"
+                                    class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm text-sm"
+                                    style="padding: 15px;"
+                                >
+                                    <option value="padrao">Modelo 1</option>
+                                    <option value="w3">Modelo 2</option>
+                                </select>
                             </div>
 
-                            <div class="mt-4" x-show="destination === 'whatsapp'" x-cloak>
-                                <x-input-label for="whatsapp_channel_select" value="Canal de WhatsApp" />
+                            <div>
+                                <x-input-label for="home_link_destination_select" value="Escolha o destino da home" />
                                 <select
+                                    id="home_link_destination_select"
+                                    x-model="homeDestination"
+                                    @change="updateHomeDestination()"
+                                    class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm text-sm"
+                                    style="padding: 15px;"
+                                >
+                                    <option value="curso">Página do curso</option>
+                                    <option value="whatsapp">WhatsApp</option>
+                                </select>
+                            </div>
+
+                            <div x-show="homeDestination === 'whatsapp'" x-cloak>
+                                <x-input-label for="home_link_whatsapp_flow_select" value="Fluxo do WhatsApp na home" />
+                                <select
+                                    id="home_link_whatsapp_flow_select"
+                                    x-model="homeWhatsappFlow"
+                                    class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm text-sm"
+                                    style="padding: 15px;"
+                                >
+                                    <option value="formulario">Mostrar formulário</option>
+                                    <option value="direto">Ir direto para o WhatsApp</option>
+                                </select>
+                            </div>
+
+                            <div x-show="homeDestination === 'whatsapp'" x-cloak>
+                                <x-input-label for="home_link_whatsapp_channel_select" value="Canal de WhatsApp" />
+                                <select
+                                    id="home_link_whatsapp_channel_select"
                                     x-model="whatsappChannel"
-                                    id="whatsapp_channel_select"
                                     class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm text-sm"
                                     style="padding: 15px;"
                                 >
@@ -471,7 +421,7 @@
                                 @endif
                             </div>
 
-                            <div class="mt-4">
+                            <div>
                                 <x-input-label value="Mostrar nome da cidade?" />
                                 <div class="mt-2 inline-flex rounded-md shadow-sm border border-gray-300 overflow-hidden">
                                     <button
@@ -493,31 +443,68 @@
                                 </div>
                             </div>
 
-                            <div class="mt-4" x-show="showCity === 'sim'" x-cloak>
-                                <x-input-label for="city_input" value="Digite o nome da cidade" />
-                                <x-text-input x-model.debounce.300ms="city" id="city_input" type="text" class="mt-1 block w-full text-sm" placeholder="Ex: salvador" style="padding: 15px;" />
+                            <div x-show="showCity === 'sim'" x-cloak>
+                                <x-input-label for="home_link_city_input" value="Digite o nome da cidade" />
+                                <x-text-input
+                                    id="home_link_city_input"
+                                    x-model.debounce.300ms="city"
+                                    type="text"
+                                    class="mt-1 block w-full text-sm"
+                                    placeholder="Ex: salvador"
+                                    style="padding: 15px;"
+                                />
                             </div>
+                        </div>
 
-                            <div class="mt-4">
-                                <x-input-label value="Seu Link Personalizado" />
+                        <div class="mt-4 flex items-center gap-3">
+                            <x-primary-button type="button" @click="saveHomeSettings()" x-bind:disabled="isSaving">
+                                <span x-show="!isSaving">Salvar</span>
+                                <span x-show="isSaving" x-cloak>Salvando...</span>
+                            </x-primary-button>
+                            <p x-show="saveSuccess" x-cloak class="text-sm text-green-700">Salvo</p>
+                            <p x-show="saveError" x-text="saveError" x-cloak class="text-sm text-red-600"></p>
+                        </div>
+
+                        <div class="mt-5 w-full border-t border-gray-200 pt-4">
+                            <div class="flex items-center gap-2 text-sm font-semibold text-gray-800">
+                                <i class="ri-links-line text-indigo-500"></i>
+                                Seu Link Personalizado
+                            </div>
+                            <p class="mt-1 text-xs text-gray-500">A prévia abaixo usa apenas parâmetros na URL. Cidade e canal não são salvos no backend.</p>
+
+                            <div x-show="hasBaseUrl" x-cloak class="mt-4">
                                 <div class="flex items-stretch mt-1">
                                     <div x-text="finalUrl" class="flex items-center w-full border border-r-0 border-gray-300 rounded-l-md shadow-sm text-sm bg-gray-200 font-mono px-3 py-2 break-all"></div>
-                                    <button type="button" @click.prevent="copyToClipboard()" class="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-r-md hover:bg-indigo-500 text-sm transition-colors flex items-center w-32 justify-center">
+                                    <button
+                                        type="button"
+                                        @click.prevent="copyToClipboard()"
+                                        :disabled="!hasBaseUrl"
+                                        class="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-r-md hover:bg-indigo-500 text-sm transition-colors flex items-center w-32 justify-center disabled:cursor-not-allowed disabled:bg-gray-400"
+                                    >
                                         <span x-show="!copied" class="flex items-center"><i class="ri-file-copy-line mr-1"></i> Copiar</span>
                                         <span x-show="copied" x-transition class="flex items-center text-lime-300"><i class="ri-check-line mr-1"></i> Copiado!</span>
                                     </button>
                                 </div>
                             </div>
+
+                            <div x-show="!hasBaseUrl" x-cloak class="mt-4 rounded-md border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
+                                Configure seu domínio primeiro para copiar o link personalizado.
+                            </div>
                         </div>
-                    @endif
-                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    </div>
+                </div>
+
+                <!-- PASSO 4: MATERIAIS E LEADS -->
+                <div class="bg-white bg-gray-800 p-6 rounded-lg shadow-sm">
+                    <h3 class="text-xl font-semibold mb-4 flex items-center text-gray-900 text-gray-100"><span class="bg-blue-500 text-white rounded-full h-8 w-8 flex items-center justify-center mr-3 text-sm">4</span>Materiais e Leads</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                         <a href="https://drive.google.com/drive/folders/1H1Obc3ozkNDUkcimhDwHD1olZYvHBL2f?usp=sharing" target="_blank" class="flex items-center gap-3 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 px-4 py-3 bg-gray-100 focus:bg-white transition"><i class="ri-folder-zip-line text-2xl text-blue-500"></i> <span class="font-medium text-gray-700 text-gray-300">Materiais de Apoio</span></a>
                         <a href="https://drive.google.com/drive/folders/1GjFHzFfwI_yEjtMwliMU5F34y581xmKN?usp=sharing" target="_blank" rel="noopener noreferrer" class="flex items-center gap-3 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 px-4 py-3 bg-gray-100 focus:bg-white transition"><i class="ri-file-list-3-line text-2xl text-blue-500"></i> <span class="font-medium text-gray-700 text-gray-300">Script de atendimento</span></a>
                         <a href="{{ route('hotmart_leads', ['version' => null]) }}" class="flex items-center gap-3 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 px-4 py-3 bg-gray-100 focus:bg-white transition"><i class="ri-user-search-line text-2xl text-blue-500"></i> <span class="font-medium text-gray-700 text-gray-300">Meus Leads</span></a>
                     </div>
                 </div>
 
-                <!-- PASSO 4: ANÁLISE E OTIMIZAÇÃO -->
+                <!-- PASSO 5: ANÁLISE E OTIMIZAÇÃO -->
                 <div class="bg-white bg-gray-800 p-6 rounded-lg shadow-sm">
                     @php
                         $quantidadeVendas = $quantidade_vendas ?? 0;
@@ -528,7 +515,7 @@
                             'totalLeads' => 0,
                         ], $dashboard ?? []);
                     @endphp
-                    <h3 class="text-xl font-semibold mb-4 flex items-center text-gray-900 text-gray-100"><span class="bg-blue-500 text-white rounded-full h-8 w-8 flex items-center justify-center mr-3 text-sm">4</span>Análise de Resultados</h3>
+                    <h3 class="text-xl font-semibold mb-4 flex items-center text-gray-900 text-gray-100"><span class="bg-blue-500 text-white rounded-full h-8 w-8 flex items-center justify-center mr-3 text-sm">5</span>Análise de Resultados</h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         @if($quantidadeVendas)
                             <div class="text-center p-4 border border-gray-700 rounded-lg">
@@ -1054,19 +1041,73 @@
         });
     }
 
-    function configureHomeSettings(element) {
+    function configureHomeLinkCard(element) {
+        const baseUrl = element?.dataset?.baseUrl || '';
         const initialHomeModel = element?.dataset?.homeModel || 'padrao';
         const initialHomeDestination = element?.dataset?.homeDestination || 'curso';
         const initialHomeWhatsappFlow = element?.dataset?.homeWhatsappFlow || 'formulario';
         const layoutEndpoint = element?.dataset?.layoutEndpoint || '';
 
         return {
+            baseUrl,
             homeModel: ['padrao', 'w3'].includes(initialHomeModel) ? initialHomeModel : 'padrao',
             homeDestination: ['curso', 'whatsapp'].includes(initialHomeDestination) ? initialHomeDestination : 'curso',
             homeWhatsappFlow: ['formulario', 'direto'].includes(initialHomeWhatsappFlow) ? initialHomeWhatsappFlow : 'formulario',
+            showCity: 'nao',
+            city: '',
+            whatsappChannel: 'rodizio',
+            copied: false,
             isSaving: false,
             saveSuccess: false,
             saveError: '',
+
+            get hasBaseUrl() {
+                return this.baseUrl.trim() !== '';
+            },
+
+            get finalUrl() {
+                if (!this.hasBaseUrl) {
+                    return '';
+                }
+
+                let url = this.baseUrl;
+                const params = new URLSearchParams();
+
+                if (this.homeModel === 'w3') {
+                    url += '/w3';
+                    if (this.homeDestination === 'curso') {
+                        params.set('destination', 'curso');
+                    }
+                } else {
+                    params.set('layout', 'padrao');
+                }
+
+                if (this.homeDestination === 'whatsapp') {
+                    params.set('w', '1');
+                    if (this.whatsappChannel && this.whatsappChannel !== 'rodizio') {
+                        params.set('t', this.whatsappChannel);
+                    }
+                }
+
+                if (this.showCity === 'sim' && this.city.trim() !== '') {
+                    params.set('c', this.city.trim());
+                }
+
+                const queryString = params.toString();
+                return queryString ? `${url}?${queryString}` : url;
+            },
+
+            updateHomeDestination() {
+                if (this.homeDestination !== 'whatsapp') {
+                    this.whatsappChannel = 'rodizio';
+                }
+            },
+
+            updateCityVisibility() {
+                if (this.showCity !== 'sim') {
+                    this.city = '';
+                }
+            },
 
             saveHomeSettings() {
                 if (!layoutEndpoint || this.isSaving) {
@@ -1107,6 +1148,7 @@
                     this.homeModel = ['padrao', 'w3'].includes(data.home_page_layout) ? data.home_page_layout : this.homeModel;
                     this.homeDestination = ['curso', 'whatsapp'].includes(data.home_page_destination) ? data.home_page_destination : this.homeDestination;
                     this.homeWhatsappFlow = ['formulario', 'direto'].includes(data.home_page_whatsapp_flow) ? data.home_page_whatsapp_flow : this.homeWhatsappFlow;
+                    this.updateHomeDestination();
                     this.saveSuccess = true;
                     window.setTimeout(() => {
                         this.saveSuccess = false;
@@ -1133,66 +1175,10 @@
                 .finally(() => {
                     this.isSaving = false;
                 });
-            }
-        };
-    }
-
-    function configureHomeBuilder(element) {
-        const baseUrl = element?.dataset?.baseUrl || '';
-        const initialHomeModel = element?.dataset?.homeModel || 'padrao';
-        const initialHomeDestination = element?.dataset?.homeDestination || 'curso';
-
-        return {
-            homeModel: ['padrao', 'w3'].includes(initialHomeModel) ? initialHomeModel : 'padrao',
-            destination: ['curso', 'whatsapp'].includes(initialHomeDestination) ? initialHomeDestination : 'curso',
-            showCity: 'nao',
-            city: '',
-            whatsappChannel: 'rodizio',
-            copied: false,
-            baseUrl,
-
-            get finalUrl() {
-                let url = this.baseUrl;
-                const params = new URLSearchParams();
-
-                if (this.homeModel === 'w3') {
-                    url += '/w3';
-                    if (this.destination === 'curso') {
-                        params.set('destination', 'curso');
-                    }
-                } else {
-                    params.set('layout', 'padrao');
-                }
-
-                if (this.destination === 'whatsapp') {
-                    params.set('w', '1');
-                    if (this.whatsappChannel && this.whatsappChannel !== 'rodizio') {
-                        params.set('t', this.whatsappChannel);
-                    }
-                }
-
-                if (this.showCity === 'sim' && this.city.trim() !== '') {
-                    params.set('c', this.city.trim());
-                }
-
-                const queryString = params.toString();
-                return queryString ? `${url}?${queryString}` : url;
-            },
-
-            updateWhatsappDestination() {
-                if (this.destination !== 'whatsapp') {
-                    this.whatsappChannel = 'rodizio';
-                }
-            },
-
-            updateCityVisibility() {
-                if (this.showCity !== 'sim') {
-                    this.city = '';
-                }
             },
 
             copyToClipboard() {
-                if (!this.finalUrl) return;
+                if (!this.hasBaseUrl || !this.finalUrl) return;
 
                 const onCopySuccess = () => {
                     this.copied = true;

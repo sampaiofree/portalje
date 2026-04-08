@@ -738,7 +738,7 @@
     </a>
     <!-- Modal com Formulário -->
     <div class="modal fade" id="inscricaoModal" tabindex="-1" aria-labelledby="modalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-fullscreen">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 560px; width: calc(100% - 2rem); margin: 1.75rem auto;">
             <div class="modal-content">
             <div class="modal-header">
                         @if ($info['whatsapp'])

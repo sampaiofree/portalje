@@ -1,6 +1,6 @@
     <!-- Modal de Inscrição (Estrutura do seu código original) -->
     <div class="modal fade" id="inscricaoModal" tabindex="-1" aria-labelledby="modalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered" style="max-width: 560px; width: calc(100% - 2rem); margin: 1.75rem auto;">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title fw-bold" id="modalLabel">@if (isset($info['whatsapp']) and $info['whatsapp']) Complete seus dados para falar com um consultor @else Preencha para garantir sua vaga! @endif</h5>
