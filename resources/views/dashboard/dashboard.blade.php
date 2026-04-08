@@ -1084,6 +1084,7 @@
 
                 if (this.homeDestination === 'whatsapp') {
                     params.set('w', '1');
+                    params.set('whatsapp_flow', this.homeWhatsappFlow);
                     if (this.whatsappChannel && this.whatsappChannel !== 'rodizio') {
                         params.set('t', this.whatsappChannel);
                     }
