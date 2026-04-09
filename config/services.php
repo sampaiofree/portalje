@@ -50,4 +50,8 @@ return [
         'verification_request_phone' => env('BOTCONVERSA_VERIFICATION_REQUEST_PHONE'),
     ],
 
+    'adsense' => [
+        'account_id' => env('GOOGLE_ADSENSE_ACCOUNT_ID', 'ca-pub-9796869151117705'),
+    ],
+
 ];

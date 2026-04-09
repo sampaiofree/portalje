@@ -6,6 +6,7 @@
     <link rel="icon" href="{{asset('/img/logo/logo-je-sm.png')}}" type="image/x-icon">
     <meta name="author" content="Portal Jovem Empreendedor">
     <meta name="robots" content="index, follow">
+    @include('partials._adsense-meta')
     <meta name="keywords" content="{{$curso->titulo}}, Curso, Certificado, Online, Profissionalização, Emprego, Educação, Carreira, Certificação, Portal Jovem Empreendedor, Programa Jovem Empreendedor, qualificação profissional, mercado de trabalho, capacitação profissional, curso com certificado, curso profissionalizante.">
 
     <meta property="og:site_name" content="Portal Jovem Empreendedor">

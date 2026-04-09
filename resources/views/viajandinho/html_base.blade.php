@@ -11,6 +11,7 @@
     <meta content="@yield('descricao_pagina')" name="description" />
     <meta content="Coderthemes" name="author" />
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    @include('partials._adsense-meta')
 
     <!-- App favicon -->
     <link rel="shortcut icon" href="{{asset('Hyper_v5.4/Admin/dist/saas/assets/images/favicon.ico')}}" >

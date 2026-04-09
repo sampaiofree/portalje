@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Portal Jovem Empreendedor</title>
     <link rel="icon" href="{{asset('/img/logo/logo-je-sm.png')}}" type="image/x-icon">
-    <meta name="google-adsense-account" content="ca-pub-9796869151117705">
+    @include('partials._adsense-meta')
     @yield('head')
 
     <style>
