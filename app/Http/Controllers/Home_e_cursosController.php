@@ -520,9 +520,11 @@ class Home_e_cursosController extends Controller
             $cidadeLayout = $this->sanitizeCityName($cidade_desconto ?? $request->get('c'));
             $pagina = $this->dados_da_pagina(null, $cidadeLayout);
             $modoCardsW3 = $this->resolverModoCardsW3($request, null, 'curso');
+            $homePageWhatsappFlow = $this->resolverHomePageWhatsappFlow($request, 'formulario');
             $pagina['cards_destino'] = $modoCardsW3;
-            $pagina['whatsapp_requires_form'] = true;
-            $cursos = $this->listar_cursos($request, null, 'w3', $modoCardsW3, true);
+            $usarFormularioWhatsappNaHomeW3 = !($modoCardsW3 === 'whatsapp' && $homePageWhatsappFlow === 'direto');
+            $pagina['whatsapp_requires_form'] = $usarFormularioWhatsappNaHomeW3;
+            $cursos = $this->listar_cursos($request, null, 'w3', $modoCardsW3, $usarFormularioWhatsappNaHomeW3);
 
             return view('home_e_cursos.w3', compact('cursos', 'pagina'));
         }
@@ -542,9 +544,10 @@ class Home_e_cursosController extends Controller
         $homePageDestination = in_array((string) ($dados['dados']['home_page_destination'] ?? 'curso'), ['curso', 'whatsapp'], true)
             ? (string) $dados['dados']['home_page_destination']
             : 'curso';
-        $homePageWhatsappFlow = in_array((string) ($dados['dados']['home_page_whatsapp_flow'] ?? 'formulario'), ['formulario', 'direto'], true)
+        $storedHomePageWhatsappFlow = in_array((string) ($dados['dados']['home_page_whatsapp_flow'] ?? 'formulario'), ['formulario', 'direto'], true)
             ? (string) $dados['dados']['home_page_whatsapp_flow']
             : 'formulario';
+        $homePageWhatsappFlow = $this->resolverHomePageWhatsappFlow($request, $storedHomePageWhatsappFlow);
         if ($layoutOverride !== null) {
             $homePageLayout = $layoutOverride;
         }
@@ -792,12 +795,19 @@ class Home_e_cursosController extends Controller
         //DADOS DA PÁGINA
         $pagina = $this->dados_da_pagina($dados_afiliado, $cidade);
         $modoCardsW3 = $this->resolverModoCardsW3($request, $cidade);
+        $homePageWhatsappFlow = $this->resolverHomePageWhatsappFlow(
+            $request,
+            in_array((string) ($dados_afiliado->home_page_whatsapp_flow ?? 'formulario'), ['formulario', 'direto'], true)
+                ? (string) $dados_afiliado->home_page_whatsapp_flow
+                : 'formulario'
+        );
         $pagina['cards_destino'] = $modoCardsW3;
-        $pagina['whatsapp_requires_form'] = true;
+        $usarFormularioWhatsappNaHomeW3 = !($modoCardsW3 === 'whatsapp' && $homePageWhatsappFlow === 'direto');
+        $pagina['whatsapp_requires_form'] = $usarFormularioWhatsappNaHomeW3;
 
         //LISTAR OS CURSOS 
-        
-        $cursos = $this->listar_cursos($request, $dados_afiliado, 'w3', $modoCardsW3);
+
+        $cursos = $this->listar_cursos($request, $dados_afiliado, 'w3', $modoCardsW3, $usarFormularioWhatsappNaHomeW3);
 
         $temCursoVisivel = collect($cursos)->contains(function ($curso) {
             return !empty($curso->publicado) && !empty($curso->mostrar_na_pagina);
@@ -1390,6 +1400,11 @@ class Home_e_cursosController extends Controller
 
     private function resolverModoCardsW3(Request $request, ?string $cidade = null, string $defaultDestination = 'curso'): string
     {
+        $queryDestination = (string) $request->query('destination');
+        if (in_array($queryDestination, ['curso', 'whatsapp'], true)) {
+            return $queryDestination;
+        }
+
         if (!empty($cidade)) {
             return 'whatsapp';
         }
@@ -1401,10 +1416,20 @@ class Home_e_cursosController extends Controller
         return in_array($defaultDestination, ['curso', 'whatsapp'], true) ? $defaultDestination : 'curso';
     }
 
+    private function resolverHomePageWhatsappFlow(Request $request, string $defaultFlow = 'formulario'): string
+    {
+        $queryFlow = (string) $request->query('whatsapp_flow');
+        if (in_array($queryFlow, ['formulario', 'direto'], true)) {
+            return $queryFlow;
+        }
+
+        return in_array($defaultFlow, ['formulario', 'direto'], true) ? $defaultFlow : 'formulario';
+    }
+
     private function montarLinkCursoCardW3(Request $request, Curso $curso): string
     {
         $query = $request->query();
-        unset($query['w'], $query['t']);
+        unset($query['w'], $query['t'], $query['destination']);
 
         $url = 'https://' . $request->getHost() . '/' . ltrim((string) $curso->url, '/');
         $queryString = http_build_query($query);
