@@ -334,7 +334,7 @@
                         </div>
 
                         <!-- Tutorial Expansível -->
-                        <div x-show="showTutorial" x-transition class="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                        <div x-show="showTutorial" x-cloak x-transition class="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
                             <h5 class="font-semibold text-blue-800 mb-2">Como usar esta página:</h5>
                             <ul class="text-sm text-blue-700 space-y-1">
                                 <li>• Configure um código REF único para cada curso</li>
@@ -393,6 +393,7 @@
 
                                     <div
                                         x-show="bulkActionDropdownOpen"
+                                        x-cloak
                                         x-transition.origin.top.right
                                         @click.outside="bulkActionDropdownOpen = false"
                                         class="absolute right-0 z-20 mt-2 w-56 overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg"
@@ -423,34 +424,34 @@
                 </div>
 
                 <!-- Mensagem de Sucesso -->
-                <div x-show="showSuccessMessage" x-transition class="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                <div x-show="showSuccessMessage" x-cloak x-transition class="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
                     <div class="flex items-center">
                         <i class="ri-check-circle-line text-green-600 mr-2"></i>
                         <span class="text-green-800" x-text="successMessage"></span>
                     </div>
                 </div>
 
-                <div x-show="bulkActionError" x-transition class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <div x-show="bulkActionError" x-cloak x-transition class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
                     <div class="flex items-center">
                         <i class="ri-error-warning-line text-red-600 mr-2"></i>
                         <span class="text-red-800" x-text="bulkActionError"></span>
                     </div>
                 </div>
 
-                <div
-                    x-show="bulkPublicConfigModalOpen"
-                    x-transition.opacity
-                    class="fixed inset-0 z-40 bg-slate-900/50"
-                    @click="closeBulkPublicConfigModal()"
-                ></div>
+                <template x-if="bulkPublicConfigModalOpen">
+                    <div>
+                        <div
+                            x-transition.opacity
+                            class="fixed inset-0 z-40 bg-slate-900/50"
+                            @click="closeBulkPublicConfigModal()"
+                        ></div>
 
-                <div
-                    x-show="bulkPublicConfigModalOpen"
-                    x-transition
-                    class="fixed inset-0 z-50 flex items-center justify-center p-4"
-                    style="overflow: scroll"
-                >
-                    <div @click.stop class="je-dark-surface w-full max-w-2xl rounded-xl border shadow-xl">
+                        <div
+                            x-transition
+                            class="fixed inset-0 z-50 flex items-center justify-center p-4"
+                            style="overflow: scroll"
+                        >
+                            <div @click.stop class="je-dark-surface w-full max-w-2xl rounded-xl border shadow-xl">
                         <div class="je-dark-divider flex items-center justify-between border-b px-6 py-4">
                             <h3 class="text-lg font-semibold text-white">Configurações da página pública em massa</h3>
                             <button
@@ -704,8 +705,10 @@
                                 <span x-text="isBulkPublicConfigLoading ? 'Aplicando...' : 'Aplicar em todos'"></span>
                             </button>
                         </div>
+                            </div>
+                        </div>
                     </div>
-                </div>
+                </template>
 
                 <!-- Grid com os Cards dos Cursos -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1080,7 +1083,8 @@
                                                         </div>
                                                     </button>
 
-                                                    <div x-show="publicPageConfigExpanded" x-transition class="space-y-4 px-4 pb-4 border-t border-blue-100">
+                                                    <template x-if="publicPageConfigExpanded">
+                                                        <div class="space-y-4 border-t border-blue-100 px-4 pb-4">
                                                         <p x-show="pricingSaveError" x-text="pricingSaveError" class="rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-700"></p>
 
                                                         <div>
@@ -1219,10 +1223,6 @@
                                                             </div>
                                                         </template>
 
-                                                        <input x-show="!hasCuponsDisponiveis" :disabled="hasCuponsDisponiveis" type="hidden" name="modo_precos" value="padrao">
-                                                        <input x-show="!hasCuponsDisponiveis" :disabled="hasCuponsDisponiveis" type="hidden" name="cupom_principal_id" value="">
-                                                        <input x-show="!hasCuponsDisponiveis" :disabled="hasCuponsDisponiveis" type="hidden" name="cupom_secundario_id" value="">
-
                                                         <div class="rounded-md border border-blue-100 bg-white/70 p-4 space-y-4">
                                                             <div>
                                                                 <p class="text-sm font-medium text-gray-800">Contador na página pública</p>
@@ -1321,9 +1321,19 @@
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                    </div>
+                                                        </div>
+                                                    </template>
                                                 </div>
                                             </template>
+
+                                            <input type="hidden" name="formulario_pre_checkout" :disabled="!hasCodigoRef || publicPageConfigExpanded" :value="formularioPreCheckout">
+                                            <input type="hidden" name="modo_precos" :disabled="!hasCodigoRef || publicPageConfigExpanded" :value="hasCuponsDisponiveis ? modoPrecos : 'padrao'">
+                                            <input type="hidden" name="cupom_principal_id" :disabled="!hasCodigoRef || publicPageConfigExpanded" :value="hasCuponsDisponiveis ? cupomPrincipalId : ''">
+                                            <input type="hidden" name="cupom_secundario_id" :disabled="!hasCodigoRef || publicPageConfigExpanded" :value="hasCuponsDisponiveis ? cupomSecundarioId : ''">
+                                            <input type="hidden" name="usar_contador" :disabled="!hasCodigoRef || publicPageConfigExpanded" :value="usarContador">
+                                            <input type="hidden" name="contador_minutos" :disabled="!hasCodigoRef || publicPageConfigExpanded" :value="usarContador === '1' ? contadorMinutos : ''">
+                                            <input type="hidden" name="contador_acao" :disabled="!hasCodigoRef || publicPageConfigExpanded" :value="usarContador === '1' ? contadorAcao : ''">
+                                            <input type="hidden" name="contador_destino_oferta" :disabled="!hasCodigoRef || publicPageConfigExpanded" :value="usarContador === '1' && contadorAcao === 'alterar_preco' ? contadorDestinoOferta : ''">
 
                                             <!-- Inputs Ocultos (CORRIGIDOS) -->
                                             <div id="ref-form-feedback-{{$curso->id}}" class="mt-2 text-sm"></div>
@@ -1340,21 +1350,23 @@
                                     </div>
                                     
                                     <!-- GERADOR DE LINKS DINÂMICOS -->
-                                    <div x-show="hasCodigoRef" x-transition class="border-t border-gray-200 bg-gray-50">
-                                        <!-- Botão para Expandir/Colapsar -->
-                                        <button 
-                                            @click="expanded = !expanded"
-                                            class="w-full px-6 py-4 text-left flex items-center justify-between hover:bg-gray-100 transition-colors"
-                                        >
-                                            <span class="font-semibold text-gray-800 flex items-center">
-                                                <i class="ri-links-line mr-2 text-blue-600"></i>
-                                                Gerador de Links
-                                            </span>
-                                            <i class="ri-arrow-down-s-line text-gray-500 transition-transform" :class="expanded ? 'rotate-180' : ''"></i>
-                                        </button>
+                                    <template x-if="hasCodigoRef">
+                                        <div class="border-t border-gray-200 bg-gray-50">
+                                            <!-- Botão para Expandir/Colapsar -->
+                                            <button 
+                                                @click="expanded = !expanded"
+                                                class="w-full px-6 py-4 text-left flex items-center justify-between hover:bg-gray-100 transition-colors"
+                                            >
+                                                <span class="font-semibold text-gray-800 flex items-center">
+                                                    <i class="ri-links-line mr-2 text-blue-600"></i>
+                                                    Gerador de Links
+                                                </span>
+                                                <i class="ri-arrow-down-s-line text-gray-500 transition-transform" :class="expanded ? 'rotate-180' : ''"></i>
+                                            </button>
 
-                                        <!-- Conteúdo Expansível -->
-                                        <div x-show="expanded" x-transition class="px-6 pb-6">
+                                            <!-- Conteúdo Expansível -->
+                                            <template x-if="expanded">
+                                                <div class="px-6 pb-6">
                                             
                                             <!-- Gerador da Página de Vendas -->
                                             <div class="space-y-4 mb-6 p-4 bg-white rounded-lg border">
@@ -1488,14 +1500,18 @@
                                                 </div>
                                             </div>
 
+                                                </div>
+                                            </template>
                                         </div>
-                                    </div>
-                                    <div x-show="!hasCodigoRef" x-transition class="border-t border-gray-200 bg-yellow-50 p-4">
-                                        <div class="flex items-center text-yellow-800">
-                                            <i class="ri-information-line mr-2"></i>
-                                            <span class="text-sm">Configure um código REF primeiro para gerar links personalizados</span>
+                                    </template>
+                                    <template x-if="!hasCodigoRef">
+                                        <div class="border-t border-gray-200 bg-yellow-50 p-4">
+                                            <div class="flex items-center text-yellow-800">
+                                                <i class="ri-information-line mr-2"></i>
+                                                <span class="text-sm">Configure um código REF primeiro para gerar links personalizados</span>
+                                            </div>
                                         </div>
-                                    </div>
+                                    </template>
                                     <!-- Bloco de Links Rápidos e Recursos -->
                                     <!-- NOVO: Acordeão de Recursos e Links Rápidos -->
                                     <div class="border-t border-gray-200 bg-gray-50">
@@ -1512,7 +1528,8 @@
                                         </button>
 
                                         <!-- Conteúdo Expansível -->
-                                        <div x-show="resourcesExpanded" x-transition class="px-6 pb-6 space-y-3">
+                                        <template x-if="resourcesExpanded">
+                                            <div class="px-6 pb-6 space-y-3">
                                             
                                             <!-- Link para Afiliar-se -->
                                             <a target="_blanck" href="{{ $curso->link_afiliacao }}" target="_blank" class="flex items-center text-sm text-indigo-600 hover:underline">
@@ -1549,7 +1566,8 @@
                                                             <span>Vídeo de Apresentação</span>
                                                         </a>
                                             @endif
-                                        </div>
+                                            </div>
+                                        </template>
                                     </div>
                                 </div>
                             </div>
@@ -1560,6 +1578,7 @@
                 <!-- Mensagem quando não há resultados (Lógica Corrigida e Simplificada) -->
                 <div 
                     x-show="search && $el.parentElement.querySelectorAll('.lista_cursos:not([style*=\'display: none\'])').length === 0" 
+                    x-cloak
                     x-transition
                     class="text-center py-16"
                 >

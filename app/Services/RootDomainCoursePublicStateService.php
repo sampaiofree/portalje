@@ -333,7 +333,7 @@ class RootDomainCoursePublicStateService
         ];
     }
 
-    public function buildAffiliateCoursePricingPreviewVariants(Curso $curso): array
+    public function buildAffiliateCoursePricingPreviewVariants(Curso $curso, Collection|array|null $cupons = null): array
     {
         $precoCompletoOriginal = $this->extractMonetaryValue($curso->preco_cheio_completo ?? null);
         $precoParceladoOriginal = $this->extractMonetaryValue($curso->preco_parcelado_completo ?? null);
@@ -358,8 +358,19 @@ class RootDomainCoursePublicStateService
             return $variants;
         }
 
-        $cupons = Cupom::query()->orderBy('id')->get();
-        foreach ($cupons as $cupom) {
+        if ($cupons instanceof Collection) {
+            $cuponsCollection = $cupons;
+        } elseif (is_array($cupons)) {
+            $cuponsCollection = collect($cupons);
+        } else {
+            $cuponsCollection = Cupom::query()->orderBy('id')->get();
+        }
+
+        if ($cuponsCollection->isEmpty()) {
+            return $variants;
+        }
+
+        foreach ($cuponsCollection as $cupom) {
             $variants['completo_cupom:' . $cupom->id] = $this->buildOfferPayloadFromCourse(
                 $this->applyOfferCouponOnClonedCourse($cursoBasePricing, 'completo', $cupom),
                 'completo'

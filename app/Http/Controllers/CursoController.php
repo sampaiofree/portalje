@@ -34,7 +34,7 @@ class CursoController extends Controller
                 continue;
             }
 
-            $previewVariants = $pricingPreviewService->buildAffiliateCoursePricingPreviewVariants($curso);
+            $previewVariants = $pricingPreviewService->buildAffiliateCoursePricingPreviewVariants($curso, $cupons);
             $curso->pricing_select_preview_labels = $this->buildAffiliatePricingSelectPreviewLabels($cupons, $previewVariants);
             $curso->countdown_destination_options = $this->buildAffiliateCountdownDestinationOptions($cupons, $previewVariants);
         }

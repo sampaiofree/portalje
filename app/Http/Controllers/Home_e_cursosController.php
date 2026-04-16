@@ -1051,6 +1051,11 @@ class Home_e_cursosController extends Controller
         
         if($user){
             $codigos_ref = Schema::hasTable('codigo_ref') ? $user->codigo_ref : collect();
+            $codigosRefByCourseId = $codigos_ref
+                ? $codigos_ref
+                    ->filter(fn ($codigoRef) => is_object($codigoRef) && isset($codigoRef->curso_id))
+                    ->keyBy(fn ($codigoRef) => (int) $codigoRef->curso_id)
+                : collect();
             $formulario_whatsapp = $user->formulario_whatsapp;
             $formulario_pre_checkout = $user->formulario_pre_checkout;
             $whatsAppAtendimentoId = null;
@@ -1065,6 +1070,7 @@ class Home_e_cursosController extends Controller
         }else{
             $dados_portal = $this->dados_portal;
             $codigos_ref = collect();
+            $codigosRefByCourseId = collect();
             $formulario_whatsapp = $dados_portal['formulario_whatsapp'];
             $formulario_pre_checkout = $dados_portal['formulario_pre_checkout'];
             $whatsApp =  $dados_portal['telefone_suporte_alunos'];
@@ -1089,37 +1095,33 @@ class Home_e_cursosController extends Controller
             $cursoEncontrado = false;
             $vaga =  $vagas[$n]; $n++;
             //ADICIONAR CÓDIGO REF DO USER EM CADA CURSO
-            if ($codigos_ref !== null && $codigos_ref->isNotEmpty()) {
-                if($codigos_ref){
-                    foreach ($codigos_ref as $codigo_ref) {
-                        if (is_object($codigo_ref) && $codigo_ref->curso_id == $curso->id) {
-                            $curso->codigo_ref = $codigo_ref->codigo_ref;
-                            $curso->codigo_ref_id = $codigo_ref->id;
-                            $curso->mostrar_curso = $codigo_ref->mostrar_curso;
-                            $modoPrecos = $codigo_ref->modo_precos ?? 'padrao';
-                            if (!in_array($modoPrecos, ['padrao', 'um_preco', 'dois_precos'], true)) {
-                                $modoPrecos = 'padrao';
-                            }
-                            $curso->modo_precos = $modoPrecos;
-                            $curso->cupom_principal_id = !empty($codigo_ref->cupom_principal_id) ? (int) $codigo_ref->cupom_principal_id : null;
-                            $curso->cupom_secundario_id = !empty($codigo_ref->cupom_secundario_id) ? (int) $codigo_ref->cupom_secundario_id : null;
-                            $curso->formulario_pre_checkout = isset($codigo_ref->formulario_pre_checkout)
-                                ? (bool) $codigo_ref->formulario_pre_checkout
-                                : true;
-                            $curso->usar_contador = isset($codigo_ref->usar_contador)
-                                ? (bool) $codigo_ref->usar_contador
-                                : false;
-                            $curso->contador_minutos = !empty($codigo_ref->contador_minutos)
-                                ? (int) $codigo_ref->contador_minutos
-                                : null;
-                            $curso->contador_acao = $codigo_ref->contador_acao ?? null;
-                            $curso->contador_destino_oferta = $codigo_ref->contador_destino_oferta ?? null;
-                            $cursoEncontrado = true;
-                            break;
-        }
-    }
+            if ($codigosRefByCourseId->isNotEmpty()) {
+                $codigo_ref = $codigosRefByCourseId->get((int) $curso->id);
+
+                if ($codigo_ref) {
+                    $curso->codigo_ref = $codigo_ref->codigo_ref;
+                    $curso->codigo_ref_id = $codigo_ref->id;
+                    $curso->mostrar_curso = $codigo_ref->mostrar_curso;
+                    $modoPrecos = $codigo_ref->modo_precos ?? 'padrao';
+                    if (!in_array($modoPrecos, ['padrao', 'um_preco', 'dois_precos'], true)) {
+                        $modoPrecos = 'padrao';
+                    }
+                    $curso->modo_precos = $modoPrecos;
+                    $curso->cupom_principal_id = !empty($codigo_ref->cupom_principal_id) ? (int) $codigo_ref->cupom_principal_id : null;
+                    $curso->cupom_secundario_id = !empty($codigo_ref->cupom_secundario_id) ? (int) $codigo_ref->cupom_secundario_id : null;
+                    $curso->formulario_pre_checkout = isset($codigo_ref->formulario_pre_checkout)
+                        ? (bool) $codigo_ref->formulario_pre_checkout
+                        : true;
+                    $curso->usar_contador = isset($codigo_ref->usar_contador)
+                        ? (bool) $codigo_ref->usar_contador
+                        : false;
+                    $curso->contador_minutos = !empty($codigo_ref->contador_minutos)
+                        ? (int) $codigo_ref->contador_minutos
+                        : null;
+                    $curso->contador_acao = $codigo_ref->contador_acao ?? null;
+                    $curso->contador_destino_oferta = $codigo_ref->contador_destino_oferta ?? null;
+                    $cursoEncontrado = true;
                 }
-                
             }
 
             if (!$cursoEncontrado) {
