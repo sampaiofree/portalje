@@ -15,6 +15,24 @@ class CatalogoController extends Controller
 {
     public function index(Request $request)
     {
+        $catalogo = $this->montarCatalogo($request);
+
+        return response()
+            ->view('afiliados.catalogo', $catalogo)
+            ->header('Content-Type', 'application/xml; charset=UTF-8');
+    }
+
+    public function markdown(Request $request)
+    {
+        $catalogo = $this->montarCatalogo($request);
+
+        return response()
+            ->view('afiliados.catalogo2', $catalogo)
+            ->header('Content-Type', 'text/markdown; charset=UTF-8');
+    }
+
+    private function montarCatalogo(Request $request): array
+    {
         $host = $request->getHost();
         $fallbackBaseUrl = $request->getSchemeAndHttpHost();
 
@@ -24,28 +42,35 @@ class CatalogoController extends Controller
 
         $itens = $cursos->map(function ($curso) use ($baseUrl, $refsPorCurso, $cuponsPorId) {
             $ref = $refsPorCurso[$curso->id] ?? null;
-            $link = rtrim($baseUrl, '/') . '/' . ltrim((string) $curso->url, '/');
 
-            return [
-                'id' => 'curso_' . $curso->id,
-                'title' => (string) ($curso->titulo ?? ''),
-                'description' => $this->descricaoCurso($curso),
-                'availability' => 'in stock',
-                'condition' => 'new',
-                'price' => $this->precoMetaPorConfiguracao($curso, $ref, $cuponsPorId),
-                'link' => $link,
-                'image_link' => $curso->capa_quadrada ? asset('storage/' . $curso->capa_quadrada) : '',
-                'brand' => 'Portal JE',
-            ];
+            return $this->mapearItemCatalogo($curso, $baseUrl, $ref, $cuponsPorId);
         })->values();
 
-        return response()
-            ->view('afiliados.catalogo', [
-                'host' => $host,
-                'baseUrl' => $baseUrl,
-                'itens' => $itens,
-            ])
-            ->header('Content-Type', 'application/xml; charset=UTF-8');
+        return [
+            'host' => $host,
+            'baseUrl' => $baseUrl,
+            'itens' => $itens,
+        ];
+    }
+
+    private function mapearItemCatalogo(Curso $curso, string $baseUrl, ?Codigo_ref $ref, Collection $cuponsPorId): array
+    {
+        $link = rtrim($baseUrl, '/') . '/' . ltrim((string) $curso->url, '/');
+
+        return [
+            'id' => 'curso_' . $curso->id,
+            'title' => trim((string) ($curso->titulo ?? '')),
+            'description' => $this->descricaoCurso($curso),
+            'availability' => 'in stock',
+            'condition' => 'new',
+            'price' => $this->precoMetaPorConfiguracao($curso, $ref, $cuponsPorId),
+            'link' => $link,
+            'checkout_link' => $this->checkoutLinkPorConfiguracao($curso, $ref, $cuponsPorId),
+            'workload' => $this->cargaHorariaCurso($curso),
+            'teacher_name' => $this->nomeProfessorCurso($curso),
+            'image_link' => $curso->capa_quadrada ? asset('storage/' . $curso->capa_quadrada) : '',
+            'brand' => 'Portal JE',
+        ];
     }
 
     private function cursosPorDominio(string $host): array
@@ -156,6 +181,25 @@ class CatalogoController extends Controller
         return mb_substr($descricao, 0, 500);
     }
 
+    private function cargaHorariaCurso(Curso $curso): string
+    {
+        $cargaHoraria = trim(strip_tags((string) ($curso->horas_completo ?? '')));
+        if ($cargaHoraria === '') {
+            return '';
+        }
+
+        if (preg_match('/hora/i', $cargaHoraria)) {
+            return $cargaHoraria;
+        }
+
+        return $cargaHoraria . ' horas';
+    }
+
+    private function nomeProfessorCurso(Curso $curso): string
+    {
+        return trim(strip_tags((string) ($curso->professor_nome ?? '')));
+    }
+
     private function carregarCuponsPorId(): Collection
     {
         if (!Schema::hasTable('cupons')) {
@@ -163,6 +207,50 @@ class CatalogoController extends Controller
         }
 
         return Cupom::query()->get()->keyBy('id');
+    }
+
+    private function checkoutLinkPorConfiguracao(Curso $curso, ?Codigo_ref $ref, Collection $cuponsPorId): string
+    {
+        $checkoutUrl = $this->checkoutBaseUrl($curso, $ref);
+        if ($checkoutUrl === '') {
+            return '';
+        }
+
+        $cupomPrincipal = $this->cupomPrincipalPorConfiguracao($ref, $cuponsPorId);
+        if (!$cupomPrincipal) {
+            return $checkoutUrl;
+        }
+
+        return $this->aplicarCupomNoCheckoutUrl($checkoutUrl, $cupomPrincipal->codigo) ?? $checkoutUrl;
+    }
+
+    private function checkoutBaseUrl(Curso $curso, ?Codigo_ref $ref): string
+    {
+        $codigoRef = trim((string) ($ref->codigo_ref ?? ''));
+        $codigoAfiliado = trim((string) ($curso->codigo_afiliado_plano_completo ?? ''));
+
+        if ($codigoRef !== '' && $codigoAfiliado !== '') {
+            return "https://go.hotmart.com/{$codigoRef}?ap={$codigoAfiliado}";
+        }
+
+        return trim((string) ($curso->link_checkout_completo ?? ''));
+    }
+
+    private function cupomPrincipalPorConfiguracao(?Codigo_ref $ref, Collection $cuponsPorId): ?Cupom
+    {
+        if (!$ref || $cuponsPorId->isEmpty() || !array_key_exists('modo_precos', $ref->getAttributes())) {
+            return null;
+        }
+
+        $modoPrecos = in_array($ref->modo_precos, ['padrao', 'um_preco', 'dois_precos'], true)
+            ? $ref->modo_precos
+            : 'padrao';
+
+        if ($modoPrecos === 'padrao' || empty($ref->cupom_principal_id)) {
+            return null;
+        }
+
+        return $cuponsPorId->get((int) $ref->cupom_principal_id);
     }
 
     private function precoMetaPorConfiguracao(Curso $curso, ?Codigo_ref $ref, Collection $cuponsPorId): string
@@ -284,6 +372,21 @@ class CatalogoController extends Controller
     private function aplicarDescontoPercentual(float $valor, float $desconto): float
     {
         return $valor * (1 - ($desconto / 100));
+    }
+
+    private function aplicarCupomNoCheckoutUrl(?string $url, ?string $codigoCupom): ?string
+    {
+        if (!$url || !$codigoCupom) {
+            return $url;
+        }
+
+        if (preg_match('/([?&])offDiscount=[^&]*/', $url)) {
+            return preg_replace('/([?&])offDiscount=[^&]*/', '$1offDiscount=' . $codigoCupom, $url, 1) ?? $url;
+        }
+
+        $separador = str_contains($url, '?') ? '&' : '?';
+
+        return $url . $separador . 'offDiscount=' . $codigoCupom;
     }
 
     private function formatarPrecoMeta(float $numero): string

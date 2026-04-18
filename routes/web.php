@@ -64,6 +64,7 @@ Route::view('/bio', 'bio');
 
 //CATALOGO PUBLICO DE AFILIADOS (META ADS)
 Route::get('/afiliado/catalogo', [CatalogoController::class, 'index'])->name('afiliado.catalogo');
+Route::get('/afiliado/catalogo2', [CatalogoController::class, 'markdown'])->name('afiliado.catalogo2');
 
 //GRUPO_SEXTA_DA_OPORTUNIDADE
 Route::view('/grupo_vip', 'grupo_sexta_oportunidade');  
