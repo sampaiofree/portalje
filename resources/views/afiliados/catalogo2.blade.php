@@ -9,10 +9,16 @@
 
 - ID: {!! $item['id'] !!}
 - Descrição: {!! $item['description'] !== '' ? $item['description'] : 'Não informada' !!}
-- Preço: {!! $item['price'] !!}
 - Link da página: {!! $item['link'] !== '' ? $item['link'] : 'Não disponível' !!}
-- Link do checkout: {!! $item['checkout_link'] !== '' ? $item['checkout_link'] : 'Não disponível' !!}
 - Carga horária: {!! $item['workload'] !== '' ? $item['workload'] : 'Não informada' !!}
 - Professor: {!! $item['teacher_name'] !== '' ? $item['teacher_name'] : 'Não informado' !!}
+
+@foreach(($item['offers'] ?? []) as $offer)
+- {!! $offer['label'] !!}: {!! $offer['price_value'] !!}
+@if(!empty($offer['show_cash_line']))
+- À vista ({!! strtolower($offer['label']) !!}): {!! $offer['cash_value'] !!}
+@endif
+- Checkout ({!! strtolower($offer['label']) !!}): {!! $offer['checkout_url'] !!}
+@endforeach
 
 @endforeach

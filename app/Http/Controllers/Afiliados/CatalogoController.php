@@ -7,12 +7,18 @@ use App\Models\Codigo_ref;
 use App\Models\Cupom;
 use App\Models\Curso;
 use App\Models\User;
+use App\Services\RootDomainCoursePublicStateService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 
 class CatalogoController extends Controller
 {
+    public function __construct(
+        private RootDomainCoursePublicStateService $pricingStateService
+    ) {
+    }
+
     public function index(Request $request)
     {
         $catalogo = $this->montarCatalogo($request);
@@ -66,6 +72,7 @@ class CatalogoController extends Controller
             'price' => $this->precoMetaPorConfiguracao($curso, $ref, $cuponsPorId),
             'link' => $link,
             'checkout_link' => $this->checkoutLinkPorConfiguracao($curso, $ref, $cuponsPorId),
+            'offers' => $this->ofertasPorConfiguracao($curso, $ref),
             'workload' => $this->cargaHorariaCurso($curso),
             'teacher_name' => $this->nomeProfessorCurso($curso),
             'image_link' => $curso->capa_quadrada ? asset('storage/' . $curso->capa_quadrada) : '',
@@ -224,6 +231,65 @@ class CatalogoController extends Controller
         return $this->aplicarCupomNoCheckoutUrl($checkoutUrl, $cupomPrincipal->codigo) ?? $checkoutUrl;
     }
 
+    private function ofertasPorConfiguracao(Curso $curso, ?Codigo_ref $ref): array
+    {
+        $dados = $this->dadosDePrecificacao($curso, $ref);
+
+        $cursoAtual = $this->pricingStateService->prepareCoursePricingBase($curso);
+        $this->pricingStateService->hydrateCourseForPublicState($cursoAtual, $dados);
+
+        $cursoBasePricing = clone $cursoAtual;
+        $this->pricingStateService->applyPricingConfigurationByCoupon($cursoAtual, $dados, false);
+
+        $pricingConfig = $this->pricingStateService->buildPublicCoursePricingConfig(
+            $cursoBasePricing,
+            $cursoAtual,
+            $dados,
+            false
+        );
+
+        $cards = $pricingConfig['initial_state']['cards'] ?? [];
+        $ofertas = [];
+
+        if (is_array($cards['completo'] ?? null) && !empty($cards['completo'])) {
+            $ofertas[] = $this->normalizarOfertaMarkdown($cards['completo'], 'Plano completo');
+        }
+
+        if (is_array($cards['basico'] ?? null) && !empty($cards['basico'])) {
+            $ofertas[] = $this->normalizarOfertaMarkdown($cards['basico'], 'Plano básico');
+        }
+
+        return $ofertas;
+    }
+
+    private function dadosDePrecificacao(Curso $curso, ?Codigo_ref $ref): array
+    {
+        return [
+            'link_checkout_completo' => $this->checkoutBaseUrl($curso, $ref),
+            'modo_precos' => $this->modoPrecosConfigurado($ref),
+            'cupom_principal_id' => !empty($ref?->cupom_principal_id) ? (int) $ref->cupom_principal_id : null,
+            'cupom_secundario_id' => !empty($ref?->cupom_secundario_id) ? (int) $ref->cupom_secundario_id : null,
+            'formulario_pre_checkout' => true,
+            'affiliate_code' => trim((string) ($ref->codigo_ref ?? '')),
+            'user_id' => null,
+            'usar_contador' => false,
+            'contador_minutos' => null,
+            'contador_acao' => null,
+            'contador_destino_oferta' => null,
+        ];
+    }
+
+    private function normalizarOfertaMarkdown(array $offer, string $label): array
+    {
+        return [
+            'label' => $label,
+            'price_value' => (string) ($offer['price_value'] ?? 'Consulte'),
+            'cash_value' => (string) ($offer['cash_value'] ?? 'Consulte'),
+            'show_cash_line' => (bool) ($offer['show_cash_line'] ?? false),
+            'checkout_url' => (string) ($offer['checkout_url'] ?? '#'),
+        ];
+    }
+
     private function checkoutBaseUrl(Curso $curso, ?Codigo_ref $ref): string
     {
         $codigoRef = trim((string) ($ref->codigo_ref ?? ''));
@@ -242,9 +308,7 @@ class CatalogoController extends Controller
             return null;
         }
 
-        $modoPrecos = in_array($ref->modo_precos, ['padrao', 'um_preco', 'dois_precos'], true)
-            ? $ref->modo_precos
-            : 'padrao';
+        $modoPrecos = $this->modoPrecosConfigurado($ref);
 
         if ($modoPrecos === 'padrao' || empty($ref->cupom_principal_id)) {
             return null;
@@ -268,9 +332,7 @@ class CatalogoController extends Controller
             return $this->formatarPrecoMeta($precoCompleto);
         }
 
-        $modoPrecos = in_array($ref->modo_precos, ['padrao', 'um_preco', 'dois_precos'], true)
-            ? $ref->modo_precos
-            : 'padrao';
+        $modoPrecos = $this->modoPrecosConfigurado($ref);
 
         $cupomPrincipalId = !empty($ref->cupom_principal_id) ? (int) $ref->cupom_principal_id : null;
         $cupomSecundarioId = !empty($ref->cupom_secundario_id) ? (int) $ref->cupom_secundario_id : null;
@@ -323,6 +385,17 @@ class CatalogoController extends Controller
 
         $precoSecundario = $this->aplicarDescontoPercentual($precoCompleto, (float) $cupomSecundario->desconto);
         return $this->formatarPrecoMeta(min($precoPrincipal, $precoSecundario));
+    }
+
+    private function modoPrecosConfigurado(?Codigo_ref $ref): string
+    {
+        if (!$ref || !array_key_exists('modo_precos', $ref->getAttributes())) {
+            return 'padrao';
+        }
+
+        return in_array($ref->modo_precos, ['padrao', 'um_preco', 'dois_precos'], true)
+            ? $ref->modo_precos
+            : 'padrao';
     }
 
     private function precoPadraoCatalogo(float $precoCompleto): float
