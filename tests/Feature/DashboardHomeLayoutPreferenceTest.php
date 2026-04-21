@@ -477,6 +477,7 @@ class DashboardHomeLayoutPreferenceTest extends TestCase
         $whatsResponse = $this->get('http://afiliado-w3-modo.test/?w=1');
         $whatsResponse->assertOk();
         $whatsResponse->assertSee('data-origem="whatsapp"', false);
+        $whatsResponse->assertSee('"whatsapp_requires_form":true', false);
     }
 
     public function test_root_w3_layout_uses_saved_whatsapp_destination_without_query(): void
@@ -487,6 +488,7 @@ class DashboardHomeLayoutPreferenceTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('data-origem="whatsapp"', false);
+        $response->assertSee('"whatsapp_requires_form":true', false);
     }
 
     public function test_root_keeps_home1_when_affiliate_home_layout_is_padrao(): void
@@ -498,6 +500,10 @@ class DashboardHomeLayoutPreferenceTest extends TestCase
         $response->assertOk();
         $response->assertViewIs('home1');
         $response->assertSee('Escolha Sua Nova Profissão');
+        $response->assertSee('data-course-trigger="1"', false);
+        $response->assertSee('data-meta-event="ViewContent"', false);
+        $response->assertSee('"home_destination":"curso"', false);
+        $response->assertSee('"whatsapp_requires_form":false', false);
     }
 
     public function test_root_home_uses_affiliate_whatsapp_when_custom_domain_is_accessed_with_www(): void
@@ -542,6 +548,10 @@ class DashboardHomeLayoutPreferenceTest extends TestCase
         $response->assertViewIs('home1');
         $response->assertSee('https://wa.me/', false);
         $response->assertSee("window.modal = new bootstrap.Modal(document.getElementById('inscricaoModal'));", false);
+        $response->assertSee('data-course-trigger="1"', false);
+        $response->assertSee('data-meta-event="Lead"', false);
+        $response->assertSee('"home_destination":"whatsapp"', false);
+        $response->assertSee('"whatsapp_requires_form":true', false);
     }
 
     public function test_root_home_model1_whatsapp_destination_sets_course_cta_to_whatsapp_link(): void
@@ -568,6 +578,7 @@ class DashboardHomeLayoutPreferenceTest extends TestCase
         $this->assertStringContainsString('https://wa.me/5511999999999', $firstCourseCtaLink);
         $this->assertStringContainsString('{nome}', $firstCourseCtaLink);
         $this->assertStringNotContainsString('/curso-home-whatsapp-cta', $firstCourseCtaLink);
+        $response->assertSee('data-meta-event="Lead"', false);
     }
 
     public function test_root_home_whatsapp_with_direto_skips_pre_whatsapp_modal(): void
@@ -580,6 +591,9 @@ class DashboardHomeLayoutPreferenceTest extends TestCase
         $response->assertViewIs('home1');
         $response->assertSee('https://wa.me/', false);
         $response->assertDontSee("window.modal = new bootstrap.Modal(document.getElementById('inscricaoModal'));", false);
+        $response->assertSee('data-meta-event="Lead"', false);
+        $response->assertSee('"home_destination":"whatsapp"', false);
+        $response->assertSee('"whatsapp_requires_form":false', false);
     }
 
     public function test_root_w3_home_whatsapp_with_direto_disables_pre_whatsapp_form_only_on_root(): void
@@ -597,7 +611,7 @@ class DashboardHomeLayoutPreferenceTest extends TestCase
         $w3Response = $this->get('http://afiliado-w3-home-whatsapp-direto.test/w3?w=1');
         $w3Response->assertOk();
         $w3Response->assertViewIs('home_e_cursos.w3');
-        $w3Response->assertSee('"whatsapp_requires_form":true', false);
+        $w3Response->assertSee('"whatsapp_requires_form":false', false);
     }
 
     public function test_cursos_route_remains_home1_even_when_affiliate_layout_is_w3(): void

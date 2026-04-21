@@ -51,7 +51,11 @@
       $homeWhatsappFloatUrl = $homeWhatsappNumber
         ? "https://api.whatsapp.com/send/?phone={$homeWhatsappNumber}&text={$homeWhatsappMessage}"
         : '#';
+      $homeDestination = !empty($info['whatsapp']) ? 'whatsapp' : 'curso';
+      $homeWhatsappRequiresForm = $homeDestination === 'whatsapp' && !empty($info['formulario']);
       $homeConfig = [
+        'home_destination' => $homeDestination,
+        'whatsapp_requires_form' => $homeWhatsappRequiresForm,
         'whatsapp_show' => (bool) ($info['whatsapp_mostrar'] ?? true),
         'whatsapp_delay_seconds' => max(0, (int) ($info['whatsapp_atendimento_tempo'] ?? 0)),
       ];
@@ -394,9 +398,14 @@
                             <div class="col-6">
                                 <p class="mb-2 home-course-card__title">{{$curso->titulo}}</p>
                                 <p class="mb-2 home-course-card__headline">{{ str_replace('"', '', $curso['headline']) }} <!--Salário pode chegar a R${{$curso->salario_maximo}}--></p>
-                                <a onclick="@if(!$info['whatsapp']) fbq('track', 'ViewContent') @elseif(!$info['formulario']) fbq('track', 'Lead') @endif" 
-                                data-cursoid="{{$curso->id}}" 
-                                href="{{$curso->link_checkout_completo}}" class="mt-1 btn-cta btn-inscricao text-center home-cta home-cta--small">SAIBA MAIS</a> 
+                                <a
+                                    data-course-trigger="1"
+                                    data-cursoid="{{$curso->id}}"
+                                    data-course-title="{{$curso->titulo}}"
+                                    data-meta-event="{{ $homeDestination === 'whatsapp' ? 'Lead' : 'ViewContent' }}"
+                                    href="{{$curso->link_checkout_completo}}"
+                                    class="mt-1 btn-cta btn-inscricao text-center home-cta home-cta--small"
+                                >SAIBA MAIS</a>
                             </div>
                         </div>
                     </div>
@@ -1005,8 +1014,8 @@
             @if($info['formulario'])
             // Quando o Bootstrap JS for carregado, executa a função que usa o modal
             bootstrapJS.onload = function() {
-                // Selecione todos os links com a classe btn-inscricao
-                const links = document.querySelectorAll('.btn-inscricao');
+                // Selecione apenas as CTAs reais de curso
+                const links = document.querySelectorAll('[data-course-trigger="1"]');
                 window.modal = new bootstrap.Modal(document.getElementById('inscricaoModal'));
 
                 links.forEach(link => {
@@ -1043,9 +1052,7 @@
                 // Substitui a expressão {nome} pelo valor do campo de nome
                 redirectLink = redirectLink.replace("{nome}", encodeURIComponent(nome));
                 window.location.href = redirectLink;
-                
-                fbq('track', 'Lead');
-                
+
                 // Envia o formulário via fetch (pode ser com ou sem resposta)
                 fetch(form.action, {
                     method: "POST",

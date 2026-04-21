@@ -335,20 +335,26 @@
         if (courseButton) {
             event.preventDefault();
 
-            trackMeta('ViewContent', {
-                content_type: 'course',
-                content_name: courseButton.getAttribute('data-course-title') || undefined,
-                content_ids: [courseButton.getAttribute('data-curso') || '']
-            });
-
             var origem = String(courseButton.getAttribute('data-origem') || '').toLowerCase();
             if (origem === 'curso') {
+                trackMeta('ViewContent', {
+                    content_type: 'course',
+                    content_name: courseButton.getAttribute('data-course-title') || undefined,
+                    content_ids: [courseButton.getAttribute('data-curso') || '']
+                });
+
                 var targetUrl = courseButton.getAttribute('data-link') || '';
                 if (targetUrl) {
                     window.location.href = targetUrl;
                 }
                 return;
             }
+
+            trackMeta('Lead', {
+                content_type: 'whatsapp',
+                content_name: courseButton.getAttribute('data-course-title') || undefined,
+                content_ids: [courseButton.getAttribute('data-curso') || '']
+            });
 
             if (!Boolean(config.whatsapp_requires_form)) {
                 var whatsappUrl = courseButton.getAttribute('data-link') || '';
@@ -432,11 +438,6 @@
                 leadSubmitButton.disabled = true;
                 leadSubmitButton.textContent = 'Redirecionando...';
             }
-
-            trackMeta('Lead', {
-                content_type: 'whatsapp',
-                content_ids: [inputLeadCursoId ? inputLeadCursoId.value : '']
-            });
 
             var payload = new FormData(leadForm);
             payload.set('nome', nome);
