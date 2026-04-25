@@ -22,7 +22,7 @@
                 name="telefone_pessoal_1"
                 type="text"
                 inputmode="numeric"
-                pattern="[0-9]{12,14}"
+                pattern="[0-9]{11,14}"
                 maxlength="14"
                 class="mt-1 block w-full bg-gray-100 p-3"
                 :value="old('telefone_pessoal_1', $pendingPhone)"

@@ -430,7 +430,7 @@ class UserController extends Controller
     //    ]);
 
         $request->validate([
-            'telefone_pessoal_1' => 'nullable|regex:/^[0-9]{12,14}$/',
+            'telefone_pessoal_1' => 'nullable|regex:/^[0-9]{11,14}$/',
             'telefone_pessoal_2' => 'nullable|regex:/^[0-9]{12,14}$/',
             'w3_whatsapp_float_enabled' => 'nullable|boolean',
             'w3_whatsapp_float_delay_seconds' => 'nullable|in:0,5,10,20,30,45,60,120',

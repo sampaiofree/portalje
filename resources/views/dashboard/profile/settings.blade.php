@@ -25,7 +25,7 @@
                                     name="telefone_pessoal_1"
                                     type="text"
                                     inputmode="numeric"
-                                    pattern="[0-9]{12,14}"
+                                    pattern="[0-9]{11,14}"
                                     class="px-4 py-3 bg-gray-100 focus:bg-white mt-1 block w-full"
                                     :value="old('telefone_pessoal_1', Auth::user()->telefone_pessoal_1_pending ?: Auth::user()->telefone_pessoal_1)"
                                     placeholder="Ex: 5562999998888"

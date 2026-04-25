@@ -144,6 +144,32 @@ class AuthVerificationFlowTest extends TestCase
         });
     }
 
+    public function test_phone_verification_send_accepts_eleven_digit_phone(): void
+    {
+        config([
+            'services.botconversa.verification_webhook_url' => 'https://bot.example/webhook',
+            'services.botconversa.verification_request_phone' => '5511954490511',
+        ]);
+
+        Http::fake([
+            'https://bot.example/webhook' => Http::response(['ok' => true], 200),
+        ]);
+
+        $user = User::factory()->unverifiedPhone()->create([
+            'email_verified_at' => now(),
+        ]);
+
+        $response = $this->actingAs($user)->post(route('phone.verification.send'), [
+            'telefone_pessoal_1' => '62999998888',
+        ]);
+
+        $response->assertRedirect(route('phone.verification.notice'));
+
+        $user->refresh();
+
+        $this->assertSame('62999998888', $user->telefone_pessoal_1_pending);
+    }
+
     public function test_phone_verification_confirmation_promotes_pending_phone(): void
     {
         $user = User::factory()->unverifiedPhone()->create([

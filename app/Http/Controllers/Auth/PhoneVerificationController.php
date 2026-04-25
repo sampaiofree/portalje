@@ -36,7 +36,7 @@ class PhoneVerificationController extends Controller
     public function send(Request $request, PhoneVerificationService $phoneVerificationService): RedirectResponse
     {
         $validated = $request->validate([
-            'telefone_pessoal_1' => ['required', 'regex:/^[0-9]{12,14}$/'],
+            'telefone_pessoal_1' => ['required', 'regex:/^[0-9]{11,14}$/'],
         ], [
             'telefone_pessoal_1.regex' => 'Digite o WhatsApp com DDI e apenas numeros.',
         ]);
