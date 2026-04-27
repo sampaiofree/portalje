@@ -46,11 +46,9 @@
       $homeJsVersion = file_exists(public_path('js/home-course.js'))
         ? (string) filemtime(public_path('js/home-course.js'))
         : null;
-      $homeWhatsappNumber = preg_replace('/\D/', '', (string) ($info['whatsapp_float_atendimento'] ?? ($info['whatsapp_atendimento'] ?? '')));
-      $homeWhatsappMessage = rawurlencode("Olá quero saber sobre os cursos do {$homeCompanyName}");
-      $homeWhatsappFloatUrl = $homeWhatsappNumber
-        ? "https://api.whatsapp.com/send/?phone={$homeWhatsappNumber}&text={$homeWhatsappMessage}"
-        : '#';
+      $homeWhatsappFloatParams = request()->query();
+      $homeWhatsappFloatQuery = http_build_query(array_filter($homeWhatsappFloatParams, fn ($value) => $value !== null && $value !== ''));
+      $homeWhatsappFloatUrl = request()->getSchemeAndHttpHost() . '/whatsapp' . ($homeWhatsappFloatQuery !== '' ? '?' . $homeWhatsappFloatQuery : '');
       $homeDestination = !empty($info['whatsapp']) ? 'whatsapp' : 'curso';
       $homeWhatsappRequiresForm = $homeDestination === 'whatsapp' && !empty($info['formulario']);
       $homeConfig = [
@@ -340,8 +338,13 @@
 
                         /**LINK PARA WHATSAPP**/
                         if($info['whatsapp']){
-                            $nome = $info['formulario']?"Olá meu nome é {nome}, ":null;
-                            $curso->link_checkout_completo = "https://wa.me/".$info['whatsapp_atendimento']."?text=$nome Quero tirar minhas dúvidas sobre o curso $curso->titulo";
+                            if ($info['formulario']) {
+                                $curso->link_checkout_completo = "https://wa.me/".$info['whatsapp_atendimento']."?text=Olá meu nome é {nome}, Quero tirar minhas dúvidas sobre o curso $curso->titulo";
+                            } else {
+                                $whatsappCourseParams = request()->query();
+                                $whatsappCourseQuery = http_build_query(array_filter($whatsappCourseParams, fn ($value) => $value !== null && $value !== ''));
+                                $curso->link_checkout_completo = request()->getSchemeAndHttpHost()."/whatsapp/curso/".rawurlencode($curso->url).($whatsappCourseQuery !== '' ? "?$whatsappCourseQuery" : '');
+                            }
                         }
 
                         /**DEFINIR SE PÁGINA SERÁ MOSTRAR OU NÃO**/
@@ -402,6 +405,7 @@
                                     data-course-trigger="1"
                                     data-cursoid="{{$curso->id}}"
                                     data-course-title="{{$curso->titulo}}"
+                                    data-whatsapp-atendimento-id="{{ $info['whatsapp_atendimento_id'] ?? '' }}"
                                     data-meta-event="{{ $homeDestination === 'whatsapp' ? 'Lead' : 'ViewContent' }}"
                                     href="{{$curso->link_checkout_completo}}"
                                     class="mt-1 btn-cta btn-inscricao text-center home-cta home-cta--small"
@@ -569,7 +573,7 @@
                     </p>
                     
                     
-                    <a href="https://wa.me/{{$info['whatsapp_atendimento']}}?text=Quero saber mais sobre os cursos do portal Jovem Empreendedor" target="_blank" class="btn-cta fw-bold ">
+                    <a href="{{ $homeWhatsappFloatUrl }}" target="_blank" class="btn-cta fw-bold ">
                         <i class="bi bi-whatsapp"></i> Fale com a gente no WhatsApp
                     </a>
                     <p class="mt-1 fw-bold" style="font-size: small">Clique no botão para conversar diretamente com a gente!</p>
@@ -774,6 +778,7 @@
                     <input id="input_lead_curso_id" type="hidden" name="curso_id" value="">
                     <input id="input_lead_href" type="hidden" name="link" value="">
                     <input id="input_lead_origem" type="hidden" name="origem" value="whatsapp">
+                    <input id="input_lead_whatsapp_atendimento_id" type="hidden" name="whatsapp_atendimento_id" value="">
                     <input id="input_lead_cidade" type="hidden" name="cidade" value="@if($info['cidade']) {{$info['cidade']}} @endif">
 
                     <div class="mb-3">    
@@ -1026,6 +1031,7 @@
                         // PEGAR O CURSO ID E COLOCAR NO FORMULÁRIO
                         window.datacursoidGlobal = link.getAttribute('data-cursoid');
                         $('#input_lead_curso_id').val(window.datacursoidGlobal);
+                        $('#input_lead_whatsapp_atendimento_id').val(link.getAttribute('data-whatsapp-atendimento-id') || '');
 
                         //SETAR O LINK, SEJA DO WHATSAPP OU DO CHECKOUT
                         window.hrefGlobal = link.getAttribute('href');

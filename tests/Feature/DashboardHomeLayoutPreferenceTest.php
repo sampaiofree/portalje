@@ -306,12 +306,12 @@ class DashboardHomeLayoutPreferenceTest extends TestCase
         $response = $this->actingAs($user)->get('/user/dashboard');
 
         $response->assertOk();
-        $response->assertSee('Configure sua home');
-        $response->assertSee('id="home_settings_model_select"', false);
-        $response->assertSee('id="home_settings_destination_select"', false);
-        $response->assertSee('id="home_settings_whatsapp_flow_select"', false);
+        $response->assertSee('Configure seu link');
+        $response->assertSee('id="home_link_model_select"', false);
+        $response->assertSee('id="home_link_destination_select"', false);
+        $response->assertSee('id="home_link_whatsapp_flow_select"', false);
         $response->assertSee('Fluxo do WhatsApp na home');
-        $response->assertSee('Gerador de links');
+        $response->assertSee('Defina o padrão da home e gere seu link personalizado na hora.');
         $response->assertSee('Escolha o modelo da sua home');
         $response->assertSee('Modelo 1');
         $response->assertSee('Modelo 2');
@@ -319,17 +319,17 @@ class DashboardHomeLayoutPreferenceTest extends TestCase
         $response->assertSee('Página do curso');
         $response->assertSee('WhatsApp');
         $response->assertSee('Mostrar nome da cidade?');
-        $response->assertSee('x-data="configureHomeBuilder($el)"', false);
+        $response->assertSee('x-data="configureHomeLinkCard($el)"', false);
         $response->assertDontSee('saveHomeLayoutPreference');
         $response->assertDontSee('Cupom de Desconto');
         $response->assertDontSee('WhatsApp Alternativo (opcional)');
-        $response->assertSee('id="whatsapp_channel_select"', false);
+        $response->assertSee('id="home_link_whatsapp_channel_select"', false);
         $response->assertSee('Rodízio (automático)');
 
         $html = $response->getContent();
-        $this->assertMatchesRegularExpression('/<select[^>]*id="whatsapp_channel_select"[^>]*>.*?<\/select>/s', $html);
+        $this->assertMatchesRegularExpression('/<select[^>]*id="home_link_whatsapp_channel_select"[^>]*>.*?<\/select>/s', $html);
 
-        preg_match('/<select[^>]*id="whatsapp_channel_select"[^>]*>(.*?)<\/select>/s', $html, $matches);
+        preg_match('/<select[^>]*id="home_link_whatsapp_channel_select"[^>]*>(.*?)<\/select>/s', $html, $matches);
         $selectContent = $matches[1] ?? '';
 
         $this->assertStringContainsString('value="' . $active->whatsapp . '"', $selectContent);
@@ -518,8 +518,11 @@ class DashboardHomeLayoutPreferenceTest extends TestCase
 
         $response->assertOk();
         $response->assertViewIs('home1');
-        $response->assertSee('https://api.whatsapp.com/send/?phone=5511912345678', false);
-        $response->assertDontSee('https://api.whatsapp.com/send/?phone=5511982671533', false);
+        $response->assertSee('href="http://www.afiliado-www-home.test/whatsapp"', false);
+
+        $redirectResponse = $this->get('http://www.afiliado-www-home.test/whatsapp');
+        $location = $redirectResponse->headers->get('Location') ?? '';
+        $this->assertStringStartsWith('https://wa.me/5511912345678', $location);
     }
 
     public function test_root_w3_uses_affiliate_whatsapp_when_custom_domain_is_accessed_with_www(): void
@@ -534,8 +537,11 @@ class DashboardHomeLayoutPreferenceTest extends TestCase
 
         $response->assertOk();
         $response->assertViewIs('home_e_cursos.w3');
-        $response->assertSee('https://api.whatsapp.com/send/?phone=5511912345678', false);
-        $response->assertDontSee('https://api.whatsapp.com/send/?phone=5511982671533', false);
+        $response->assertSee('href="http://www.afiliado-www-w3.test/whatsapp"', false);
+
+        $redirectResponse = $this->get('http://www.afiliado-www-w3.test/whatsapp');
+        $location = $redirectResponse->headers->get('Location') ?? '';
+        $this->assertStringStartsWith('https://wa.me/5511912345678', $location);
     }
 
     public function test_root_home_whatsapp_with_formulario_keeps_pre_whatsapp_modal(): void
@@ -589,7 +595,7 @@ class DashboardHomeLayoutPreferenceTest extends TestCase
 
         $response->assertOk();
         $response->assertViewIs('home1');
-        $response->assertSee('https://wa.me/', false);
+        $response->assertSee('/whatsapp/curso/curso-home-whatsapp-direto', false);
         $response->assertDontSee("window.modal = new bootstrap.Modal(document.getElementById('inscricaoModal'));", false);
         $response->assertSee('data-meta-event="Lead"', false);
         $response->assertSee('"home_destination":"whatsapp"', false);
@@ -605,7 +611,7 @@ class DashboardHomeLayoutPreferenceTest extends TestCase
         $rootResponse->assertViewIs('home_e_cursos.w3');
         $rootResponse->assertSee('data-origem="whatsapp"', false);
         $rootResponse->assertSee('"whatsapp_requires_form":false', false);
-        $rootResponse->assertSee('https://wa.me/5511999999999?text=Olá, quero saber mais sobre o curso de Curso Teste Home Layout', false);
+        $rootResponse->assertSee('/whatsapp/curso/curso-w3-home-whatsapp-direto', false);
         $rootResponse->assertDontSee('{nome}', false);
 
         $w3Response = $this->get('http://afiliado-w3-home-whatsapp-direto.test/w3?w=1');
@@ -702,8 +708,16 @@ class DashboardHomeLayoutPreferenceTest extends TestCase
         $response = $this->get('http://afiliado-home1-float-specific.test/');
 
         $response->assertOk();
-        $response->assertSee('https://api.whatsapp.com/send/?phone=5511999992222', false);
-        $response->assertDontSee('https://api.whatsapp.com/send/?phone=5511999991111', false);
+        $response->assertSee('href="http://afiliado-home1-float-specific.test/whatsapp"', false);
+
+        $redirectResponse = $this->get('http://afiliado-home1-float-specific.test/whatsapp');
+        $location = $redirectResponse->headers->get('Location') ?? '';
+        $this->assertStringStartsWith('https://wa.me/5511999992222', $location);
+
+        $this->assertDatabaseHas('whatsapp_atendimento', [
+            'id' => $rodizioA->id,
+            'routed_count' => 0,
+        ]);
     }
 
     public function test_w3_float_button_can_use_specific_whatsapp_channel(): void
@@ -732,8 +746,16 @@ class DashboardHomeLayoutPreferenceTest extends TestCase
 
         $response->assertOk();
         $response->assertViewIs('home_e_cursos.w3');
-        $response->assertSee('https://api.whatsapp.com/send/?phone=5511999994444', false);
-        $response->assertDontSee('https://api.whatsapp.com/send/?phone=5511999993333', false);
+        $response->assertSee('href="http://afiliado-w3-float-specific.test/whatsapp"', false);
+
+        $redirectResponse = $this->get('http://afiliado-w3-float-specific.test/whatsapp');
+        $location = $redirectResponse->headers->get('Location') ?? '';
+        $this->assertStringStartsWith('https://wa.me/5511999994444', $location);
+
+        $this->assertDatabaseHas('whatsapp_atendimento', [
+            'id' => $rodizioA->id,
+            'routed_count' => 0,
+        ]);
     }
 
     public function test_portal_and_jovem_domains_render_w3_on_root_and_cursos_paths(): void

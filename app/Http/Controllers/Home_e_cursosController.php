@@ -10,8 +10,10 @@ use App\Http\Controllers\Meta_apiController;
 use App\Models\Curso;
 use App\Models\Cupom;
 use App\Models\User;
+use App\Models\WhatsappAtendimento;
 use App\Models\RootDomainCourseConfig;
 use App\Services\RootDomainCoursePublicStateService;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
@@ -71,6 +73,49 @@ class Home_e_cursosController extends Controller
             ],
             $this->dados_portal
         );
+    }
+
+    public function redirecionar_whatsapp(Request $request)
+    {
+        $user = $this->resolverUsuarioPublicoParaWhatsapp($request);
+        $selecao = $this->selecionarWhatsappParaRedirect($request, $user, true);
+        $whatsapp = $selecao['whatsapp'] ?? null;
+
+        if (!$whatsapp) {
+            return redirect()->away('https://portalje.org');
+        }
+
+        $empresa = $this->resolverNomeEmpresa($user);
+        $mensagem = "Olá quero saber sobre os cursos do {$empresa}";
+
+        return redirect()->away($this->montarWhatsappExternoUrl($whatsapp, $mensagem));
+    }
+
+    public function redirecionar_whatsapp_curso(Request $request, string $curso)
+    {
+        if (!Schema::hasTable('curso')) {
+            return redirect()->away('https://portalje.org');
+        }
+
+        $cursoModel = Curso::where('url', $curso)->first();
+        if (!$cursoModel) {
+            return redirect()->away('https://portalje.org');
+        }
+
+        $user = $this->resolverUsuarioPublicoParaWhatsapp($request, $cursoModel);
+        $selecao = $this->selecionarWhatsappParaRedirect($request, $user, false);
+        $whatsapp = $selecao['whatsapp'] ?? null;
+
+        if (!$whatsapp) {
+            return redirect()->away('https://portalje.org');
+        }
+
+        $intent = (string) $request->query('intent');
+        $mensagem = $intent === 'inscricao'
+            ? "Olá, quero fazer minha inscrição no curso de {$cursoModel->titulo}"
+            : "Olá, quero saber mais sobre o curso de {$cursoModel->titulo}";
+
+        return redirect()->away($this->montarWhatsappExternoUrl($whatsapp, $mensagem));
     }
 
     //PÁGINA CURSO INDIVIDUAL
@@ -235,8 +280,11 @@ class Home_e_cursosController extends Controller
         
         if($desconto AND $desconto =='w'){
             $curso->formulario = (bool)($dados['formulario_pre_checkout'] ?? true);
-            if($curso->formulario){$zap_complemento = "meu nome é {nome},";}else{$zap_complemento = '';}
-            $curso->link_checkout_completo = "https://wa.me/$curso->whatsapp_atendimento?text=Olá, $zap_complemento quero fazer minha inscrição no curso de $curso->titulo";
+            if($curso->formulario){
+                $curso->link_checkout_completo = "https://wa.me/$curso->whatsapp_atendimento?text=Olá, meu nome é {nome}, quero fazer minha inscrição no curso de $curso->titulo";
+            }else{
+                $curso->link_checkout_completo = $this->montarWhatsappRedirectUrl($request, $curso, ['intent' => 'inscricao']);
+            }
             $curso->origem = 'whatsapp';
         }
 
@@ -589,7 +637,11 @@ class Home_e_cursosController extends Controller
         } else {
             $info['whatsapp'] = null;
         }
-        if((strlen(request()->get('t')) > 10)){$info['whatsapp_atendimento']=request()->get('t');}
+        $whatsappFixoHome = $this->normalizarWhatsappFixo(request()->get('t'));
+        if($whatsappFixoHome){
+            $info['whatsapp_atendimento'] = $whatsappFixoHome;
+            $info['whatsapp_atendimento_id'] = null;
+        }
         $info['whatsapp'] = $watsapp_curso ?? $info['whatsapp'];
         
         
@@ -795,10 +847,13 @@ class Home_e_cursosController extends Controller
         //DADOS DA PÁGINA
         $pagina = $this->dados_da_pagina($dados_afiliado, $cidade);
         $modoCardsW3 = $this->resolverModoCardsW3($request, $cidade);
+        $storedWhatsappFlow = $dados_afiliado instanceof User
+            ? (string) ($dados_afiliado->home_page_whatsapp_flow ?? 'formulario')
+            : 'formulario';
         $homePageWhatsappFlow = $this->resolverHomePageWhatsappFlow(
             $request,
-            in_array((string) ($dados_afiliado->home_page_whatsapp_flow ?? 'formulario'), ['formulario', 'direto'], true)
-                ? (string) $dados_afiliado->home_page_whatsapp_flow
+            in_array($storedWhatsappFlow, ['formulario', 'direto'], true)
+                ? $storedWhatsappFlow
                 : 'formulario'
         );
         $pagina['cards_destino'] = $modoCardsW3;
@@ -1060,9 +1115,15 @@ class Home_e_cursosController extends Controller
             $formulario_pre_checkout = $user->formulario_pre_checkout;
             $whatsAppAtendimentoId = null;
             if (in_array($pagina, ['w', 'w3', 'w4'], true)) {
-                $whatsappSelecionado = $this->selecionarWhatsappAtendimento($user);
-                $whatsApp = $whatsappSelecionado['whatsapp'] ?? $user->whatsapp_atendimento ?? $this->dados_portal['telefone_suporte_alunos'];
-                $whatsAppAtendimentoId = $whatsappSelecionado['id'] ?? null;
+                $whatsappFixo = $this->normalizarWhatsappFixo($request->query('t'));
+                if ($whatsappFixo) {
+                    $whatsApp = $whatsappFixo;
+                    $whatsAppAtendimentoId = null;
+                } else {
+                    $whatsappSelecionado = $this->selecionarWhatsappAtendimento($user);
+                    $whatsApp = $whatsappSelecionado['whatsapp'] ?? $user->whatsapp_atendimento ?? $this->dados_portal['telefone_suporte_alunos'];
+                    $whatsAppAtendimentoId = $whatsappSelecionado['id'] ?? null;
+                }
             } else {
                 $whatsApp =  $user->whatsapp_atendimento;
             }
@@ -1205,7 +1266,7 @@ class Home_e_cursosController extends Controller
                     if ($usarFormularioWhatsapp) {
                         $curso->card_link = "https://wa.me/$whatsApp?text=Olá, meu nome é {nome} e quero saber mais sobre o curso de $curso->titulo";
                     } else {
-                        $curso->card_link = "https://wa.me/$whatsApp?text=Olá, quero saber mais sobre o curso de $curso->titulo";
+                        $curso->card_link = $this->montarWhatsappRedirectUrl($request, $curso);
                     }
                     $curso->card_user_id = $data_user;
                     $curso->card_origem = 'whatsapp';
@@ -1441,6 +1502,170 @@ class Home_e_cursosController extends Controller
         }
 
         return $url;
+    }
+
+    private function montarWhatsappRedirectUrl(Request $request, ?Curso $curso = null, array $extras = []): string
+    {
+        $path = '/whatsapp';
+
+        if ($curso) {
+            $path .= '/curso/' . rawurlencode((string) $curso->url);
+        }
+
+        $query = array_merge($request->query(), $extras);
+        foreach ($query as $key => $value) {
+            if ($value === null || $value === '') {
+                unset($query[$key]);
+            }
+        }
+
+        $queryString = http_build_query($query);
+        $url = $request->getSchemeAndHttpHost() . $path;
+
+        return $queryString !== '' ? $url . '?' . $queryString : $url;
+    }
+
+    private function montarWhatsappExternoUrl(string $whatsapp, string $mensagem): string
+    {
+        $whatsapp = preg_replace('/\D/', '', $whatsapp);
+
+        return 'https://wa.me/' . $whatsapp . '?text=' . rawurlencode($mensagem);
+    }
+
+    private function resolverUsuarioPublicoParaWhatsapp(Request $request, ?Curso $curso = null): ?User
+    {
+        $afiliadoId = (int) $request->query('af', 0);
+        if ($afiliadoId > 0) {
+            $user = User::find($afiliadoId);
+            if ($user) {
+                return $user;
+            }
+        }
+
+        $ref = trim((string) $request->query('ref', ''));
+        if ($ref !== '' && Schema::hasTable('codigo_ref')) {
+            $query = Codigo_ref::where('codigo_ref', $ref);
+            if ($curso) {
+                $query->where('curso_id', $curso->id);
+            }
+
+            $codigoRef = $query->first();
+            if ($codigoRef) {
+                $user = User::find($codigoRef->user_id);
+                if ($user) {
+                    return $user;
+                }
+            }
+        }
+
+        $dominio = $this->normalizarHost((string) $request->getHost());
+        if (!$this->isRootPortalHost($dominio) && $dominio !== 'dns.portalje.org' && $dominio !== 'dns.jovemempreendedor.org') {
+            return User::where('dominio', $dominio)
+                ->orWhere('dominio_externo', $dominio)
+                ->first();
+        }
+
+        return null;
+    }
+
+    private function normalizarWhatsappFixo($value): ?string
+    {
+        $whatsapp = preg_replace('/\D/', '', (string) ($value ?? ''));
+
+        return strlen($whatsapp) > 10 && strlen($whatsapp) <= 15 ? $whatsapp : null;
+    }
+
+    private function selecionarWhatsappParaRedirect(Request $request, ?User $user, bool $usarCanalFixoFlutuante): array
+    {
+        $whatsappFixo = $this->normalizarWhatsappFixo($request->query('t'));
+        if ($whatsappFixo) {
+            return ['id' => null, 'whatsapp' => $whatsappFixo, 'source' => 'query'];
+        }
+
+        if ($user) {
+            if ($usarCanalFixoFlutuante) {
+                $canalFixo = $this->selecionarWhatsappFlutuanteFixo($user);
+                if ($canalFixo) {
+                    return $canalFixo + ['source' => 'float_fixed'];
+                }
+            }
+
+            $selecionado = $this->selecionarWhatsappAtendimentoParaRedirectRodizio($user);
+            if ($selecionado) {
+                return $selecionado + ['source' => 'rotation'];
+            }
+
+            $fallbackWhatsapp = preg_replace('/\D/', '', (string) $user->whatsapp_atendimento);
+            if ($fallbackWhatsapp !== '') {
+                return ['id' => null, 'whatsapp' => $fallbackWhatsapp, 'source' => 'legacy'];
+            }
+        }
+
+        $portalWhatsapp = preg_replace('/\D/', '', (string) ($this->dados_portal['telefone_suporte_alunos'] ?? ''));
+
+        return ['id' => null, 'whatsapp' => $portalWhatsapp ?: null, 'source' => 'portal'];
+    }
+
+    private function selecionarWhatsappFlutuanteFixo(User $user): ?array
+    {
+        if (!Schema::hasTable('whatsapp_atendimento') || !Schema::hasColumn('users', 'w3_whatsapp_float_whatsapp_atendimento_id')) {
+            return null;
+        }
+
+        $selectedId = (int) ($user->w3_whatsapp_float_whatsapp_atendimento_id ?? 0);
+        if ($selectedId <= 0) {
+            return null;
+        }
+
+        $registro = $user->whatsappAtendimentos()
+            ->where('id', $selectedId)
+            ->where('is_active', true)
+            ->first();
+
+        if (!$registro) {
+            return null;
+        }
+
+        return [
+            'id' => $registro->id,
+            'whatsapp' => (string) $registro->whatsapp,
+        ];
+    }
+
+    private function selecionarWhatsappAtendimentoParaRedirectRodizio(User $user): ?array
+    {
+        if (
+            !Schema::hasTable('whatsapp_atendimento')
+            || !Schema::hasColumn('whatsapp_atendimento', 'last_routed_at')
+            || !Schema::hasColumn('whatsapp_atendimento', 'routed_count')
+        ) {
+            $fallback = $this->selecionarWhatsappAtendimento($user);
+            return !empty($fallback['whatsapp']) ? $fallback : null;
+        }
+
+        return DB::transaction(function () use ($user) {
+            $registro = $user->whatsappAtendimentos()
+                ->where('is_active', true)
+                ->orderByRaw('CASE WHEN last_routed_at IS NULL THEN 0 ELSE 1 END')
+                ->orderBy('last_routed_at')
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->first();
+
+            if (!$registro) {
+                return null;
+            }
+
+            WhatsappAtendimento::whereKey($registro->id)->update([
+                'last_routed_at' => now(),
+                'routed_count' => DB::raw('COALESCE(routed_count, 0) + 1'),
+            ]);
+
+            return [
+                'id' => $registro->id,
+                'whatsapp' => (string) $registro->whatsapp,
+            ];
+        });
     }
 
     private function selecionarWhatsappAtendimento(?User $user): array

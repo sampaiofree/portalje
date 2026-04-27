@@ -17,11 +17,15 @@ class WhatsappAtendimento extends Model
         'whatsapp',
         'is_active',
         'last_lead_at',
+        'last_routed_at',
+        'routed_count',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
         'last_lead_at' => 'datetime',
+        'last_routed_at' => 'datetime',
+        'routed_count' => 'integer',
     ];
 
     public function user(): BelongsTo

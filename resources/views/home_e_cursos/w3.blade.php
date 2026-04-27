@@ -25,11 +25,9 @@
         return !empty($curso->publicado) && !empty($curso->mostrar_na_pagina);
     })->values();
 
-    $whatsappNumero = preg_replace('/\D/', '', (string) ($pagina['whatsapp_float_atendimento'] ?? ($pagina['whatsapp'] ?? '')));
-    $whatsappMensagem = rawurlencode("Olá quero saber sobre os cursos do {$empresaNome}");
-    $whatsappFloatUrl = $whatsappNumero
-        ? "https://api.whatsapp.com/send/?phone={$whatsappNumero}&text={$whatsappMensagem}"
-        : '#';
+    $whatsappFloatParams = request()->query();
+    $whatsappFloatQuery = http_build_query(array_filter($whatsappFloatParams, fn ($value) => $value !== null && $value !== ''));
+    $whatsappFloatUrl = request()->getSchemeAndHttpHost() . '/whatsapp' . ($whatsappFloatQuery !== '' ? '?' . $whatsappFloatQuery : '');
     $cardsDestino = ($pagina['cards_destino'] ?? 'curso') === 'whatsapp' ? 'whatsapp' : 'curso';
 
     $trackingConfig = [

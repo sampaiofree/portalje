@@ -389,6 +389,8 @@ Route::prefix('viajandinho')->group(function () {
 });    
 
 //PÁGINA W3
+Route::get('/whatsapp', [Home_e_cursosController::class, 'redirecionar_whatsapp'])->name('whatsapp.redirect');
+Route::get('/whatsapp/curso/{curso}', [Home_e_cursosController::class, 'redirecionar_whatsapp_curso'])->name('whatsapp.curso.redirect');
 Route::get('/w3/{cidade?}', [Home_e_cursosController::class, 'carvalho_whatsapp'])->name('w3');
 
 //PÁGINA W4 (LEGADO) -> REDIRECIONA PARA W3
