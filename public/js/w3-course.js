@@ -114,6 +114,139 @@
         window.fbq('track', eventName);
     }
 
+    function currentQueryWhatsapp() {
+        try {
+            return normalizeDigits(new URLSearchParams(window.location.search).get('t'));
+        } catch (error) {
+            return '';
+        }
+    }
+
+    function whatsappStorageKey() {
+        var userId = String(config.user_id || '').trim() || 'public';
+        return 'portalje:whatsapp:' + window.location.host + ':' + userId;
+    }
+
+    function readStoredWhatsapp(key) {
+        try {
+            var parsed = JSON.parse(window.sessionStorage.getItem(key) || '{}');
+            var whatsapp = normalizeDigits(parsed.whatsapp);
+
+            if (whatsapp.length <= 10 || whatsapp.length > 15) {
+                return null;
+            }
+
+            return {
+                whatsapp: whatsapp,
+                whatsapp_atendimento_id: parsed.whatsapp_atendimento_id ? String(parsed.whatsapp_atendimento_id) : ''
+            };
+        } catch (error) {
+            return null;
+        }
+    }
+
+    function writeStoredWhatsapp(key, selection) {
+        try {
+            window.sessionStorage.setItem(key, JSON.stringify(selection));
+        } catch (error) {
+            // no-op
+        }
+    }
+
+    function resolveWhatsappSelection() {
+        var key = whatsappStorageKey();
+        var queryWhatsapp = currentQueryWhatsapp();
+
+        if (queryWhatsapp.length > 10 && queryWhatsapp.length <= 15) {
+            var fixedSelection = {
+                whatsapp: queryWhatsapp,
+                whatsapp_atendimento_id: ''
+            };
+            writeStoredWhatsapp(key, fixedSelection);
+            return fixedSelection;
+        }
+
+        var storedSelection = readStoredWhatsapp(key);
+        if (storedSelection) {
+            return storedSelection;
+        }
+
+        var renderedWhatsapp = normalizeDigits(config.whatsapp_atendimento);
+        if (renderedWhatsapp.length <= 10 || renderedWhatsapp.length > 15) {
+            return null;
+        }
+
+        var renderedSelection = {
+            whatsapp: renderedWhatsapp,
+            whatsapp_atendimento_id: config.whatsapp_atendimento_id ? String(config.whatsapp_atendimento_id) : ''
+        };
+        writeStoredWhatsapp(key, renderedSelection);
+
+        return renderedSelection;
+    }
+
+    function withWhatsappQuery(url, whatsapp) {
+        try {
+            var parsed = new URL(url, window.location.href);
+            if (parsed.origin !== window.location.origin || !parsed.pathname.match(/^\/whatsapp(?:\/|$)/)) {
+                return url;
+            }
+
+            parsed.searchParams.set('t', whatsapp);
+            return parsed.toString();
+        } catch (error) {
+            return url;
+        }
+    }
+
+    function withWhatsappPhone(url, whatsapp) {
+        try {
+            var parsed = new URL(url, window.location.href);
+            var host = parsed.hostname.replace(/^www\./, '');
+
+            if (host === 'wa.me') {
+                return url.replace(/(https?:\/\/(?:www\.)?wa\.me\/)\d+/i, '$1' + whatsapp);
+            }
+
+            if (host === 'api.whatsapp.com' || host === 'web.whatsapp.com') {
+                if (/[?&]phone=/.test(url)) {
+                    return url.replace(/([?&]phone=)[^&]*/i, '$1' + whatsapp);
+                }
+
+                return url + (url.indexOf('?') >= 0 ? '&' : '?') + 'phone=' + whatsapp;
+            }
+
+            return withWhatsappQuery(url, whatsapp);
+        } catch (error) {
+            return url;
+        }
+    }
+
+    function applyWhatsappSelection() {
+        var selection = resolveWhatsappSelection();
+        if (!selection) {
+            return;
+        }
+
+        document.querySelectorAll('.js-course-trigger').forEach(function (trigger) {
+            var link = trigger.getAttribute('data-link') || '';
+            if (link) {
+                trigger.setAttribute('data-link', withWhatsappPhone(link, selection.whatsapp));
+            }
+
+            trigger.setAttribute('data-whatsapp-atendimento-id', selection.whatsapp_atendimento_id);
+        });
+
+        if (whatsappButton) {
+            var buttonHref = whatsappButton.getAttribute('href') || '';
+            if (buttonHref) {
+                whatsappButton.setAttribute('href', withWhatsappPhone(buttonHref, selection.whatsapp));
+            }
+        }
+    }
+
+    applyWhatsappSelection();
+
     function openLeadModal(button) {
         if (!modal || !button) {
             return;

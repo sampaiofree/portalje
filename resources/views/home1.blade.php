@@ -56,6 +56,9 @@
         'whatsapp_requires_form' => $homeWhatsappRequiresForm,
         'whatsapp_show' => (bool) ($info['whatsapp_mostrar'] ?? true),
         'whatsapp_delay_seconds' => max(0, (int) ($info['whatsapp_atendimento_tempo'] ?? 0)),
+        'user_id' => $info['user_id'] ?? null,
+        'whatsapp_atendimento' => $info['whatsapp_atendimento'] ?? null,
+        'whatsapp_atendimento_id' => $info['whatsapp_atendimento_id'] ?? null,
       ];
     @endphp
     <link rel="stylesheet" href="{{ asset('css/home-course.css') }}{{ $homeCssVersion ? '?v=' . $homeCssVersion : '' }}">

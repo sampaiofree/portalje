@@ -29,6 +29,7 @@
     $whatsappFloatQuery = http_build_query(array_filter($whatsappFloatParams, fn ($value) => $value !== null && $value !== ''));
     $whatsappFloatUrl = request()->getSchemeAndHttpHost() . '/whatsapp' . ($whatsappFloatQuery !== '' ? '?' . $whatsappFloatQuery : '');
     $cardsDestino = ($pagina['cards_destino'] ?? 'curso') === 'whatsapp' ? 'whatsapp' : 'curso';
+    $w3UserId = $pagina['user_id'] ?? $cursosVisiveis->pluck('card_user_id')->filter()->first();
 
     $trackingConfig = [
         'pixel_id' => (int) ($pagina['pidel_id'] ?? 0),
@@ -36,6 +37,9 @@
         'whatsapp_show' => (bool) ($pagina['whatsapp_mostrar'] ?? false),
         'whatsapp_delay_seconds' => (int) ($pagina['whatsapp_atendimento_tempo'] ?? 0),
         'whatsapp_requires_form' => (bool) ($pagina['whatsapp_requires_form'] ?? true),
+        'user_id' => $w3UserId,
+        'whatsapp_atendimento' => $pagina['whatsapp'] ?? null,
+        'whatsapp_atendimento_id' => $pagina['whatsapp_atendimento_id'] ?? null,
         'csrf_token' => csrf_token(),
     ];
 @endphp
