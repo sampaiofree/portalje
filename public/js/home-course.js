@@ -99,53 +99,14 @@
         }
     }
 
-    function whatsappStorageKey(config) {
-        var userId = String(config.user_id || '').trim() || 'public';
-        return 'portalje:whatsapp:' + window.location.host + ':' + userId;
-    }
-
-    function readStoredWhatsapp(key) {
-        try {
-            var parsed = JSON.parse(window.sessionStorage.getItem(key) || '{}');
-            var whatsapp = normalizeWhatsapp(parsed.whatsapp);
-
-            if (!whatsapp) {
-                return null;
-            }
-
-            return {
-                whatsapp: whatsapp,
-                whatsapp_atendimento_id: parsed.whatsapp_atendimento_id ? String(parsed.whatsapp_atendimento_id) : ''
-            };
-        } catch (error) {
-            return null;
-        }
-    }
-
-    function writeStoredWhatsapp(key, selection) {
-        try {
-            window.sessionStorage.setItem(key, JSON.stringify(selection));
-        } catch (error) {
-            // no-op
-        }
-    }
-
     function resolveWhatsappSelection(config) {
-        var key = whatsappStorageKey(config);
         var queryWhatsapp = currentQueryWhatsapp();
 
         if (queryWhatsapp) {
-            var fixedSelection = {
+            return {
                 whatsapp: queryWhatsapp,
                 whatsapp_atendimento_id: ''
             };
-            writeStoredWhatsapp(key, fixedSelection);
-            return fixedSelection;
-        }
-
-        var storedSelection = readStoredWhatsapp(key);
-        if (storedSelection) {
-            return storedSelection;
         }
 
         var renderedWhatsapp = normalizeWhatsapp(config.whatsapp_atendimento);
@@ -157,23 +118,8 @@
             whatsapp: renderedWhatsapp,
             whatsapp_atendimento_id: config.whatsapp_atendimento_id ? String(config.whatsapp_atendimento_id) : ''
         };
-        writeStoredWhatsapp(key, renderedSelection);
 
         return renderedSelection;
-    }
-
-    function withWhatsappQuery(url, whatsapp) {
-        try {
-            var parsed = new URL(url, window.location.href);
-            if (parsed.origin !== window.location.origin || !parsed.pathname.match(/^\/whatsapp(?:\/|$)/)) {
-                return url;
-            }
-
-            parsed.searchParams.set('t', whatsapp);
-            return parsed.toString();
-        } catch (error) {
-            return url;
-        }
     }
 
     function withWhatsappPhone(url, whatsapp) {
@@ -193,7 +139,7 @@
                 return url + (url.indexOf('?') >= 0 ? '&' : '?') + 'phone=' + whatsapp;
             }
 
-            return withWhatsappQuery(url, whatsapp);
+            return url;
         } catch (error) {
             return url;
         }

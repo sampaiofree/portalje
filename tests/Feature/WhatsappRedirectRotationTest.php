@@ -13,7 +13,7 @@ class WhatsappRedirectRotationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_course_whatsapp_redirect_rotates_by_last_routed_at(): void
+    public function test_course_whatsapp_redirect_keeps_number_in_same_session_and_rotates_new_session(): void
     {
         [$user, $curso] = $this->createAffiliateCourse('afiliado-redirect.test', 'curso-redirect-rotation');
 
@@ -40,9 +40,106 @@ class WhatsappRedirectRotationTest extends TestCase
         $secondResponse = $this->get("http://afiliado-redirect.test/whatsapp/curso/{$curso->url}");
         $secondLocation = $secondResponse->headers->get('Location') ?? '';
 
-        $this->assertStringStartsWith('https://wa.me/5511999992222', $secondLocation);
+        $this->assertStringStartsWith('https://wa.me/5511999991111', $secondLocation);
+        $this->assertSame(1, $primeiro->refresh()->routed_count);
+        $this->assertNull($segundo->refresh()->last_routed_at);
+
+        $this->app['session']->flush();
+
+        $thirdResponse = $this->get("http://afiliado-redirect.test/whatsapp/curso/{$curso->url}");
+        $thirdLocation = $thirdResponse->headers->get('Location') ?? '';
+
+        $this->assertStringStartsWith('https://wa.me/5511999992222', $thirdLocation);
         $this->assertNotNull($segundo->refresh()->last_routed_at);
         $this->assertSame(1, $segundo->routed_count);
+    }
+
+    public function test_public_home_whatsapp_form_keeps_rendered_number_in_same_session_and_rotates_new_session(): void
+    {
+        [$user] = $this->createAffiliateCourse(
+            'afiliado-home-rotation.test',
+            'curso-home-rotation',
+            'whatsapp',
+            'formulario'
+        );
+
+        $primeiro = WhatsappAtendimento::create([
+            'user_id' => $user->id,
+            'whatsapp' => '5511999991111',
+            'is_active' => true,
+        ]);
+
+        $segundo = WhatsappAtendimento::create([
+            'user_id' => $user->id,
+            'whatsapp' => '5511999992222',
+            'is_active' => true,
+        ]);
+
+        $firstResponse = $this->get('http://afiliado-home-rotation.test/');
+
+        $firstResponse->assertOk();
+        $firstResponse->assertViewIs('home1');
+        $firstResponse->assertSee('"whatsapp_atendimento":"5511999991111"', false);
+        $this->assertNotNull($primeiro->refresh()->last_routed_at);
+        $this->assertSame(1, $primeiro->routed_count);
+        $this->assertNull($segundo->refresh()->last_routed_at);
+
+        $secondResponse = $this->get('http://afiliado-home-rotation.test/');
+
+        $secondResponse->assertOk();
+        $secondResponse->assertViewIs('home1');
+        $secondResponse->assertSee('"whatsapp_atendimento":"5511999991111"', false);
+        $this->assertSame(1, $primeiro->refresh()->routed_count);
+        $this->assertNull($segundo->refresh()->last_routed_at);
+
+        $this->app['session']->flush();
+
+        $thirdResponse = $this->get('http://afiliado-home-rotation.test/');
+
+        $thirdResponse->assertOk();
+        $thirdResponse->assertViewIs('home1');
+        $thirdResponse->assertSee('"whatsapp_atendimento":"5511999992222"', false);
+        $this->assertNotNull($segundo->refresh()->last_routed_at);
+        $this->assertSame(1, $segundo->routed_count);
+    }
+
+    public function test_public_w3_page_uses_one_rotated_number_for_config_and_cards(): void
+    {
+        [$user] = $this->createAffiliateCourse(
+            'afiliado-w3-rotation.test',
+            'curso-w3-rotation',
+            'whatsapp',
+            'formulario'
+        );
+
+        $user->update([
+            'home_page_layout' => 'w3',
+        ]);
+
+        $primeiro = WhatsappAtendimento::create([
+            'user_id' => $user->id,
+            'whatsapp' => '5511999993333',
+            'is_active' => true,
+        ]);
+
+        $segundo = WhatsappAtendimento::create([
+            'user_id' => $user->id,
+            'whatsapp' => '5511999994444',
+            'is_active' => true,
+        ]);
+
+        $response = $this->get('http://afiliado-w3-rotation.test/');
+
+        $response->assertOk();
+        $response->assertViewIs('home_e_cursos.w3');
+        $response->assertSee('"whatsapp_atendimento":"5511999993333"', false);
+        $response->assertSee('https://wa.me/5511999993333', false);
+        $response->assertDontSee('https://wa.me/5511999994444', false);
+
+        $this->assertNotNull($primeiro->refresh()->last_routed_at);
+        $this->assertSame(1, $primeiro->routed_count);
+        $this->assertNull($segundo->refresh()->last_routed_at);
+        $this->assertSame(0, $segundo->routed_count);
     }
 
     public function test_course_whatsapp_redirect_with_t_uses_fixed_number_without_moving_rotation(): void
@@ -93,7 +190,7 @@ class WhatsappRedirectRotationTest extends TestCase
         $this->assertSame(0, $fixo->routed_count);
     }
 
-    public function test_home1_form_renders_whatsapp_atendimento_id_and_lead_updates_last_lead_at_only(): void
+    public function test_home1_form_renders_whatsapp_atendimento_id_and_lead_updates_last_lead_at(): void
     {
         [$user, $curso] = $this->createAffiliateCourse(
             'afiliado-form-last-lead.test',
@@ -126,8 +223,8 @@ class WhatsappRedirectRotationTest extends TestCase
 
         $leadResponse->assertOk();
         $this->assertNotNull($whatsapp->refresh()->last_lead_at);
-        $this->assertNull($whatsapp->last_routed_at);
-        $this->assertSame(0, $whatsapp->routed_count);
+        $this->assertNotNull($whatsapp->last_routed_at);
+        $this->assertSame(1, $whatsapp->routed_count);
     }
 
     public function test_course_page_whatsapp_without_form_uses_internal_redirect(): void
