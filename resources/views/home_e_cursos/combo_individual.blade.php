@@ -53,7 +53,7 @@
                             <div id="combo_descricao_curta">
                                 <p class="mb-2">{{ $descricaoComboCurta }}</p>
                                 @if($mostrarDescricaoExpandida)
-                                    <a href="javascript:void(0)" onclick="mostrarMais('combo_descricao')">Saiba mais</a>
+                                    <a href="javascript:void(0)" onclick="mostrarMais('combo_descricao')">Quero minha vaga</a>
                                 @endif
                             </div>
                             @if($mostrarDescricaoExpandida)

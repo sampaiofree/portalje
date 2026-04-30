@@ -150,7 +150,7 @@
                                     <span class="w3-course-card__meta">{{ number_format((int) $curso->numero_alunos, 0, ',', '.') }} Alunos</span>
                                     <span class="w3-course-card__rating">{{ number_format((float) $curso->nota_avaliacao, 1, ',', '.') }}/5</span>
                                     <span class="w3-course-card__vacancy">{{ $curso->card_vagas ?? 0 }} vagas restantes</span>
-                                    <span class="w3-course-card__cta">Saiba mais</span>
+                                    <span class="w3-course-card__cta">Quero minha vaga</span>
                                 </span>
                             </button>
                         </article>

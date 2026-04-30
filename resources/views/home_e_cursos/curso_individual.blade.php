@@ -46,7 +46,7 @@
                         <p class="h3">O que você vai aprender?</p>
                         <div id="o_que_vc_aprender_curta">
                             {!! Str::limit($curso->descricao_curta, 400) !!}
-                            <a href="javascript:void(0)" onclick="mostrar_mais('o_que_vc_aprender')">Saiba mais</a>
+                            <a href="javascript:void(0)" onclick="mostrar_mais('o_que_vc_aprender')">Quero minha vaga</a>
                         </div>
                         <div id="o_que_vc_aprender_completa" class="content-hidden">
                             {!! $curso->descricao_curta !!}
@@ -69,7 +69,7 @@
                         @if($curso->professor_biografia)
                             <div id="professor_bio_curta">
                                 {!! Str::limit($curso->professor_biografia, 400) !!}
-                                <a href="javascript:void(0)" onclick="mostrar_mais('professor_bio')">Saiba mais</a>
+                                <a href="javascript:void(0)" onclick="mostrar_mais('professor_bio')">Quero minha vaga</a>
                             </div>
                             <div id="professor_bio_completa" class="content-hidden">
                                 {!! $curso->professor_biografia !!}

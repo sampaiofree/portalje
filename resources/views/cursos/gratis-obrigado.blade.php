@@ -336,7 +336,7 @@
             <h3 class="mt-4">{{ $curso->professor_nome }}</h3>
             <p class="text-muted">{{ $curso->professor_especialidade ?? 'Especialista na Área' }}</p>
             <div id="professor-bio-wrapper">{!! $curso->professor_biografia !!}</div>
-            <button id="toggle-bio-btn">Saiba mais</button>
+            <button id="toggle-bio-btn">Quero minha vaga</button>
         </div>
     </section>
     @endif
