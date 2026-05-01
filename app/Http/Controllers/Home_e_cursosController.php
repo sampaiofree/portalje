@@ -113,7 +113,7 @@ class Home_e_cursosController extends Controller
         $intent = (string) $request->query('intent');
         $mensagem = $intent === 'inscricao'
             ? "Olá, quero fazer minha inscrição no curso de {$cursoModel->titulo}"
-            : "Olá, quero saber mais sobre o curso de {$cursoModel->titulo}";
+            : "Olá, quero garantir minha vaga no curso de {$cursoModel->titulo}";
 
         return redirect()->away($this->montarWhatsappExternoUrl($whatsapp, $mensagem));
     }
@@ -1280,7 +1280,7 @@ class Home_e_cursosController extends Controller
                     </a>";
                 }else{
                     $curso->tag_a = "
-                    <a class='lead'  target=\"_blanck\" data-href=\"https://wa.me/$whatsApp?text=Olá, quero saber mais sobre o curso de $curso->titulo\">
+                    <a class='lead'  target=\"_blanck\" data-href=\"https://wa.me/$whatsApp?text=Olá, quero garantir minha vaga no curso de $curso->titulo\">
                         <img src=\"$src\" alt=\"$curso->titulo\" class=\"img-fluid rounded-4 border border-1\">
                     </a>";
                 }*/
@@ -1894,7 +1894,7 @@ class Home_e_cursosController extends Controller
             <a data-bs-toggle=\"modal\" data-bs-target=\"#modal_lead\" 
             class=\"jump mx-auto btn btn-lg border border-dark border-3 d-flex align-items-center text-white\"
             style='font-weight: bolder;background-color: #009d4e;z-index: 1000;max-width: 90%;font-weight: bolder;'
-            data-link=\"https://wa.me/$whatsApp?text=Olá, quero saber mais sobre o curso de $curso->titulo\" 
+            data-link=\"https://wa.me/$whatsApp?text=Olá, quero garantir minha vaga no curso de $curso->titulo\" 
             data-curso=\"$curso->id\" 
             data-user=\"$user_id\"
             data-origem=\"whatsapp\">
@@ -1906,7 +1906,7 @@ class Home_e_cursosController extends Controller
             <a 
             class=\"jump mx-auto btn btn-lg border border-dark border-3 d-flex align-items-center text-white \"
             style='font-weight: bolder;background-color: #009d4e;z-index: 1000;max-width: 90%;font-weight: bolder;'
-            href=\"https://wa.me/$whatsApp?text=Olá, quero saber mais sobre o curso de $curso->titulo\">
+            href=\"https://wa.me/$whatsApp?text=Olá, quero garantir minha vaga no curso de $curso->titulo\">
             <i class=\"ri-whatsapp-fill me-2\" style='font-size: xx-large;'></i>Saiba mais pelo WhatsApp!</a>
             </div>";
         }
