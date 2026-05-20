@@ -54,4 +54,9 @@ return [
         'account_id' => env('GOOGLE_ADSENSE_ACCOUNT_ID', 'ca-pub-9796869151117705'),
     ],
 
+    'typebot' => [
+        'course_popup_id' => env('TYPEBOT_COURSE_POPUP_ID', 'my-typebot-t0kedpk'),
+        'api_host' => env('TYPEBOT_API_HOST', 'https://typebot.3f7.org'),
+    ],
+
 ];

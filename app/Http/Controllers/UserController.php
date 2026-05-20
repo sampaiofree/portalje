@@ -432,6 +432,7 @@ class UserController extends Controller
         $request->validate([
             'telefone_pessoal_1' => 'nullable|regex:/^[0-9]{11,14}$/',
             'telefone_pessoal_2' => 'nullable|regex:/^[0-9]{12,14}$/',
+            'site_contact_provider' => 'nullable|in:whatsapp,typebot',
             'w3_whatsapp_float_enabled' => 'nullable|boolean',
             'w3_whatsapp_float_delay_seconds' => 'nullable|in:0,5,10,20,30,45,60,120',
             'w3_whatsapp_float_channel' => [
@@ -501,6 +502,20 @@ class UserController extends Controller
         if (Schema::hasColumn('users', 'botconversa_webhook')) {
             $user->botconversa_webhook = $request->input('botconversa_webhook')??null;
         }
+        if (Schema::hasColumn('users', 'site_contact_provider')) {
+            $siteContactProvider = trim((string) $request->input('site_contact_provider', 'whatsapp'));
+            $user->site_contact_provider = in_array($siteContactProvider, ['whatsapp', 'typebot'], true)
+                ? $siteContactProvider
+                : 'whatsapp';
+
+            if (Schema::hasColumn('users', 'home_page_destination')) {
+                if ($user->site_contact_provider === 'typebot' && $user->home_page_destination === 'whatsapp') {
+                    $user->home_page_destination = 'typebot';
+                } elseif ($user->site_contact_provider === 'whatsapp' && $user->home_page_destination === 'typebot') {
+                    $user->home_page_destination = 'whatsapp';
+                }
+            }
+        }
         if (Schema::hasColumn('users', 'w3_whatsapp_float_enabled')) {
             $user->w3_whatsapp_float_enabled = $request->boolean('w3_whatsapp_float_enabled', true);
         }
@@ -568,13 +583,18 @@ class UserController extends Controller
 
     public function update_home_page_layout(Request $request)
     {
+        $user = Auth::user();
+        $siteContactProvider = Schema::hasColumn('users', 'site_contact_provider')
+            ? (string) ($user->site_contact_provider ?? 'whatsapp')
+            : 'whatsapp';
+        $contactDestination = $siteContactProvider === 'typebot' ? 'typebot' : 'whatsapp';
+
         $validated = $request->validate([
             'home_page_layout' => 'required|in:padrao,w3',
-            'home_page_destination' => 'required|in:curso,whatsapp',
+            'home_page_destination' => 'required|in:curso,' . $contactDestination,
             'home_page_whatsapp_flow' => 'required_if:home_page_destination,whatsapp|in:formulario,direto',
         ]);
 
-        $user = Auth::user();
         $user->home_page_layout = $validated['home_page_layout'];
         $user->home_page_destination = $validated['home_page_destination'];
         $user->home_page_whatsapp_flow = $validated['home_page_whatsapp_flow']

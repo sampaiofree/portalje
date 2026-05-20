@@ -12,10 +12,12 @@ use App\Models\Cupom;
 use App\Models\User;
 use App\Models\WhatsappAtendimento;
 use App\Models\RootDomainCourseConfig;
+use App\Services\CourseCompleteOfferService;
 use App\Services\RootDomainCoursePublicStateService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Throwable;
 
 use DOMDocument;
 use DOMXPath;
@@ -25,10 +27,14 @@ class Home_e_cursosController extends Controller
 
     public $dados_portal;
     private RootDomainCoursePublicStateService $rootDomainCoursePublicStateService;
+    private CourseCompleteOfferService $courseCompleteOfferService;
 
-    public function __construct(RootDomainCoursePublicStateService $rootDomainCoursePublicStateService)
-    {
+    public function __construct(
+        RootDomainCoursePublicStateService $rootDomainCoursePublicStateService,
+        CourseCompleteOfferService $courseCompleteOfferService
+    ) {
         $this->rootDomainCoursePublicStateService = $rootDomainCoursePublicStateService;
+        $this->courseCompleteOfferService = $courseCompleteOfferService;
         $this->dados_portal = $this->carregarDadosPortal();
     }
 
@@ -596,9 +602,13 @@ class Home_e_cursosController extends Controller
             ? (string) $request->query('layout')
             : null;
         $homePageLayout = $dados['dados']['home_page_layout'] ?? 'padrao';
-        $homePageDestination = in_array((string) ($dados['dados']['home_page_destination'] ?? 'curso'), ['curso', 'whatsapp'], true)
-            ? (string) $dados['dados']['home_page_destination']
-            : 'curso';
+        $siteContactProvider = in_array((string) ($dados['dados']['site_contact_provider'] ?? 'whatsapp'), ['whatsapp', 'typebot'], true)
+            ? (string) $dados['dados']['site_contact_provider']
+            : 'whatsapp';
+        $homePageDestination = $this->resolverHomePageDestinationForProvider(
+            $dados['dados']['home_page_destination'] ?? 'curso',
+            $siteContactProvider
+        );
         $storedHomePageWhatsappFlow = in_array((string) ($dados['dados']['home_page_whatsapp_flow'] ?? 'formulario'), ['formulario', 'direto'], true)
             ? (string) $dados['dados']['home_page_whatsapp_flow']
             : 'formulario';
@@ -640,6 +650,9 @@ class Home_e_cursosController extends Controller
         //PEGAR TODOS OS PARAMETROS PARA COLOCAR NA URL    
         $info = $dados['dados'];
         $info['parametros'] = isset($query) ? $query.$src : $src;
+        $info['home_destination'] = $homePageDestination;
+        $info['site_contact_provider'] = $siteContactProvider;
+        $info['typebot'] = $siteContactProvider === 'typebot' && $homePageDestination === 'typebot';
 
         //CARVALHO WHATSAPP
         if (request()->has('w')) {
@@ -724,6 +737,11 @@ class Home_e_cursosController extends Controller
             }
             
             if($verificar){
+                $siteContactProvider = $this->resolverSiteContactProvider($verificar);
+                $homePageDestination = $this->resolverHomePageDestinationForProvider(
+                    $verificar->home_page_destination ?? 'curso',
+                    $siteContactProvider
+                );
                 $whatsappSelecionado = $this->selecionarWhatsappAtendimento($verificar);
                 $whatsappAtendimento = $whatsappSelecionado['whatsapp'] ?? $verificar->whatsapp_atendimento;
                 $whatsappFloatSelecionado = $this->selecionarWhatsappAtendimentoParaBotaoFlutuante($verificar, $whatsappSelecionado);
@@ -751,9 +769,8 @@ class Home_e_cursosController extends Controller
                     'home_page_layout' => in_array((string) $verificar->home_page_layout, ['padrao', 'w3'], true)
                         ? (string) $verificar->home_page_layout
                         : 'padrao',
-                    'home_page_destination' => in_array((string) $verificar->home_page_destination, ['curso', 'whatsapp'], true)
-                        ? (string) $verificar->home_page_destination
-                        : 'curso',
+                    'site_contact_provider' => $siteContactProvider,
+                    'home_page_destination' => $homePageDestination,
                     'home_page_whatsapp_flow' => in_array((string) $verificar->home_page_whatsapp_flow, ['formulario', 'direto'], true)
                         ? (string) $verificar->home_page_whatsapp_flow
                         : 'formulario',
@@ -772,6 +789,10 @@ class Home_e_cursosController extends Controller
                     ->orderBy('curso.ordem')
                     ->orderBy('curso.id')
                     ->get();
+
+                    $dados['cursos']->each(function ($curso) {
+                        $this->aplicarDadosTypebotNoCurso($curso);
+                    });
                 } else {
                     $dados['cursos'] = collect();
                 }
@@ -793,6 +814,7 @@ class Home_e_cursosController extends Controller
             'logo_padrao_url' => $this->resolverLogoPadraoUrl(),
             'logo_dark_url' => $this->resolverLogoDarkUrl(),
             'home_page_layout' => 'padrao',
+            'site_contact_provider' => 'whatsapp',
             'home_page_destination' => 'curso',
             'home_page_whatsapp_flow' => 'formulario',
             'formulario_pre_checkout' => $dados_portal['formulario_pre_checkout'],
@@ -804,6 +826,9 @@ class Home_e_cursosController extends Controller
             $dados['cursos'] = Curso::orderBy('ordem')
                                 ->orderBy('id')
                                 ->get();
+            $dados['cursos']->each(function ($curso) {
+                $this->aplicarDadosTypebotNoCurso($curso);
+            });
         } else {
             $dados['cursos'] = collect();
         }
@@ -864,7 +889,11 @@ class Home_e_cursosController extends Controller
 
         //DADOS DA PÁGINA
         $pagina = $this->dados_da_pagina($dados_afiliado, $cidade);
-        $modoCardsW3 = $this->resolverModoCardsW3($request, $cidade);
+        $siteContactProvider = $this->resolverSiteContactProvider($dados_afiliado instanceof User ? $dados_afiliado : null);
+        $storedHomePageDestination = $dados_afiliado instanceof User
+            ? $this->resolverHomePageDestinationForProvider($dados_afiliado->home_page_destination ?? 'curso', $siteContactProvider)
+            : 'curso';
+        $modoCardsW3 = $this->resolverModoCardsW3($request, $cidade, $storedHomePageDestination);
         $storedWhatsappFlow = $dados_afiliado instanceof User
             ? (string) ($dados_afiliado->home_page_whatsapp_flow ?? 'formulario')
             : 'formulario';
@@ -946,6 +975,7 @@ class Home_e_cursosController extends Controller
         $curso_id = null;
         $user_id = null;
         $botao_whatsapp_flutuante = null;
+        $site_contact_provider = 'whatsapp';
         $company_name = 'Programa Jovem Empreendedor';
         $logo_padrao_url = $this->resolverLogoPadraoUrl();
         $logo_dark_url = $this->resolverLogoDarkUrl();
@@ -973,6 +1003,7 @@ class Home_e_cursosController extends Controller
 
         if($user){ //DADOS DO AFILIADO
             $user_id = $user->id;
+            $site_contact_provider = $this->resolverSiteContactProvider($user);
             $whatsappSelecionado = $this->selecionarWhatsappAtendimento($user);
             $whatsapp_atendimento = $whatsappSelecionado['whatsapp'] ?? $user->whatsapp_atendimento ?? $this->dados_portal['telefone_suporte_alunos'];
             $whatsapp_atendimento_id = $whatsappSelecionado['id'] ?? null;
@@ -1043,6 +1074,7 @@ class Home_e_cursosController extends Controller
             "whatsapp_float_atendimento" => $whatsapp_float_atendimento,
             "whatsapp_float_atendimento_id" => $whatsapp_float_atendimento_id,
             "whatsapp_mostrar"=> $whatsapp_mostrar,
+            "site_contact_provider"=> $site_contact_provider,
             "formulario_whatsapp"=> $formulario_whatsapp,
             "formulario_pre_checkout"=> $formulario_pre_checkout,
             "botao_whatsapp_flutuante"=> $botao_whatsapp_flutuante,
@@ -1112,7 +1144,7 @@ class Home_e_cursosController extends Controller
 
     public function listar_cursos($request, $user = null, $pagina = 'home', $modoCardsW3 = null, $usarFormularioWhatsapp = true){
         
-        $modoCardsW3 = in_array($modoCardsW3, ['curso', 'whatsapp'], true) ? $modoCardsW3 : 'curso';
+        $modoCardsW3 = in_array($modoCardsW3, ['curso', 'whatsapp', 'typebot'], true) ? $modoCardsW3 : 'curso';
 
         $src = "";
         $sck = "";
@@ -1181,12 +1213,14 @@ class Home_e_cursosController extends Controller
 
         foreach ($datacursos as $curso) {
             $cursoEncontrado = false;
+            $codigoRefAtual = null;
             $vaga =  $vagas[$n]; $n++;
             //ADICIONAR CÓDIGO REF DO USER EM CADA CURSO
             if ($codigosRefByCourseId->isNotEmpty()) {
                 $codigo_ref = $codigosRefByCourseId->get((int) $curso->id);
 
                 if ($codigo_ref) {
+                    $codigoRefAtual = $codigo_ref;
                     $curso->codigo_ref = $codigo_ref->codigo_ref;
                     $curso->codigo_ref_id = $codigo_ref->id;
                     $curso->mostrar_curso = $codigo_ref->mostrar_curso;
@@ -1251,6 +1285,9 @@ class Home_e_cursosController extends Controller
                 $curso->link_checkout_completo = $curso->link_checkout_completo.$parametros;
             }
 
+            $this->aplicarDadosTypebotNoCurso($curso, $codigoRefAtual);
+            $curso->typebot_whatsapp_url = $this->montarTypebotWhatsappUrl($whatsApp ?? null);
+
             $src = asset('storage/'.$curso->capa_quadrada);
            
             
@@ -1298,6 +1335,11 @@ class Home_e_cursosController extends Controller
                     $curso->card_user_id = $data_user;
                     $curso->card_origem = 'whatsapp';
                     $curso->card_whatsapp_atendimento_id = $whatsAppAtendimentoId;
+                } elseif ($modoCardsW3 === 'typebot') {
+                    $curso->card_link = $this->montarLinkCursoCardW3($request, $curso);
+                    $curso->card_user_id = null;
+                    $curso->card_origem = 'typebot';
+                    $curso->card_whatsapp_atendimento_id = null;
                 } else {
                     $curso->card_link = $this->montarLinkCursoCardW3($request, $curso);
                     $curso->card_user_id = null;
@@ -1491,6 +1533,19 @@ class Home_e_cursosController extends Controller
     private function resolverModoCardsW3(Request $request, ?string $cidade = null, string $defaultDestination = 'curso'): string
     {
         $queryDestination = (string) $request->query('destination');
+
+        if ($defaultDestination === 'typebot') {
+            if (in_array($queryDestination, ['curso', 'typebot'], true)) {
+                return $queryDestination;
+            }
+
+            if ((string) $request->query('w') === '1') {
+                return 'whatsapp';
+            }
+
+            return 'typebot';
+        }
+
         if (in_array($queryDestination, ['curso', 'whatsapp'], true)) {
             return $queryDestination;
         }
@@ -1504,6 +1559,144 @@ class Home_e_cursosController extends Controller
         }
 
         return in_array($defaultDestination, ['curso', 'whatsapp'], true) ? $defaultDestination : 'curso';
+    }
+
+    private function resolverSiteContactProvider(?User $user): string
+    {
+        if (!$user || !Schema::hasColumn('users', 'site_contact_provider')) {
+            return 'whatsapp';
+        }
+
+        $provider = (string) ($user->site_contact_provider ?? 'whatsapp');
+
+        return in_array($provider, ['whatsapp', 'typebot'], true) ? $provider : 'whatsapp';
+    }
+
+    private function resolverHomePageDestinationForProvider($destination, string $siteContactProvider): string
+    {
+        $destination = (string) ($destination ?? 'curso');
+        $allowedDestinations = $siteContactProvider === 'typebot'
+            ? ['curso', 'typebot']
+            : ['curso', 'whatsapp'];
+
+        return in_array($destination, $allowedDestinations, true) ? $destination : 'curso';
+    }
+
+    private function montarTypebotWhatsappUrl($whatsapp): string
+    {
+        $digits = preg_replace('/\D/', '', (string) ($whatsapp ?? ''));
+
+        return $digits !== '' ? 'https://wa.me/' . $digits : '';
+    }
+
+    private function aplicarDadosTypebotNoCurso(object $curso, ?Codigo_ref $ref = null): void
+    {
+        $cursoModel = $this->normalizarCursoTypebot($curso);
+        $ref = $ref ?: $this->normalizarCodigoRefTypebot($curso);
+        $completeOffer = $this->courseCompleteOfferService->completeOffer($cursoModel, $ref);
+
+        $curso->typebot_curso_nome = trim((string) ($cursoModel->titulo ?? ''));
+        $curso->typebot_curso_preco = (string) ($completeOffer['price_value'] ?? '');
+        $curso->typebot_checkout_url = (string) ($completeOffer['checkout_url'] ?? '');
+        $curso->typebot_curso_imagem_url = $this->montarTypebotImagemCursoUrl($curso->capa_quadrada ?? null);
+        $curso->typebot_curso_areas = $this->extrairAreasTypebot($curso->areas_de_atuacao ?? null);
+        $curso->typebot_curso_conteudo = $this->extrairTopicosPrincipaisTypebot($curso->conteudo_principal ?? null);
+        $curso->typebot_curso_bonus = $this->extrairTopicosPrincipaisTypebot($curso->conteudo_bonus ?? null);
+    }
+
+    private function normalizarCursoTypebot(object $curso): Curso
+    {
+        if ($curso instanceof Curso) {
+            return $curso;
+        }
+
+        $cursoModel = new Curso();
+        $attributes = method_exists($curso, 'getAttributes')
+            ? $curso->getAttributes()
+            : get_object_vars($curso);
+
+        $cursoModel->setRawAttributes($attributes, true);
+
+        return $cursoModel;
+    }
+
+    private function normalizarCodigoRefTypebot(object $curso): ?Codigo_ref
+    {
+        $codigoRef = trim((string) ($curso->codigo_ref ?? ''));
+
+        if ($codigoRef === '') {
+            return null;
+        }
+
+        $attributes = [
+            'codigo_ref' => $codigoRef,
+        ];
+
+        foreach (['curso_id', 'modo_precos', 'cupom_principal_id', 'cupom_secundario_id'] as $field) {
+            if (isset($curso->{$field})) {
+                $attributes[$field] = $curso->{$field};
+            }
+        }
+
+        $ref = new Codigo_ref();
+        $ref->setRawAttributes($attributes, true);
+
+        return $ref;
+    }
+
+    private function montarTypebotImagemCursoUrl($path): string
+    {
+        $path = trim((string) ($path ?? ''));
+
+        if ($path === '') {
+            return '';
+        }
+
+        if (preg_match('/^https?:\/\//i', $path)) {
+            return $path;
+        }
+
+        $path = ltrim($path, '/');
+
+        if (str_starts_with($path, 'storage/')) {
+            return asset($path);
+        }
+
+        return asset('storage/' . $path);
+    }
+
+    private function extrairAreasTypebot($areas): array
+    {
+        $areas = trim((string) ($areas ?? ''));
+
+        if ($areas === '') {
+            return [];
+        }
+
+        return array_values(array_filter(array_map(
+            static fn ($area) => trim((string) $area),
+            preg_split('/[\/,]/', $areas) ?: []
+        )));
+    }
+
+    private function extrairTopicosPrincipaisTypebot($html): array
+    {
+        $conteudos = $this->lista_conteudo((string) ($html ?? '')) ?? [];
+        $titulos = [];
+
+        foreach ($conteudos as $conteudo) {
+            $titulo = trim((string) ($conteudo['title'] ?? ''));
+
+            if ($titulo !== '') {
+                $titulos[] = $titulo;
+            }
+
+            if (count($titulos) >= 12) {
+                break;
+            }
+        }
+
+        return array_values(array_unique($titulos));
     }
 
     private function resolverHomePageWhatsappFlow(Request $request, string $defaultFlow = 'formulario'): string

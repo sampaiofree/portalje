@@ -28,6 +28,19 @@
         return output;
     }
 
+    function parseJsonListAttribute(element, attributeName) {
+        try {
+            var parsed = JSON.parse(element.getAttribute(attributeName) || '[]');
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (error) {
+            return [];
+        }
+    }
+
+    function parseListTextAttribute(element, attributeName) {
+        return parseJsonListAttribute(element, attributeName).join('\n');
+    }
+
     function getHeaderOffset() {
         var topBanner = document.querySelector('.top-banner');
         return topBanner ? topBanner.offsetHeight + 12 : 12;
@@ -207,6 +220,36 @@
 
             var trigger = event.target.closest('[data-course-trigger="1"]');
             if (!trigger) {
+                return;
+            }
+
+            if (trigger.getAttribute('data-typebot-course-trigger') === '1') {
+                trackMeta('Lead', compactObject({
+                    content_type: 'typebot',
+                    content_name: trigger.getAttribute('data-course-title') || undefined,
+                    content_ids: trigger.getAttribute('data-cursoid') ? [trigger.getAttribute('data-cursoid')] : undefined
+                }));
+
+                if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+                    return;
+                }
+
+                var typebotOpener = window.PortalJeTypebotCourse;
+                if (!typebotOpener || typeof typebotOpener.open !== 'function') {
+                    return;
+                }
+
+                event.preventDefault();
+                typebotOpener.open({
+                    curso_nome: trigger.getAttribute('data-typebot-curso-nome') || '',
+                    curso_preco: trigger.getAttribute('data-typebot-curso-preco') || '',
+                    curso_checkout: trigger.getAttribute('data-typebot-checkout-url') || '',
+                    whatsapp_atendimento: trigger.getAttribute('data-typebot-whatsapp-url') || '',
+                    curso_imagem: trigger.getAttribute('data-typebot-curso-imagem') || '',
+                    curso_areas: parseListTextAttribute(trigger, 'data-typebot-curso-areas'),
+                    curso_conteudo: parseListTextAttribute(trigger, 'data-typebot-curso-conteudo'),
+                    curso_bonus: parseListTextAttribute(trigger, 'data-typebot-curso-bonus')
+                });
                 return;
             }
 

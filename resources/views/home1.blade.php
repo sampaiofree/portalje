@@ -49,7 +49,9 @@
       $homeWhatsappFloatParams = request()->query();
       $homeWhatsappFloatQuery = http_build_query(array_filter($homeWhatsappFloatParams, fn ($value) => $value !== null && $value !== ''));
       $homeWhatsappFloatUrl = request()->getSchemeAndHttpHost() . '/whatsapp' . ($homeWhatsappFloatQuery !== '' ? '?' . $homeWhatsappFloatQuery : '');
-      $homeDestination = !empty($info['whatsapp']) ? 'whatsapp' : 'curso';
+      $homeDestination = in_array((string) ($info['home_destination'] ?? ''), ['curso', 'whatsapp', 'typebot'], true)
+        ? (string) $info['home_destination']
+        : (!empty($info['whatsapp']) ? 'whatsapp' : 'curso');
       $homeWhatsappRequiresForm = $homeDestination === 'whatsapp' && !empty($info['formulario']);
       $homeConfig = [
         'home_destination' => $homeDestination,
@@ -59,6 +61,7 @@
         'user_id' => $info['user_id'] ?? null,
         'whatsapp_atendimento' => $info['whatsapp_atendimento'] ?? null,
         'whatsapp_atendimento_id' => $info['whatsapp_atendimento_id'] ?? null,
+        'typebot_enabled' => $homeDestination === 'typebot',
       ];
     @endphp
     <link rel="stylesheet" href="{{ asset('css/home-course.css') }}{{ $homeCssVersion ? '?v=' . $homeCssVersion : '' }}">
@@ -339,6 +342,14 @@
                                 </span>"; 
                             }
 
+                        $typebotCheckoutUrl = '';
+                        $typebotWhatsappUrl = '';
+                        if ($homeDestination === 'typebot') {
+                            $typebotCheckoutUrl = (string) ($curso->typebot_checkout_url ?? '');
+                            $typebotWhatsappDigits = preg_replace('/\D/', '', (string) ($info['whatsapp_atendimento'] ?? ''));
+                            $typebotWhatsappUrl = $typebotWhatsappDigits !== '' ? 'https://wa.me/' . $typebotWhatsappDigits : '';
+                        }
+
                         /**LINK PARA WHATSAPP**/
                         if($info['whatsapp']){
                             if ($info['formulario']) {
@@ -410,6 +421,17 @@
                                     data-course-title="{{$curso->titulo}}"
                                     data-whatsapp-atendimento-id="{{ $info['whatsapp_atendimento_id'] ?? '' }}"
                                     data-meta-event="{{ $homeDestination === 'whatsapp' ? 'Lead' : 'ViewContent' }}"
+                                    @if($homeDestination === 'typebot')
+                                        data-typebot-course-trigger="1"
+                                        data-typebot-checkout-url="{{ $typebotCheckoutUrl }}"
+                                        data-typebot-whatsapp-url="{{ $typebotWhatsappUrl }}"
+                                        data-typebot-curso-nome="{{ $curso->typebot_curso_nome ?? $curso->titulo }}"
+                                        data-typebot-curso-preco="{{ $curso->typebot_curso_preco ?? '' }}"
+                                        data-typebot-curso-imagem="{{ $curso->typebot_curso_imagem_url ?? '' }}"
+                                        data-typebot-curso-areas="{{ json_encode($curso->typebot_curso_areas ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}"
+                                        data-typebot-curso-conteudo="{{ json_encode($curso->typebot_curso_conteudo ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}"
+                                        data-typebot-curso-bonus="{{ json_encode($curso->typebot_curso_bonus ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}"
+                                    @endif
                                     href="{{$curso->link_checkout_completo}}"
                                     class="mt-1 btn-cta btn-inscricao text-center home-cta home-cta--small"
                                 >SAIBA MAIS</a>
@@ -1126,6 +1148,9 @@
         @endif
         <!-- Fim do Código base para dois Pixels do Facebook -->
     <script id="home-course-config" type="application/json">@json($homeConfig)</script>
+    @if($homeDestination === 'typebot')
+        @include('partials.typebot-course-popup')
+    @endif
     <script defer src="{{ asset('js/home-course.js') }}{{ $homeJsVersion ? '?v=' . $homeJsVersion : '' }}"></script>
   </body>
 </html>

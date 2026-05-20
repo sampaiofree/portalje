@@ -193,6 +193,33 @@
                     </div>
                 </div>
 
+                <!-- Card: Canal de atendimento -->
+                <div class="p-4 sm:p-8 bg-white shadow sm:rounded-lg">
+                    <div class="max-w-xl">
+                        <h2 class="text-lg font-medium text-gray-900">Canal de atendimento do site</h2>
+                        <p class="mt-1 text-sm text-gray-600">Escolha qual canal será salvo como preferência de atendimento.</p>
+
+                        <div class="mt-6">
+                            @php
+                                $siteContactProviderAtual = old('site_contact_provider', Auth::user()->site_contact_provider ?? 'whatsapp');
+                                $siteContactProviderAtual = in_array((string) $siteContactProviderAtual, ['whatsapp', 'typebot'], true)
+                                    ? (string) $siteContactProviderAtual
+                                    : 'whatsapp';
+                            @endphp
+                            <x-input-label for="site_contact_provider" value="Canal de atendimento" />
+                            <select
+                                id="site_contact_provider"
+                                name="site_contact_provider"
+                                class="mt-1 px-4 py-3 bg-gray-100 focus:bg-white block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
+                            >
+                                <option value="whatsapp" @selected($siteContactProviderAtual === 'whatsapp')>WhatsApp</option>
+                                <option value="typebot" @selected($siteContactProviderAtual === 'typebot')>Typebot</option>
+                            </select>
+                            <x-input-error :messages="$errors->get('site_contact_provider')" class="mt-2" />
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Card: Botão Flutuante do WhatsApp -->
                 <div class="p-4 sm:p-8 bg-white shadow sm:rounded-lg">
                     <div class="max-w-xl">

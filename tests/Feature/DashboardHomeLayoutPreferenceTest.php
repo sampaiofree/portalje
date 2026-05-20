@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Codigo_ref;
+use App\Models\Cupom;
 use App\Models\Curso;
 use App\Models\User;
 use App\Models\WhatsappAtendimento;
@@ -32,6 +33,10 @@ class DashboardHomeLayoutPreferenceTest extends TestCase
         $response = $this->actingAs($user)->get('/user/configurar_site2');
 
         $response->assertOk();
+        $response->assertSee('Canal de atendimento do site');
+        $response->assertSee('id="site_contact_provider"', false);
+        $response->assertSee('WhatsApp');
+        $response->assertSee('Typebot');
         $response->assertSee('Botão flutuante do WhatsApp');
         $response->assertSee('id="w3_whatsapp_float_enabled"', false);
         $response->assertSee('id="w3_whatsapp_float_delay_seconds"', false);
@@ -100,6 +105,80 @@ class DashboardHomeLayoutPreferenceTest extends TestCase
             'w3_whatsapp_float_enabled' => 0,
             'w3_whatsapp_float_delay_seconds' => 45,
             'w3_whatsapp_float_whatsapp_atendimento_id' => $whatsapp->id,
+            'site_contact_provider' => 'whatsapp',
+        ]);
+    }
+
+    public function test_configurar_site_post_persists_site_contact_provider_typebot(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'home_page_destination' => 'whatsapp',
+        ]);
+
+        $response = $this->actingAs($user)
+            ->from('/user/configurar_site2')
+            ->post('/user/configurar_site', [
+                'site_contact_provider' => 'typebot',
+            ]);
+
+        $response->assertRedirect('/user/configurar_site2');
+        $response->assertSessionHas('success');
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'site_contact_provider' => 'typebot',
+            'home_page_destination' => 'typebot',
+        ]);
+    }
+
+    public function test_configurar_site_post_rejects_invalid_site_contact_provider(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+        ]);
+
+        $response = $this->actingAs($user)
+            ->from('/user/configurar_site2')
+            ->post('/user/configurar_site', [
+                'site_contact_provider' => 'telegram',
+            ]);
+
+        $response->assertRedirect('/user/configurar_site2');
+        $response->assertSessionHasErrors(['site_contact_provider']);
+    }
+
+    public function test_configurar_site_post_falls_back_to_whatsapp_when_site_contact_provider_is_missing_or_null(): void
+    {
+        $missingFieldUser = User::factory()->create([
+            'email_verified_at' => now(),
+            'site_contact_provider' => 'typebot',
+        ]);
+
+        $missingFieldResponse = $this->actingAs($missingFieldUser)
+            ->from('/user/configurar_site2')
+            ->post('/user/configurar_site', []);
+
+        $missingFieldResponse->assertRedirect('/user/configurar_site2');
+        $this->assertDatabaseHas('users', [
+            'id' => $missingFieldUser->id,
+            'site_contact_provider' => 'whatsapp',
+        ]);
+
+        $nullFieldUser = User::factory()->create([
+            'email_verified_at' => now(),
+            'site_contact_provider' => 'typebot',
+        ]);
+
+        $nullFieldResponse = $this->actingAs($nullFieldUser)
+            ->from('/user/configurar_site2')
+            ->post('/user/configurar_site', [
+                'site_contact_provider' => null,
+            ]);
+
+        $nullFieldResponse->assertRedirect('/user/configurar_site2');
+        $this->assertDatabaseHas('users', [
+            'id' => $nullFieldUser->id,
+            'site_contact_provider' => 'whatsapp',
         ]);
     }
 
@@ -289,6 +368,7 @@ class DashboardHomeLayoutPreferenceTest extends TestCase
             'whatsapp_atendimento' => '5511999999999',
             'home_page_layout' => 'padrao',
             'home_page_destination' => 'curso',
+            'site_contact_provider' => 'whatsapp',
         ]);
 
         $active = WhatsappAtendimento::create([
@@ -336,6 +416,41 @@ class DashboardHomeLayoutPreferenceTest extends TestCase
         $this->assertStringNotContainsString('value="' . $inactive->whatsapp . '"', $selectContent);
     }
 
+    public function test_dashboard_home_link_uses_typebot_destination_when_site_contact_provider_is_typebot(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'dominio' => 'dashboard-typebot.test',
+            'home_page_layout' => 'padrao',
+            'home_page_destination' => 'whatsapp',
+            'site_contact_provider' => 'typebot',
+        ]);
+
+        $response = $this->actingAs($user)->get('/user/dashboard');
+
+        $response->assertOk();
+        $response->assertSee('Configure seu link');
+        $response->assertSee('data-site-contact-provider="typebot"', false);
+        $response->assertSee('data-home-destination="typebot"', false);
+        $response->assertSee('id="home_link_destination_select"', false);
+        $response->assertDontSee('id="home_link_whatsapp_flow_select"', false);
+        $response->assertDontSee('id="home_link_whatsapp_channel_select"', false);
+        $response->assertDontSee('Fluxo do WhatsApp na home');
+        $response->assertDontSee('Canal de WhatsApp');
+
+        $html = $response->getContent();
+        $this->assertMatchesRegularExpression('/<select[^>]*id="home_link_destination_select"[^>]*>.*?<\/select>/s', $html);
+
+        preg_match('/<select[^>]*id="home_link_destination_select"[^>]*>(.*?)<\/select>/s', $html, $matches);
+        $selectContent = $matches[1] ?? '';
+
+        $this->assertStringContainsString('value="curso"', $selectContent);
+        $this->assertStringContainsString('Página do curso', $selectContent);
+        $this->assertStringContainsString('value="typebot"', $selectContent);
+        $this->assertStringContainsString('Typebot', $selectContent);
+        $this->assertStringNotContainsString('value="whatsapp"', $selectContent);
+    }
+
     public function test_update_home_page_layout_endpoint_persists_valid_values(): void
     {
         $user = User::factory()->create([
@@ -375,6 +490,31 @@ class DashboardHomeLayoutPreferenceTest extends TestCase
             'id' => $user->id,
             'home_page_layout' => 'padrao',
             'home_page_destination' => 'curso',
+        ]);
+    }
+
+    public function test_update_home_page_layout_endpoint_persists_typebot_destination_for_typebot_provider(): void
+    {
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+            'home_page_layout' => 'padrao',
+            'home_page_destination' => 'curso',
+            'site_contact_provider' => 'typebot',
+        ]);
+
+        $response = $this->actingAs($user)
+            ->postJson(route('alterar_home_page_layout'), [
+                'home_page_layout' => 'w3',
+                'home_page_destination' => 'typebot',
+            ]);
+
+        $response->assertOk();
+        $response->assertJsonFragment(['home_page_layout' => 'w3']);
+        $response->assertJsonFragment(['home_page_destination' => 'typebot']);
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'home_page_layout' => 'w3',
+            'home_page_destination' => 'typebot',
         ]);
     }
 
@@ -602,6 +742,89 @@ class DashboardHomeLayoutPreferenceTest extends TestCase
         $response->assertSee('"whatsapp_requires_form":false', false);
     }
 
+    public function test_root_home_typebot_destination_sets_course_cta_to_typebot_popup(): void
+    {
+        [$user, $curso] = $this->createAffiliateWithConfiguredCurso(
+            'afiliado-home-typebot.test',
+            'padrao',
+            'curso-home-typebot',
+            'typebot'
+        );
+
+        $user->update([
+            'site_contact_provider' => 'typebot',
+        ]);
+
+        $response = $this->get('http://afiliado-home-typebot.test/');
+        $html = $response->getContent();
+
+        $response->assertOk();
+        $response->assertViewIs('home1');
+        $response->assertSee('Typebot.initPopup', false);
+        $response->assertSee('curso_checkout', false);
+        $response->assertDontSee('checkout_curso', false);
+        $response->assertSee('"home_destination":"typebot"', false);
+        $response->assertSee('"typebot_enabled":true', false);
+        $response->assertSee('data-typebot-course-trigger="1"', false);
+        $response->assertSee('data-typebot-whatsapp-url="https://wa.me/5511999999999"', false);
+        $response->assertSee('data-typebot-curso-nome="Curso Teste Home Layout"', false);
+        $response->assertSee('data-typebot-curso-preco="12xR$19,70"', false);
+        $response->assertSee('data-typebot-curso-imagem="http://afiliado-home-typebot.test/storage/img/home_page/cartaestagio.webp"', false);
+        $response->assertSee('data-typebot-curso-areas="[&quot;Atendimento&quot;,&quot;Vendas&quot;]"', false);
+        $response->assertSee('data-typebot-curso-conteudo="[&quot;Modulo principal&quot;,&quot;Modulo avancado&quot;]"', false);
+        $response->assertSee('data-typebot-curso-bonus="[&quot;Bonus especial&quot;]"', false);
+
+        preg_match('/<a[^>]*data-typebot-course-trigger="1"[^>]*>/s', $html, $matches);
+        $courseCta = html_entity_decode($matches[0] ?? '');
+
+        $this->assertNotSame('', $courseCta, 'Não foi encontrado CTA Typebot de curso na home.');
+        $this->assertStringContainsString(
+            'data-typebot-checkout-url="https://go.hotmart.com/REFHOME' . $curso->id . '?ap=abc123"',
+            $courseCta
+        );
+        $this->assertStringContainsString('href="https://afiliado-home-typebot.test/curso-home-typebot?src=home_page"', $courseCta);
+        $this->assertStringNotContainsString('href="https://wa.me/', $courseCta);
+    }
+
+    public function test_root_home_typebot_uses_catalogo_complete_offer_with_coupon(): void
+    {
+        [$user, $curso] = $this->createAffiliateWithConfiguredCurso(
+            'afiliado-home-typebot-cupom.test',
+            'padrao',
+            'curso-home-typebot-cupom',
+            'typebot'
+        );
+
+        $user->update([
+            'site_contact_provider' => 'typebot',
+        ]);
+
+        $cupomPrincipal = Cupom::create([
+            'codigo' => 'MAIN15',
+            'desconto' => 15,
+        ]);
+
+        Codigo_ref::query()
+            ->where('user_id', $user->id)
+            ->where('curso_id', $curso->id)
+            ->update([
+                'modo_precos' => 'um_preco',
+                'cupom_principal_id' => $cupomPrincipal->id,
+            ]);
+
+        $catalogoResponse = $this->get('http://afiliado-home-typebot-cupom.test/afiliado/catalogo2');
+        $catalogoResponse->assertOk();
+        $catalogoResponse->assertSee('- Plano completo: 12xR$16,74', false);
+        $catalogoResponse->assertSee('- Checkout (plano completo): https://go.hotmart.com/REFHOME' . $curso->id . '?ap=abc123&offDiscount=MAIN15', false);
+
+        $homeResponse = $this->get('http://afiliado-home-typebot-cupom.test/');
+
+        $homeResponse->assertOk();
+        $homeResponse->assertViewIs('home1');
+        $homeResponse->assertSee('data-typebot-curso-preco="12xR$16,74"', false);
+        $homeResponse->assertSee('data-typebot-checkout-url="https://go.hotmart.com/REFHOME' . $curso->id . '?ap=abc123&amp;offDiscount=MAIN15"', false);
+    }
+
     public function test_root_w3_home_whatsapp_with_direto_disables_pre_whatsapp_form_only_on_root(): void
     {
         [$user, $curso] = $this->createAffiliateWithConfiguredCurso('afiliado-w3-home-whatsapp-direto.test', 'w3', 'curso-w3-home-whatsapp-direto', 'whatsapp', 'direto');
@@ -618,6 +841,40 @@ class DashboardHomeLayoutPreferenceTest extends TestCase
         $w3Response->assertOk();
         $w3Response->assertViewIs('home_e_cursos.w3');
         $w3Response->assertSee('"whatsapp_requires_form":false', false);
+    }
+
+    public function test_root_w3_typebot_destination_sets_course_cards_to_typebot_popup(): void
+    {
+        [$user, $curso] = $this->createAffiliateWithConfiguredCurso(
+            'afiliado-w3-typebot.test',
+            'w3',
+            'curso-w3-typebot',
+            'typebot'
+        );
+
+        $user->update([
+            'site_contact_provider' => 'typebot',
+        ]);
+
+        $response = $this->get('http://afiliado-w3-typebot.test/');
+
+        $response->assertOk();
+        $response->assertViewIs('home_e_cursos.w3');
+        $response->assertSee('Typebot.initPopup', false);
+        $response->assertSee('curso_checkout', false);
+        $response->assertDontSee('checkout_curso', false);
+        $response->assertSee('"typebot_enabled":true', false);
+        $response->assertSee('data-origem="typebot"', false);
+        $response->assertSee('data-typebot-course-trigger="1"', false);
+        $response->assertSee('data-typebot-checkout-url="https://go.hotmart.com/REFHOME' . $curso->id . '?ap=abc123"', false);
+        $response->assertSee('data-typebot-whatsapp-url="https://wa.me/5511999999999"', false);
+        $response->assertSee('data-typebot-curso-nome="Curso Teste Home Layout"', false);
+        $response->assertSee('data-typebot-curso-preco="12xR$19,70"', false);
+        $response->assertSee('data-typebot-curso-imagem="http://afiliado-w3-typebot.test/storage/img/home_page/cartaestagio.webp"', false);
+        $response->assertSee('data-typebot-curso-areas="[&quot;Atendimento&quot;,&quot;Vendas&quot;]"', false);
+        $response->assertSee('data-typebot-curso-conteudo="[&quot;Modulo principal&quot;,&quot;Modulo avancado&quot;]"', false);
+        $response->assertSee('data-typebot-curso-bonus="[&quot;Bonus especial&quot;]"', false);
+        $response->assertDontSee('data-origem="whatsapp"', false);
     }
 
     public function test_cursos_route_remains_home1_even_when_affiliate_layout_is_w3(): void
@@ -878,6 +1135,9 @@ class DashboardHomeLayoutPreferenceTest extends TestCase
             'capa_vertical' => 'img/home_page/cartaestagio.webp',
             'capa_quadrada' => 'img/home_page/cartaestagio.webp',
             'capa_horizontal' => 'img/home_page/certificadoNovo2.webp',
+            'areas_de_atuacao' => 'Atendimento/Vendas',
+            'conteudo_principal' => '<ul><li>Modulo principal</li><li class="ql-indent-1">Aula interna</li><li>Modulo avancado</li></ul>',
+            'conteudo_bonus' => '<ul><li>Bonus especial</li><li class="ql-indent-1">Material extra</li></ul>',
             'horas_completo' => 40,
             'numero_alunos' => 1200,
             'nota_avaliacao' => 4.8,

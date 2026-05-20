@@ -34,6 +34,19 @@
         return (value || '').replace(/\D+/g, '');
     }
 
+    function parseJsonListAttribute(element, attributeName) {
+        try {
+            var parsed = JSON.parse(element.getAttribute(attributeName) || '[]');
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (error) {
+            return [];
+        }
+    }
+
+    function parseListTextAttribute(element, attributeName) {
+        return parseJsonListAttribute(element, attributeName).join('\n');
+    }
+
     function maskBrazilPhone(value) {
         var digits = normalizeDigits(value).slice(0, 11);
 
@@ -415,6 +428,35 @@
             event.preventDefault();
 
             var origem = String(courseButton.getAttribute('data-origem') || '').toLowerCase();
+            if (origem === 'typebot') {
+                trackMeta('Lead', {
+                    content_type: 'typebot',
+                    content_name: courseButton.getAttribute('data-course-title') || undefined,
+                    content_ids: [courseButton.getAttribute('data-curso') || '']
+                });
+
+                var typebotOpener = window.PortalJeTypebotCourse;
+                if (typebotOpener && typeof typebotOpener.open === 'function') {
+                    typebotOpener.open({
+                        curso_nome: courseButton.getAttribute('data-typebot-curso-nome') || '',
+                        curso_preco: courseButton.getAttribute('data-typebot-curso-preco') || '',
+                        curso_checkout: courseButton.getAttribute('data-typebot-checkout-url') || '',
+                        whatsapp_atendimento: courseButton.getAttribute('data-typebot-whatsapp-url') || '',
+                        curso_imagem: courseButton.getAttribute('data-typebot-curso-imagem') || '',
+                        curso_areas: parseListTextAttribute(courseButton, 'data-typebot-curso-areas'),
+                        curso_conteudo: parseListTextAttribute(courseButton, 'data-typebot-curso-conteudo'),
+                        curso_bonus: parseListTextAttribute(courseButton, 'data-typebot-curso-bonus')
+                    });
+                    return;
+                }
+
+                var typebotFallbackUrl = courseButton.getAttribute('data-link') || '';
+                if (typebotFallbackUrl) {
+                    window.location.href = typebotFallbackUrl;
+                }
+                return;
+            }
+
             if (origem === 'curso') {
                 trackMeta('ViewContent', {
                     content_type: 'course',

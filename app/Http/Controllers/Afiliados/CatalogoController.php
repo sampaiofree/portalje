@@ -7,7 +7,7 @@ use App\Models\Codigo_ref;
 use App\Models\Cupom;
 use App\Models\Curso;
 use App\Models\User;
-use App\Services\RootDomainCoursePublicStateService;
+use App\Services\CourseCompleteOfferService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Schema;
 class CatalogoController extends Controller
 {
     public function __construct(
-        private RootDomainCoursePublicStateService $pricingStateService
+        private CourseCompleteOfferService $completeOfferService
     ) {
     }
 
@@ -71,8 +71,8 @@ class CatalogoController extends Controller
             'condition' => 'new',
             'price' => $this->precoMetaPorConfiguracao($curso, $ref, $cuponsPorId),
             'link' => $link,
-            'checkout_link' => $this->checkoutLinkPorConfiguracao($curso, $ref, $cuponsPorId),
-            'offers' => $this->ofertasPorConfiguracao($curso, $ref),
+            'checkout_link' => $this->completeOfferService->completeOffer($curso, $ref)['checkout_url'] ?? '',
+            'offers' => $this->completeOfferService->offersForCatalog($curso, $ref),
             'workload' => $this->cargaHorariaCurso($curso),
             'teacher_name' => $this->nomeProfessorCurso($curso),
             'image_link' => $curso->capa_quadrada ? asset('storage/' . $curso->capa_quadrada) : '',
@@ -214,80 +214,6 @@ class CatalogoController extends Controller
         }
 
         return Cupom::query()->get()->keyBy('id');
-    }
-
-    private function checkoutLinkPorConfiguracao(Curso $curso, ?Codigo_ref $ref, Collection $cuponsPorId): string
-    {
-        $checkoutUrl = $this->checkoutBaseUrl($curso, $ref);
-        if ($checkoutUrl === '') {
-            return '';
-        }
-
-        $cupomPrincipal = $this->cupomPrincipalPorConfiguracao($ref, $cuponsPorId);
-        if (!$cupomPrincipal) {
-            return $checkoutUrl;
-        }
-
-        return $this->aplicarCupomNoCheckoutUrl($checkoutUrl, $cupomPrincipal->codigo) ?? $checkoutUrl;
-    }
-
-    private function ofertasPorConfiguracao(Curso $curso, ?Codigo_ref $ref): array
-    {
-        $dados = $this->dadosDePrecificacao($curso, $ref);
-
-        $cursoAtual = $this->pricingStateService->prepareCoursePricingBase($curso);
-        $this->pricingStateService->hydrateCourseForPublicState($cursoAtual, $dados);
-
-        $cursoBasePricing = clone $cursoAtual;
-        $this->pricingStateService->applyPricingConfigurationByCoupon($cursoAtual, $dados, false);
-
-        $pricingConfig = $this->pricingStateService->buildPublicCoursePricingConfig(
-            $cursoBasePricing,
-            $cursoAtual,
-            $dados,
-            false
-        );
-
-        $cards = $pricingConfig['initial_state']['cards'] ?? [];
-        $ofertas = [];
-
-        if (is_array($cards['completo'] ?? null) && !empty($cards['completo'])) {
-            $ofertas[] = $this->normalizarOfertaMarkdown($cards['completo'], 'Plano completo');
-        }
-
-        if (is_array($cards['basico'] ?? null) && !empty($cards['basico'])) {
-            $ofertas[] = $this->normalizarOfertaMarkdown($cards['basico'], 'Plano básico');
-        }
-
-        return $ofertas;
-    }
-
-    private function dadosDePrecificacao(Curso $curso, ?Codigo_ref $ref): array
-    {
-        return [
-            'link_checkout_completo' => $this->checkoutBaseUrl($curso, $ref),
-            'modo_precos' => $this->modoPrecosConfigurado($ref),
-            'cupom_principal_id' => !empty($ref?->cupom_principal_id) ? (int) $ref->cupom_principal_id : null,
-            'cupom_secundario_id' => !empty($ref?->cupom_secundario_id) ? (int) $ref->cupom_secundario_id : null,
-            'formulario_pre_checkout' => true,
-            'affiliate_code' => trim((string) ($ref->codigo_ref ?? '')),
-            'user_id' => null,
-            'usar_contador' => false,
-            'contador_minutos' => null,
-            'contador_acao' => null,
-            'contador_destino_oferta' => null,
-        ];
-    }
-
-    private function normalizarOfertaMarkdown(array $offer, string $label): array
-    {
-        return [
-            'label' => $label,
-            'price_value' => (string) ($offer['price_value'] ?? 'Consulte'),
-            'cash_value' => (string) ($offer['cash_value'] ?? 'Consulte'),
-            'show_cash_line' => (bool) ($offer['show_cash_line'] ?? false),
-            'checkout_url' => (string) ($offer['checkout_url'] ?? '#'),
-        ];
     }
 
     private function checkoutBaseUrl(Curso $curso, ?Codigo_ref $ref): string

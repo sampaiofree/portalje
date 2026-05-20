@@ -28,7 +28,9 @@
     $whatsappFloatParams = request()->query();
     $whatsappFloatQuery = http_build_query(array_filter($whatsappFloatParams, fn ($value) => $value !== null && $value !== ''));
     $whatsappFloatUrl = request()->getSchemeAndHttpHost() . '/whatsapp' . ($whatsappFloatQuery !== '' ? '?' . $whatsappFloatQuery : '');
-    $cardsDestino = ($pagina['cards_destino'] ?? 'curso') === 'whatsapp' ? 'whatsapp' : 'curso';
+    $cardsDestino = in_array((string) ($pagina['cards_destino'] ?? 'curso'), ['curso', 'whatsapp', 'typebot'], true)
+        ? (string) $pagina['cards_destino']
+        : 'curso';
     $w3UserId = $pagina['user_id'] ?? $cursosVisiveis->pluck('card_user_id')->filter()->first();
 
     $trackingConfig = [
@@ -40,6 +42,7 @@
         'user_id' => $w3UserId,
         'whatsapp_atendimento' => $pagina['whatsapp'] ?? null,
         'whatsapp_atendimento_id' => $pagina['whatsapp_atendimento_id'] ?? null,
+        'typebot_enabled' => $cardsDestino === 'typebot',
         'csrf_token' => csrf_token(),
     ];
 @endphp
@@ -50,6 +53,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ $empresaNome }}</title>
+    <link rel="icon" href="{{ asset('/img/logo/logo-je-sm.png') }}" type="image/x-icon">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
@@ -116,7 +120,15 @@
         <section id="lista-cursos" class="w3-section w3-section--courses w3-shell">
             <header class="w3-section__head">
                 <h2>Escolha seu curso</h2>
-                <p>{{ $cardsDestino === 'whatsapp' ? 'Clique no curso para falar com nosso consultor no WhatsApp.' : 'Clique no curso para abrir a página do curso.' }}</p>
+                <p>
+                    @if($cardsDestino === 'typebot')
+                        Clique no curso para falar com nosso atendimento.
+                    @elseif($cardsDestino === 'whatsapp')
+                        Clique no curso para falar com nosso consultor no WhatsApp.
+                    @else
+                        Clique no curso para abrir a página do curso.
+                    @endif
+                </p>
             </header>
 
             @if($cursosVisiveis->isNotEmpty())
@@ -132,6 +144,17 @@
                                 data-origem="{{ $curso->card_origem ?? 'whatsapp' }}"
                                 data-whatsapp-atendimento-id="{{ $curso->card_whatsapp_atendimento_id ?? '' }}"
                                 data-course-title="{{ $curso->titulo }}"
+                                @if($cardsDestino === 'typebot')
+                                    data-typebot-course-trigger="1"
+                                    data-typebot-checkout-url="{{ $curso->typebot_checkout_url ?? '' }}"
+                                    data-typebot-whatsapp-url="{{ $curso->typebot_whatsapp_url ?? '' }}"
+                                    data-typebot-curso-nome="{{ $curso->typebot_curso_nome ?? $curso->titulo }}"
+                                    data-typebot-curso-preco="{{ $curso->typebot_curso_preco ?? '' }}"
+                                    data-typebot-curso-imagem="{{ $curso->typebot_curso_imagem_url ?? '' }}"
+                                    data-typebot-curso-areas="{{ json_encode($curso->typebot_curso_areas ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}"
+                                    data-typebot-curso-conteudo="{{ json_encode($curso->typebot_curso_conteudo ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}"
+                                    data-typebot-curso-bonus="{{ json_encode($curso->typebot_curso_bonus ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}"
+                                @endif
                             >
                                 <span class="w3-course-card__media">
                                     <img
@@ -383,6 +406,9 @@
     </a>
 
     <script id="w3-course-config" type="application/json">@json($trackingConfig)</script>
+    @if($cardsDestino === 'typebot')
+        @include('partials.typebot-course-popup')
+    @endif
     <script defer src="{{ asset('js/w3-course.js') }}{{ $w3JsVersion ? '?v=' . $w3JsVersion : '' }}"></script>
 
     @if(!empty($pagina['pidel_id']))

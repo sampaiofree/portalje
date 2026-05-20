@@ -8,6 +8,7 @@
 ## {!! $item['title'] !== '' ? $item['title'] : $item['id'] !!}
 
 - ID: {!! $item['id'] !!}
+- Descrição: {!! $item['description'] !== '' ? $item['description'] : 'Não informada' !!}
 - Link da página: {!! $item['link'] !== '' ? $item['link'] : 'Não disponível' !!}
 - Carga horária: {!! $item['workload'] !== '' ? $item['workload'] : 'Não informada' !!}
 - Professor: {!! $item['teacher_name'] !== '' ? $item['teacher_name'] : 'Não informado' !!}

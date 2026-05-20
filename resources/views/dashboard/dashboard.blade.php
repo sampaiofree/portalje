@@ -14,9 +14,20 @@
         $homePageLayoutAtual = in_array((string) Auth::user()->home_page_layout, ['padrao', 'w3'], true)
             ? (string) Auth::user()->home_page_layout
             : 'padrao';
-        $homePageDestinationAtual = in_array((string) Auth::user()->home_page_destination, ['curso', 'whatsapp'], true)
-            ? (string) Auth::user()->home_page_destination
-            : 'curso';
+        $siteContactProviderRaw = (string) (Auth::user()->site_contact_provider ?? 'whatsapp');
+        $siteContactProviderAtual = in_array($siteContactProviderRaw, ['whatsapp', 'typebot'], true)
+            ? $siteContactProviderRaw
+            : 'whatsapp';
+        $homePageDestinationRaw = (string) Auth::user()->home_page_destination;
+        if ($siteContactProviderAtual === 'typebot') {
+            $homePageDestinationAtual = in_array($homePageDestinationRaw, ['curso', 'typebot'], true)
+                ? $homePageDestinationRaw
+                : ($homePageDestinationRaw === 'whatsapp' ? 'typebot' : 'curso');
+        } else {
+            $homePageDestinationAtual = in_array($homePageDestinationRaw, ['curso', 'whatsapp'], true)
+                ? $homePageDestinationRaw
+                : 'curso';
+        }
         $homePageWhatsappFlowAtual = in_array((string) Auth::user()->home_page_whatsapp_flow, ['formulario', 'direto'], true)
             ? (string) Auth::user()->home_page_whatsapp_flow
             : 'formulario';
@@ -350,6 +361,7 @@
                         data-home-model="{{ $homePageLayoutAtual }}"
                         data-home-destination="{{ $homePageDestinationAtual }}"
                         data-home-whatsapp-flow="{{ $homePageWhatsappFlowAtual }}"
+                        data-site-contact-provider="{{ $siteContactProviderAtual }}"
                         data-layout-endpoint="{{ route('alterar_home_page_layout') }}"
                         data-base-url="{{ $dashboardBaseUrl }}"
                         class="p-4 border rounded-lg flex flex-col items-start"
@@ -386,40 +398,46 @@
                                     style="padding: 15px;"
                                 >
                                     <option value="curso">Página do curso</option>
-                                    <option value="whatsapp">WhatsApp</option>
+                                    @if($siteContactProviderAtual === 'typebot')
+                                        <option value="typebot">Typebot</option>
+                                    @else
+                                        <option value="whatsapp">WhatsApp</option>
+                                    @endif
                                 </select>
                             </div>
 
-                            <div x-show="homeDestination === 'whatsapp'" x-cloak>
-                                <x-input-label for="home_link_whatsapp_flow_select" value="Fluxo do WhatsApp na home" />
-                                <select
-                                    id="home_link_whatsapp_flow_select"
-                                    x-model="homeWhatsappFlow"
-                                    class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm text-sm"
-                                    style="padding: 15px;"
-                                >
-                                    <option value="formulario">Mostrar formulário</option>
-                                    <option value="direto">Ir direto para o WhatsApp</option>
-                                </select>
-                            </div>
+                            @if($siteContactProviderAtual === 'whatsapp')
+                                <div x-show="homeDestination === 'whatsapp'" x-cloak>
+                                    <x-input-label for="home_link_whatsapp_flow_select" value="Fluxo do WhatsApp na home" />
+                                    <select
+                                        id="home_link_whatsapp_flow_select"
+                                        x-model="homeWhatsappFlow"
+                                        class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm text-sm"
+                                        style="padding: 15px;"
+                                    >
+                                        <option value="formulario">Mostrar formulário</option>
+                                        <option value="direto">Ir direto para o WhatsApp</option>
+                                    </select>
+                                </div>
 
-                            <div x-show="homeDestination === 'whatsapp'" x-cloak>
-                                <x-input-label for="home_link_whatsapp_channel_select" value="Canal de WhatsApp" />
-                                <select
-                                    id="home_link_whatsapp_channel_select"
-                                    x-model="whatsappChannel"
-                                    class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm text-sm"
-                                    style="padding: 15px;"
-                                >
-                                    <option value="rodizio">Rodízio (automático)</option>
-                                    @foreach($whatsappAtivos as $whatsappAtivo)
-                                        <option value="{{ $whatsappAtivo->whatsapp }}">{{ $whatsappAtivo->whatsapp }}</option>
-                                    @endforeach
-                                </select>
-                                @if($whatsappAtivos->isEmpty())
-                                    <p class="mt-1 text-xs text-yellow-700">Nenhum WhatsApp ativo encontrado. O link usará rodízio.</p>
-                                @endif
-                            </div>
+                                <div x-show="homeDestination === 'whatsapp'" x-cloak>
+                                    <x-input-label for="home_link_whatsapp_channel_select" value="Canal de WhatsApp" />
+                                    <select
+                                        id="home_link_whatsapp_channel_select"
+                                        x-model="whatsappChannel"
+                                        class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm text-sm"
+                                        style="padding: 15px;"
+                                    >
+                                        <option value="rodizio">Rodízio (automático)</option>
+                                        @foreach($whatsappAtivos as $whatsappAtivo)
+                                            <option value="{{ $whatsappAtivo->whatsapp }}">{{ $whatsappAtivo->whatsapp }}</option>
+                                        @endforeach
+                                    </select>
+                                    @if($whatsappAtivos->isEmpty())
+                                        <p class="mt-1 text-xs text-yellow-700">Nenhum WhatsApp ativo encontrado. O link usará rodízio.</p>
+                                    @endif
+                                </div>
+                            @endif
 
                             <div>
                                 <x-input-label value="Mostrar nome da cidade?" />
@@ -1046,12 +1064,21 @@
         const initialHomeModel = element?.dataset?.homeModel || 'padrao';
         const initialHomeDestination = element?.dataset?.homeDestination || 'curso';
         const initialHomeWhatsappFlow = element?.dataset?.homeWhatsappFlow || 'formulario';
+        const siteContactProvider = ['whatsapp', 'typebot'].includes(element?.dataset?.siteContactProvider)
+            ? element.dataset.siteContactProvider
+            : 'whatsapp';
+        const contactDestination = siteContactProvider === 'typebot' ? 'typebot' : 'whatsapp';
+        const validHomeDestinations = ['curso', contactDestination];
+        const normalizedHomeDestination = validHomeDestinations.includes(initialHomeDestination)
+            ? initialHomeDestination
+            : (siteContactProvider === 'typebot' && initialHomeDestination === 'whatsapp' ? 'typebot' : 'curso');
         const layoutEndpoint = element?.dataset?.layoutEndpoint || '';
 
         return {
             baseUrl,
+            siteContactProvider,
             homeModel: ['padrao', 'w3'].includes(initialHomeModel) ? initialHomeModel : 'padrao',
-            homeDestination: ['curso', 'whatsapp'].includes(initialHomeDestination) ? initialHomeDestination : 'curso',
+            homeDestination: normalizedHomeDestination,
             homeWhatsappFlow: ['formulario', 'direto'].includes(initialHomeWhatsappFlow) ? initialHomeWhatsappFlow : 'formulario',
             showCity: 'nao',
             city: '',
@@ -1128,7 +1155,9 @@
                 const formData = new FormData();
                 formData.append('home_page_layout', this.homeModel);
                 formData.append('home_page_destination', this.homeDestination);
-                formData.append('home_page_whatsapp_flow', this.homeWhatsappFlow);
+                if (this.homeDestination === 'whatsapp') {
+                    formData.append('home_page_whatsapp_flow', this.homeWhatsappFlow);
+                }
 
                 fetch(layoutEndpoint, {
                     method: 'POST',
@@ -1147,7 +1176,7 @@
                 })
                 .then((data) => {
                     this.homeModel = ['padrao', 'w3'].includes(data.home_page_layout) ? data.home_page_layout : this.homeModel;
-                    this.homeDestination = ['curso', 'whatsapp'].includes(data.home_page_destination) ? data.home_page_destination : this.homeDestination;
+                    this.homeDestination = validHomeDestinations.includes(data.home_page_destination) ? data.home_page_destination : this.homeDestination;
                     this.homeWhatsappFlow = ['formulario', 'direto'].includes(data.home_page_whatsapp_flow) ? data.home_page_whatsapp_flow : this.homeWhatsappFlow;
                     this.updateHomeDestination();
                     this.saveSuccess = true;
