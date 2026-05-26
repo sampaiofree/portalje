@@ -435,6 +435,8 @@ class UserController extends Controller
             'site_contact_provider' => 'nullable|in:whatsapp,typebot',
             'w3_whatsapp_float_enabled' => 'nullable|boolean',
             'w3_whatsapp_float_delay_seconds' => 'nullable|in:0,5,10,20,30,45,60,120',
+            'w3_whatsapp_float_show_home' => 'nullable|boolean',
+            'w3_whatsapp_float_show_courses' => 'nullable|boolean',
             'w3_whatsapp_float_channel' => [
                 'nullable',
                 'string',
@@ -521,6 +523,12 @@ class UserController extends Controller
         }
         if (Schema::hasColumn('users', 'w3_whatsapp_float_delay_seconds')) {
             $user->w3_whatsapp_float_delay_seconds = (int) $request->input('w3_whatsapp_float_delay_seconds', 0);
+        }
+        if (Schema::hasColumn('users', 'w3_whatsapp_float_show_home')) {
+            $user->w3_whatsapp_float_show_home = $request->boolean('w3_whatsapp_float_show_home', true);
+        }
+        if (Schema::hasColumn('users', 'w3_whatsapp_float_show_courses')) {
+            $user->w3_whatsapp_float_show_courses = $request->boolean('w3_whatsapp_float_show_courses', true);
         }
         if (Schema::hasColumn('users', 'w3_whatsapp_float_whatsapp_atendimento_id')) {
             $floatChannel = trim((string) $request->input('w3_whatsapp_float_channel', 'rodizio'));

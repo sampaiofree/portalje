@@ -259,6 +259,9 @@ class Home_e_cursosController extends Controller
         }
         //if($curso->whatsapp_atendimento=='5511982671533'){$curso->whatsapp_atendimento='5511962501386';}
         $curso->whatsapp_atendimento_tempo = $dados['whatsapp_atendimento_tempo'];
+        $curso->whatsapp_float_atendimento = $dados['whatsapp_float_atendimento'] ?? $curso->whatsapp_atendimento;
+        $curso->whatsapp_float_atendimento_id = $dados['whatsapp_float_atendimento_id'] ?? ($curso->whatsapp_atendimento_id ?? null);
+        $curso->whatsapp_float_mostrar = (bool) ($dados['whatsapp_mostrar'] ?? true);
         $curso->link_checkout_completo = $dados['link_checkout_completo'].$desconto.$query.$src;
         $curso->link_checkout_basico = $dados['link_checkout_completo'].$desconto.$query.$src."&offDiscount=50OFF";
         $curso->link_checkout_certificado = $dados['link_checkout_completo'].$desconto.$query.$src."&offDiscount=80OFF";
@@ -382,6 +385,9 @@ class Home_e_cursosController extends Controller
                 $whatsappAtendimento = $whatsappSelecionado['whatsapp'] ?? $verificar->whatsapp_atendimento;
                 $whatsappFloatSelecionado = $this->selecionarWhatsappAtendimentoParaBotaoFlutuante($verificar, $whatsappSelecionado);
                 $whatsappFloatAtendimento = $whatsappFloatSelecionado['whatsapp'] ?? $whatsappAtendimento;
+                $whatsappDelaySeconds = isset($verificar->w3_whatsapp_float_delay_seconds)
+                    ? max(0, (int) $verificar->w3_whatsapp_float_delay_seconds)
+                    : (int) ($verificar->whatsapp_atendimento_tempo ?? 0);
 
                 //DADOS DO AFILIADO
                 $dados = [
@@ -389,7 +395,8 @@ class Home_e_cursosController extends Controller
                     'whatsapp_atendimento_id' => $whatsappSelecionado['id'] ?? null,
                     'whatsapp_float_atendimento' => $whatsappFloatAtendimento,
                     'whatsapp_float_atendimento_id' => $whatsappFloatSelecionado['id'] ?? ($whatsappSelecionado['id'] ?? null),
-                    'whatsapp_atendimento_tempo' => $verificar->whatsapp_atendimento_tempo,
+                    'whatsapp_atendimento_tempo' => $whatsappDelaySeconds,
+                    'whatsapp_mostrar' => $this->shouldShowWhatsappFloat($verificar, $curso ? 'courses' : $this->whatsappFloatLocationForCurrentRequest()),
                     'meta_pixel_id' => $verificar->meta_pixel_id,
                     'company_name' => $this->resolverNomeEmpresa($verificar),
                     'logo_padrao_url' => $this->resolverLogoPadraoUrl($verificar),
@@ -749,9 +756,7 @@ class Home_e_cursosController extends Controller
                 $whatsappDelaySeconds = isset($verificar->w3_whatsapp_float_delay_seconds)
                     ? max(0, (int) $verificar->w3_whatsapp_float_delay_seconds)
                     : 0;
-                $whatsappMostrar = isset($verificar->w3_whatsapp_float_enabled)
-                    ? (bool) $verificar->w3_whatsapp_float_enabled
-                    : true;
+                $whatsappMostrar = $this->shouldShowWhatsappFloat($verificar, $this->whatsappFloatLocationForCurrentRequest());
 
                 //DADOS DO AFILIADO
                 $dados['dados'] = [
@@ -1016,9 +1021,7 @@ class Home_e_cursosController extends Controller
             $whatsapp_atendimento_tempo = isset($user->w3_whatsapp_float_delay_seconds)
                 ? (int) $user->w3_whatsapp_float_delay_seconds
                 : (int) ($user->whatsapp_atendimento_tempo ?? 0);
-            $whatsapp_mostrar = isset($user->w3_whatsapp_float_enabled)
-                ? (bool) $user->w3_whatsapp_float_enabled
-                : true;
+            $whatsapp_mostrar = $this->shouldShowWhatsappFloat($user, $curso ? 'courses' : $this->whatsappFloatLocationForCurrentRequest());
             $formulario_whatsapp = $user->formulario_whatsapp;
             $formulario_pre_checkout = $user->formulario_pre_checkout;
             $pidel_id = $user->meta_pixel_id;
@@ -1059,7 +1062,7 @@ class Home_e_cursosController extends Controller
         $img_botao_whatsapp = asset('img/home_page/whatsapp.gif');
         
         if($cidade!='w'){
-            $botao_whatsapp_flutuante = "<a id=\"whatsapp_botao\"  href=\"https://api.whatsapp.com/send/?phone=$whatsapp_atendimento&text=Olá quero saber sobre $botao_whatsapp_flutuante_nome_curso\" target=\"_blank\" class=\"jump bg-success rounded-circle d-flex justify-content-center align-items-center position-fixed bottom-0 end-0 m-3\" style=\"width: 70px; height: 70px; z-index: 9; visibility:hidden;\"><img alt='Portal Jovem Empreendedor' loading='lazy' src=\"$img_botao_whatsapp\" width='70' height='70'></a>";
+            $botao_whatsapp_flutuante = "<a id=\"whatsapp_botao\"  href=\"https://api.whatsapp.com/send/?phone=$whatsapp_float_atendimento&text=Olá quero saber sobre $botao_whatsapp_flutuante_nome_curso\" target=\"_blank\" class=\"jump bg-success rounded-circle d-flex justify-content-center align-items-center position-fixed bottom-0 end-0 m-3\" style=\"width: 70px; height: 70px; z-index: 9; visibility:hidden;\"><img alt='Portal Jovem Empreendedor' loading='lazy' src=\"$img_botao_whatsapp\" width='70' height='70'></a>";
         } 
        
         
@@ -1377,6 +1380,42 @@ class Home_e_cursosController extends Controller
         }
 
         return mb_substr($city, 0, 80);
+    }
+
+    private function whatsappFloatLocationForCurrentRequest(): string
+    {
+        $path = rtrim(request()->getPathInfo(), '/');
+
+        if ($path === '') {
+            $path = '/';
+        }
+
+        return $path === '/cursos' ? 'courses' : 'home';
+    }
+
+    private function shouldShowWhatsappFloat(?User $user, string $location): bool
+    {
+        if (!$user) {
+            return true;
+        }
+
+        $enabled = Schema::hasColumn('users', 'w3_whatsapp_float_enabled')
+            ? (bool) ($user->w3_whatsapp_float_enabled ?? true)
+            : true;
+
+        if (!$enabled) {
+            return false;
+        }
+
+        if ($location === 'courses') {
+            return Schema::hasColumn('users', 'w3_whatsapp_float_show_courses')
+                ? (bool) ($user->w3_whatsapp_float_show_courses ?? true)
+                : true;
+        }
+
+        return Schema::hasColumn('users', 'w3_whatsapp_float_show_home')
+            ? (bool) ($user->w3_whatsapp_float_show_home ?? true)
+            : true;
     }
 
     public function listar_todos_cursos(){

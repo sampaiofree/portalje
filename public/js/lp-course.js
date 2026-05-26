@@ -36,6 +36,7 @@
     var primaryScrollCtas = document.querySelectorAll('[data-lp-primary-scroll-cta]');
     var countdownTimers = document.querySelectorAll('[data-lp-countdown-timer]');
     var countdownBlocks = document.querySelectorAll('[data-lp-countdown-block]');
+    var whatsappButton = document.getElementById('whatsapp_botao');
 
     var selectedCheckoutUrl = '';
     var selectedCtaContext = {};
@@ -1086,6 +1087,11 @@
     setupBackRedirect();
     syncTestimonialsVisibility();
     initCountdown();
+    if (config.whatsapp_show && whatsappButton) {
+        window.setTimeout(function () {
+            whatsappButton.style.visibility = 'visible';
+        }, Math.max(0, Number(config.whatsapp_delay_seconds || 0) * 1000));
+    }
     ensureMetaPixel(config.pixel_ids || []);
     trackMeta('ViewContent', buildPayload());
 })();

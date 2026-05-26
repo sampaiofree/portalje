@@ -224,7 +224,7 @@
                 <div class="p-4 sm:p-8 bg-white shadow sm:rounded-lg">
                     <div class="max-w-xl">
                         <h2 class="text-lg font-medium text-gray-900">Botão flutuante do WhatsApp</h2>
-                        <p class="mt-1 text-sm text-gray-600">Configuração aplicada à home (/) e /cursos, além da W3 (/w3 e /w3/{cidade}).</p>
+                        <p class="mt-1 text-sm text-gray-600">Configure quando, onde e qual número será usado no botão flutuante.</p>
 
                         <div class="mt-6 space-y-4">
                             @php
@@ -269,6 +269,42 @@
                                         </option>
                                     @endforeach
                                 </select>
+                            </div>
+                            <div>
+                                @php
+                                    $w3FloatShowHomeAtual = (bool) old('w3_whatsapp_float_show_home', (bool) (Auth::user()->w3_whatsapp_float_show_home ?? true));
+                                    $w3FloatShowCoursesAtual = (bool) old('w3_whatsapp_float_show_courses', (bool) (Auth::user()->w3_whatsapp_float_show_courses ?? true));
+                                @endphp
+                                <x-input-label value="Mostrar em" />
+                                <div class="mt-2 space-y-2">
+                                    <label for="w3_whatsapp_float_show_home" class="flex items-center gap-2 text-sm text-gray-700">
+                                        <input type="hidden" name="w3_whatsapp_float_show_home" value="0">
+                                        <input
+                                            id="w3_whatsapp_float_show_home"
+                                            name="w3_whatsapp_float_show_home"
+                                            type="checkbox"
+                                            value="1"
+                                            class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500"
+                                            @checked($w3FloatShowHomeAtual)
+                                        >
+                                        <span>Home</span>
+                                    </label>
+                                    <label for="w3_whatsapp_float_show_courses" class="flex items-center gap-2 text-sm text-gray-700">
+                                        <input type="hidden" name="w3_whatsapp_float_show_courses" value="0">
+                                        <input
+                                            id="w3_whatsapp_float_show_courses"
+                                            name="w3_whatsapp_float_show_courses"
+                                            type="checkbox"
+                                            value="1"
+                                            class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500"
+                                            @checked($w3FloatShowCoursesAtual)
+                                        >
+                                        <span>Página dos cursos</span>
+                                    </label>
+                                </div>
+                                <p class="mt-1 text-xs text-gray-500">Página dos cursos inclui a listagem de cursos e as páginas individuais de curso.</p>
+                                <x-input-error :messages="$errors->get('w3_whatsapp_float_show_home')" class="mt-2" />
+                                <x-input-error :messages="$errors->get('w3_whatsapp_float_show_courses')" class="mt-2" />
                             </div>
                             <div>
                                 <x-input-label for="w3_whatsapp_float_channel" value="Escolha o WhatsApp" />

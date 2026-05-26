@@ -169,6 +169,14 @@
     $waitlistWhatsappUrl = $waitlistWhatsappDigits !== ''
         ? 'https://wa.me/' . $waitlistWhatsappDigits . '?text=' . rawurlencode($waitlistWhatsappText)
         : '#';
+    $whatsappFloatDigits = preg_replace('/\D/', '', (string) request()->query('t'));
+    if (strlen($whatsappFloatDigits) <= 10 || strlen($whatsappFloatDigits) > 15) {
+        $whatsappFloatDigits = preg_replace('/\D/', '', (string) ($curso->whatsapp_float_atendimento ?? $curso->whatsapp_atendimento ?? ''));
+    }
+    $whatsappFloatText = 'Olá, quero garantir minha vaga no curso de ' . $tituloCurso;
+    $whatsappFloatUrl = $whatsappFloatDigits !== ''
+        ? 'https://wa.me/' . $whatsappFloatDigits . '?text=' . rawurlencode($whatsappFloatText)
+        : '#';
     $currentCompleteOfferKey = $curso->current_complete_offer_key ?? 'completo_padrao';
     $currentBasicOfferKey = $curso->current_basic_offer_key ?? null;
 
@@ -181,6 +189,8 @@
         'csrf_token' => csrf_token(),
         'lead_endpoint' => route('lead_whatsapp'),
         'back_redirect_url' => $backRedirectUrl,
+        'whatsapp_show' => (bool) ($curso->whatsapp_float_mostrar ?? true) && $whatsappFloatDigits !== '',
+        'whatsapp_delay_seconds' => (int) ($curso->whatsapp_atendimento_tempo ?? 0),
         'countdown' => $countdownConfig,
         'pricing' => [
             'initial_state' => $pricingInitialState,
@@ -779,6 +789,18 @@
             <p>© {{ date('Y') }} {{ $empresaNome }}. Todos os direitos reservados.</p>
         </div>
     </footer>
+
+    <a
+        id="whatsapp_botao"
+        href="{{ $whatsappFloatUrl }}"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="lp-whatsapp-float"
+        aria-label="Falar no WhatsApp"
+        style="visibility: hidden;"
+    >
+        <img src="{{ asset('img/home_page/whatsapp.gif') }}" alt="WhatsApp" width="70" height="70" loading="lazy" decoding="async">
+    </a>
 
     <div id="lead-modal" class="lp-modal" aria-hidden="true">
         <div class="lp-modal__backdrop" data-close-modal></div>
