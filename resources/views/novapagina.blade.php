@@ -564,6 +564,50 @@
             </div>
         </section>
 
+        <section id="depoimentos" class="lp-section lp-section--muted">
+            <div class="lp-shell">
+                <div class="lp-heading">
+                    <h2>Depoimentos de alunos</h2>
+                    <p>Veja relatos reais de quem aplicou o curso e conquistou novas oportunidades.</p>
+                </div>
+
+                <div class="lp-testimonials" aria-label="Depoimentos em vídeo">
+                    @foreach($depoimentosVideos as $indiceDepoimento => $depoimentoVideoId)
+                        <article class="lp-testimonial" data-video-id="{{ $depoimentoVideoId }}" data-loaded="0">
+                            <button
+                                type="button"
+                                class="lp-testimonial__trigger js-testimonial-trigger"
+                                data-video-id="{{ $depoimentoVideoId }}"
+                                aria-label="Assistir depoimento {{ $indiceDepoimento + 1 }} em vídeo"
+                            >
+                                <img
+                                    src="https://img.youtube.com/vi/{{ $depoimentoVideoId }}/hqdefault.jpg"
+                                    alt="Depoimento de aluno do curso {{ $tituloCurso }}"
+                                    width="480"
+                                    height="270"
+                                    loading="lazy"
+                                    decoding="async"
+                            >
+                                <span class="lp-testimonial__play" aria-hidden="true">
+                                    <span class="lp-testimonial__play-icon">▶</span>
+                                </span>
+                            </button>
+                            <noscript>
+                                <a
+                                    href="https://www.youtube.com/watch?v={{ $depoimentoVideoId }}"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    class="lp-testimonial__fallback"
+                                >
+                                    Assistir depoimento no YouTube
+                                </a>
+                            </noscript>
+                        </article>
+                    @endforeach
+                </div>
+            </div>
+        </section>
+
         <section id="planos" class="lp-section lp-section--dark">
             <div class="lp-shell">
                 <div class="lp-heading lp-heading--light">
@@ -678,49 +722,7 @@
         </section>
 
         
-        <section id="depoimentos" class="lp-section lp-section--muted">
-            <div class="lp-shell">
-                <div class="lp-heading">
-                    <h2>Depoimentos de alunos</h2>
-                    <p>Veja relatos reais de quem aplicou o curso e conquistou novas oportunidades.</p>
-                </div>
-
-                <div class="lp-testimonials" aria-label="Depoimentos em vídeo">
-                    @foreach($depoimentosVideos as $indiceDepoimento => $depoimentoVideoId)
-                        <article class="lp-testimonial" data-video-id="{{ $depoimentoVideoId }}" data-loaded="0">
-                            <button
-                                type="button"
-                                class="lp-testimonial__trigger js-testimonial-trigger"
-                                data-video-id="{{ $depoimentoVideoId }}"
-                                aria-label="Assistir depoimento {{ $indiceDepoimento + 1 }} em vídeo"
-                            >
-                                <img
-                                    src="https://img.youtube.com/vi/{{ $depoimentoVideoId }}/hqdefault.jpg"
-                                    alt="Depoimento de aluno do curso {{ $tituloCurso }}"
-                                    width="480"
-                                    height="270"
-                                    loading="lazy"
-                                    decoding="async"
-                            >
-                                <span class="lp-testimonial__play" aria-hidden="true">
-                                    <span class="lp-testimonial__play-icon">▶</span>
-                                </span>
-                            </button>
-                            <noscript>
-                                <a
-                                    href="https://www.youtube.com/watch?v={{ $depoimentoVideoId }}"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    class="lp-testimonial__fallback"
-                                >
-                                    Assistir depoimento no YouTube
-                                </a>
-                            </noscript>
-                        </article>
-                    @endforeach
-                </div>
-            </div>
-        </section>
+        
 
         <section id="faq" class="lp-section lp-section--muted">
             <div class="lp-shell">
