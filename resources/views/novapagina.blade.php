@@ -379,6 +379,78 @@
             </div>
         </section>
 
+        <section class="lp-section">
+            <div class="lp-shell lp-certificate">
+                <div>
+                    <div class="lp-heading">
+                        <h2 class="lp-heading__title">
+                            
+                            <span>Certificado com QR Code</span>
+                        </h2>
+                    </div>
+                    <p>Cocê recebe um certificado digital com QR Code de validação e válido em todo o Brasil.</p>
+                    <ul>
+                        <li>
+                            <svg class="lp-icon lp-icon--sm" aria-hidden="true"><use href="#lp-icon-check-circle"></use></svg>
+                            <span>Validade para Faculdade - Horas Extras.</span>
+                        </li>
+                        <li>
+                            <svg class="lp-icon lp-icon--sm" aria-hidden="true"><use href="#lp-icon-check-circle"></use></svg>
+                            <span>Válido para concursos - mediante edital.</span>
+                        </li>
+                    </ul>
+                </div>
+                <img
+                    src="{{ asset('img/home_page/certificadoNovo2.webp') }}"
+                    alt="Exemplo de certificado do curso"
+                    width="728"
+                    height="515"
+                    loading="lazy"
+                >
+            </div>
+        </section>
+
+        <section class="lp-section">
+            <div class="lp-shell lp-certificate">
+                <div>
+                    <div class="lp-heading">
+                        <h2 class="lp-heading__title">
+                            
+                            <span>Carta de Estágio assinada</span>
+                        </h2>
+                    </div>
+                    <p>Ao concluir sua inscrição, você também recebe uma Carta de Estágio, um documento para apresentar junto com o currículo e mostrar que você está buscando qualificação profissional.</p>
+                    <ul>
+                        <li>
+                            <svg class="lp-icon lp-icon--sm" aria-hidden="true"><use href="#lp-icon-check-circle"></use></svg>
+                            <span>Entregar junto com seu currículo.</span>
+                        </li>
+                        <li>
+                            <svg class="lp-icon lp-icon--sm" aria-hidden="true"><use href="#lp-icon-check-circle"></use></svg>
+                            <span>Apresentar em empresas da sua cidade.</span>
+                        </li>
+                        <li>
+                            <svg class="lp-icon lp-icon--sm" aria-hidden="true"><use href="#lp-icon-check-circle"></use></svg>
+                            <span>Demonstrar interesse por estágio ou primeira oportunidade.</span>
+                        </li>
+                        <li>
+                            <svg class="lp-icon lp-icon--sm" aria-hidden="true"><use href="#lp-icon-check-circle"></use></svg>
+                            <span>Mostrar que você está em capacitação.</span>
+                        </li>
+                        <li>
+                            <svg class="lp-icon lp-icon--sm" aria-hidden="true"><use href="#lp-icon-check-circle"></use></svg>
+                            <span>Passar uma imagem mais profissional.</span>
+                        </li>
+                    </ul>
+                </div>
+                <img
+                    src="https://facilitaiagencia.3f7.org//storage/user_images/2/3qUAtSJD6s5YABc8aIuUGLcLPqgBayeoDaCNgjR1.jpg"
+                    alt="Carta de Estágio assinada"
+                    loading="lazy"
+                >
+            </div>
+        </section>
+
         <section id="conteudo" class="lp-section">
             <div class="lp-shell">
                 <div class="lp-heading">
@@ -605,41 +677,7 @@
             </div>
         </section>
 
-        <section class="lp-section">
-            <div class="lp-shell lp-certificate">
-                <div>
-                    <div class="lp-heading">
-                        <h2 class="lp-heading__title">
-                            
-                            <span>Certificação para fortalecer seu currículo</span>
-                        </h2>
-                    </div>
-                    <p>Seu certificado de conclusão é reconhecido e pode ser validado digitalmente, trazendo mais confiança para recrutadores.</p>
-                    <ul>
-                        <li>
-                            <svg class="lp-icon lp-icon--sm" aria-hidden="true"><use href="#lp-icon-check-circle"></use></svg>
-                            <span>Validade nacional.</span>
-                        </li>
-                        <li>
-                            <svg class="lp-icon lp-icon--sm" aria-hidden="true"><use href="#lp-icon-check-circle"></use></svg>
-                            <span>Comprovação de horas e conteúdo estudado.</span>
-                        </li>
-                        <li>
-                            <svg class="lp-icon lp-icon--sm" aria-hidden="true"><use href="#lp-icon-check-circle"></use></svg>
-                            <span>Documento ideal para processos seletivos.</span>
-                        </li>
-                    </ul>
-                </div>
-                <img
-                    src="{{ asset('img/home_page/certificadoNovo2.webp') }}"
-                    alt="Exemplo de certificado do curso"
-                    width="728"
-                    height="515"
-                    loading="lazy"
-                >
-            </div>
-        </section>
-
+        
         <section id="depoimentos" class="lp-section lp-section--muted">
             <div class="lp-shell">
                 <div class="lp-heading">
