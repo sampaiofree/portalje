@@ -30,6 +30,32 @@ class UserController extends Controller
         $this->middleware('auth')->except(['pixel_user']);
     }
 
+    public function buscar_user($domain)
+    {
+        $normalizedDomain = $this->normalizeDomain($domain);
+
+        if (!$normalizedDomain) {
+            return response()->json(['error' => 'Domínio inválido.'], 400);
+        }
+
+        $user = User::where('dominio', $normalizedDomain)
+                    ->orWhere('dominio_externo', $normalizedDomain)
+                    ->first();
+
+        if ($user) {
+            return response()->json([
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'dominio' => $user->dominio,
+                'dominio_externo' => $user->dominio_externo,
+                // Adicione outros campos que deseja retornar
+            ]);
+        } else {
+            return response()->json(['error' => 'Usuário não encontrado para o domínio fornecido.'], 404);
+        }
+    }
+
     public function pixel_user(Request $request){
         $dominio = $request->getHost(); // ex: meudominio.com
         $user = User::where('dominio', $dominio)

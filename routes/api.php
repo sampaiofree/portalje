@@ -24,6 +24,9 @@ Route::post('/consultar/cidade', [ConsultarController::class, 'consultarNovaCida
 //BUSCAR PIXEL DO USER
 Route::get('/pixel_user', [UserController::class, 'pixel_user'])->name('pixel_user');
 
+//BUSCAR DADOS DO USUÁRIO PELO DOMINIO
+Route::get('/buscar_user/{domain}', [UserController::class, 'buscar_user'])->name('buscar_user');
+
 Route::post('/receive-data/user', [DataController::class, 'user']);
 
 Route::post('/receive-data/curso', [DataController::class, 'curso']);
