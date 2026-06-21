@@ -27,20 +27,12 @@ class UserController extends Controller
     public function __construct()
     {
         // Aplica o middleware de autenticação a todas as ações do controlador
-        $this->middleware('auth')->except(['pixel_user']);
+        $this->middleware('auth')->except(['pixel_user', 'buscar_user']);
     }
 
-    public function buscar_user($domain)
+    public function buscar_user($email)
     {
-        $normalizedDomain = $this->normalizeDomain($domain);
-
-        if (!$normalizedDomain) {
-            return response()->json(['error' => 'Domínio inválido.'], 400);
-        }
-
-        $user = User::where('dominio', $normalizedDomain)
-                    ->orWhere('dominio_externo', $normalizedDomain)
-                    ->first();
+        $user = User::where('email', $email)->first();
 
         if ($user) {
             return response()->json([
@@ -52,9 +44,10 @@ class UserController extends Controller
                 // Adicione outros campos que deseja retornar
             ]);
         } else {
-            return response()->json(['error' => 'Usuário não encontrado para o domínio fornecido.'], 404);
+            return response()->json(['error' => 'Usuário não encontrado para o email fornecido.'], 404);
         }
     }
+        
 
     public function pixel_user(Request $request){
         $dominio = $request->getHost(); // ex: meudominio.com

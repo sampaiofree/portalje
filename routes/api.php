@@ -25,7 +25,7 @@ Route::post('/consultar/cidade', [ConsultarController::class, 'consultarNovaCida
 Route::get('/pixel_user', [UserController::class, 'pixel_user'])->name('pixel_user');
 
 //BUSCAR DADOS DO USUÁRIO PELO DOMINIO
-Route::get('/buscar_user/{domain}', [UserController::class, 'buscar_user'])->name('buscar_user');
+Route::get('/buscar_user/{email}', [UserController::class, 'buscar_user'])->name('buscar_user');
 
 Route::post('/receive-data/user', [DataController::class, 'user']);
 
