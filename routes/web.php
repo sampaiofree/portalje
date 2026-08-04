@@ -128,7 +128,8 @@ Route::middleware(['auth', 'verified'])->prefix('user')->group(function () {
         ->name('phone.verification.confirm');
 });
 
-Route::middleware(['auth', 'verified', 'verified.phone', 'minha_jornada'])->group(function () {
+// A verificacao de telefone permanece disponivel, mas nao e obrigatoria para acessar o painel.
+Route::middleware(['auth', 'verified', 'minha_jornada'])->group(function () {
     Route::prefix('user')->group(function () {
         /**META API */
         Route::get('/auto_ads/auto_ads', [Meta_apiController::class, 'auto_ads'])->name('auto_ads');
