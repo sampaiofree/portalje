@@ -398,7 +398,7 @@
                             <span>Certificado com QR Code</span>
                         </h2>
                     </div>
-                    <p>Cocê recebe um certificado digital com QR Code de validação e válido em todo o Brasil.</p>
+                    <p>Você recebe um certificado digital com QR Code de validação e válido em todo o Brasil.</p>
                     <ul>
                         <li>
                             <svg class="lp-icon lp-icon--sm" aria-hidden="true"><use href="#lp-icon-check-circle"></use></svg>
