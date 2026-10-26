@@ -707,6 +707,11 @@ class Home_e_cursosController extends Controller
             $info['whatsapp_atendimento_id'] = $whatsappSelecionado['id'] ?? null;
         }
         $cursos = $dados['cursos']; 
+        if ($homePageDestination === 'typebot') {
+            $cursos->each(function ($curso) {
+                $this->aplicarConteudoTypebotNoCurso($curso);
+            });
+        }
         
         if(request()->get('edital')=='1'){
             return view('landign_pages.edital', compact('cursos', 'info', 'desconto_banner'));
@@ -796,7 +801,7 @@ class Home_e_cursosController extends Controller
                     ->get();
 
                     $dados['cursos']->each(function ($curso) {
-                        $this->aplicarDadosTypebotNoCurso($curso);
+                        $this->aplicarOfertaTypebotNoCurso($curso);
                     });
                 } else {
                     $dados['cursos'] = collect();
@@ -832,7 +837,7 @@ class Home_e_cursosController extends Controller
                                 ->orderBy('id')
                                 ->get();
             $dados['cursos']->each(function ($curso) {
-                $this->aplicarDadosTypebotNoCurso($curso);
+                $this->aplicarOfertaTypebotNoCurso($curso);
             });
         } else {
             $dados['cursos'] = collect();
@@ -1288,7 +1293,10 @@ class Home_e_cursosController extends Controller
                 $curso->link_checkout_completo = $curso->link_checkout_completo.$parametros;
             }
 
-            $this->aplicarDadosTypebotNoCurso($curso, $codigoRefAtual);
+            $this->aplicarOfertaTypebotNoCurso($curso, $codigoRefAtual);
+            if ($modoCardsW3 === 'typebot') {
+                $this->aplicarConteudoTypebotNoCurso($curso);
+            }
             $curso->typebot_whatsapp_url = $this->montarTypebotWhatsappUrl($whatsApp ?? null);
 
             $src = asset('storage/'.$curso->capa_quadrada);
@@ -1628,15 +1636,19 @@ class Home_e_cursosController extends Controller
         return $digits !== '' ? 'https://wa.me/' . $digits : '';
     }
 
-    private function aplicarDadosTypebotNoCurso(object $curso, ?Codigo_ref $ref = null): void
+    private function aplicarOfertaTypebotNoCurso(object $curso, ?Codigo_ref $ref = null): void
     {
         $cursoModel = $this->normalizarCursoTypebot($curso);
         $ref = $ref ?: $this->normalizarCodigoRefTypebot($curso);
         $completeOffer = $this->courseCompleteOfferService->completeOffer($cursoModel, $ref);
 
-        $curso->typebot_curso_nome = trim((string) ($cursoModel->titulo ?? ''));
         $curso->typebot_curso_preco = (string) ($completeOffer['price_value'] ?? '');
         $curso->typebot_checkout_url = (string) ($completeOffer['checkout_url'] ?? '');
+    }
+
+    private function aplicarConteudoTypebotNoCurso(object $curso): void
+    {
+        $curso->typebot_curso_nome = trim((string) ($curso->titulo ?? ''));
         $curso->typebot_curso_imagem_url = $this->montarTypebotImagemCursoUrl($curso->capa_quadrada ?? null);
         $curso->typebot_curso_areas = $this->extrairAreasTypebot($curso->areas_de_atuacao ?? null);
         $curso->typebot_curso_conteudo = $this->extrairTopicosPrincipaisTypebot($curso->conteudo_principal ?? null);

@@ -825,6 +825,41 @@ class DashboardHomeLayoutPreferenceTest extends TestCase
         $homeResponse->assertSee('data-typebot-checkout-url="https://go.hotmart.com/REFHOME' . $curso->id . '?ap=abc123&amp;offDiscount=MAIN15"', false);
     }
 
+    public function test_home1_prepares_html_topics_only_for_typebot_destination_while_keeping_offers(): void
+    {
+        [$user, $curso] = $this->createAffiliateWithConfiguredCurso(
+            'afiliado-home-conteudo-typebot.test', 'padrao', 'curso-home-conteudo-typebot'
+        );
+
+        foreach (['curso', 'whatsapp', 'typebot'] as $destination) {
+            $user->update([
+                'site_contact_provider' => $destination === 'typebot' ? 'typebot' : 'whatsapp',
+                'home_page_destination' => $destination,
+            ]);
+
+            $response = $this->get('http://afiliado-home-conteudo-typebot.test/');
+            $response->assertOk();
+            $response->assertViewIs('home1');
+
+            $courseData = $response->viewData('cursos')->first()->getAttributes();
+            $this->assertSame('12xR$19,70', $courseData['typebot_curso_preco']);
+            $this->assertSame(
+                'https://go.hotmart.com/REFHOME' . $curso->id . '?ap=abc123',
+                $courseData['typebot_checkout_url']
+            );
+
+            if ($destination === 'typebot') {
+                $this->assertSame(['Modulo principal', 'Modulo avancado'], $courseData['typebot_curso_conteudo']);
+                $this->assertSame(['Bonus especial'], $courseData['typebot_curso_bonus']);
+                $response->assertSee('data-typebot-curso-conteudo=', false);
+            } else {
+                $this->assertArrayNotHasKey('typebot_curso_conteudo', $courseData);
+                $this->assertArrayNotHasKey('typebot_curso_bonus', $courseData);
+                $response->assertDontSee('data-typebot-curso-conteudo=', false);
+            }
+        }
+    }
+
     public function test_root_w3_home_whatsapp_with_direto_disables_pre_whatsapp_form_only_on_root(): void
     {
         [$user, $curso] = $this->createAffiliateWithConfiguredCurso('afiliado-w3-home-whatsapp-direto.test', 'w3', 'curso-w3-home-whatsapp-direto', 'whatsapp', 'direto');
@@ -875,6 +910,49 @@ class DashboardHomeLayoutPreferenceTest extends TestCase
         $response->assertSee('data-typebot-curso-conteudo="[&quot;Modulo principal&quot;,&quot;Modulo avancado&quot;]"', false);
         $response->assertSee('data-typebot-curso-bonus="[&quot;Bonus especial&quot;]"', false);
         $response->assertDontSee('data-origem="whatsapp"', false);
+    }
+
+    public function test_w3_prepares_html_topics_only_for_effective_typebot_destination(): void
+    {
+        [$user, $curso] = $this->createAffiliateWithConfiguredCurso(
+            'afiliado-w3-conteudo-typebot.test', 'w3', 'curso-w3-conteudo-typebot', 'typebot'
+        );
+        $user->update(['site_contact_provider' => 'typebot']);
+
+        foreach (['/', '/w3'] as $path) {
+            foreach (['?destination=curso', '?w=1', '?destination=typebot'] as $query) {
+                $response = $this->get('http://afiliado-w3-conteudo-typebot.test' . $path . $query);
+                $response->assertOk();
+                $response->assertViewIs('home_e_cursos.w3');
+
+                $courseData = $response->viewData('cursos')[0]->getAttributes();
+                $this->assertSame('12xR$19,70', $courseData['typebot_curso_preco']);
+                $this->assertSame(
+                    'https://go.hotmart.com/REFHOME' . $curso->id . '?ap=abc123',
+                    $courseData['typebot_checkout_url']
+                );
+
+                if ($query === '?destination=typebot') {
+                    $this->assertSame(['Modulo principal', 'Modulo avancado'], $courseData['typebot_curso_conteudo']);
+                    $this->assertSame(['Bonus especial'], $courseData['typebot_curso_bonus']);
+                    $response->assertSee('data-typebot-curso-conteudo=', false);
+                } else {
+                    $this->assertArrayNotHasKey('typebot_curso_conteudo', $courseData);
+                    $this->assertArrayNotHasKey('typebot_curso_bonus', $courseData);
+                    $response->assertDontSee('data-typebot-curso-conteudo=', false);
+                }
+            }
+        }
+
+        $user->update(['home_page_destination' => 'curso']);
+        $overrideResponse = $this->get('http://afiliado-w3-conteudo-typebot.test/w3?destination=typebot');
+        $overrideResponse->assertOk();
+        $overrideResponse->assertSee('data-origem="curso"', false);
+        $this->assertArrayNotHasKey(
+            'typebot_curso_conteudo',
+            $overrideResponse->viewData('cursos')[0]->getAttributes()
+        );
+        $overrideResponse->assertDontSee('data-typebot-curso-conteudo=', false);
     }
 
     public function test_cursos_route_remains_home1_even_when_affiliate_layout_is_w3(): void
