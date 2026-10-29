@@ -50,19 +50,7 @@ class RootDomainCoursePublicStateService
 
     public function normalizeHost(string $dominio): string
     {
-        $dominio = strtolower(trim($dominio));
-        if ($dominio === '') {
-            return '';
-        }
-
-        if (!str_contains($dominio, '://')) {
-            $dominio = 'https://' . $dominio;
-        }
-
-        $host = (string) (parse_url($dominio, PHP_URL_HOST) ?? '');
-        $host = preg_replace('/^www\./', '', strtolower(trim($host)));
-
-        return $host ?? '';
+        return app(AffiliateDomainResolver::class)->normalize($dominio);
     }
 
     public function isRootPortalHost(?string $dominio): bool

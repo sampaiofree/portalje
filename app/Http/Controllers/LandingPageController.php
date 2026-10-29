@@ -27,9 +27,7 @@ class LandingPageController extends Controller
         if ($data) { $data = Carbon::createFromFormat('d-m', $data)->translatedFormat('d \d\e F'); // Converte "31-05" para "31 de maio"
         } else { $data = Carbon::now()->translatedFormat('d \d\e F'); } /* Data de hoje sem o ano, ex: "25 de maio" */ 
 
-        $user = User::where('dominio', $request->getHost())
-                                ->orWhere('dominio_externo', $request->getHost())
-                                ->first();
+        $user = app(\App\Services\AffiliateDomainResolver::class)->resolve($request->getHost());
         if(isset($user->whatsapp)){$whatsapp = $user->whatsapp;} //Whatsapp do Afiliado da Página
 
         $cursos = Curso::where(function($q) {
@@ -135,9 +133,7 @@ class LandingPageController extends Controller
 
 
             //BUSCAR DADOS DO USUÁRIO
-            $user = User::where('dominio', $request->getHost())
-                                ->orWhere('dominio_externo', $request->getHost())
-                                ->first();
+            $user = app(\App\Services\AffiliateDomainResolver::class)->resolve($request->getHost());
             $dados['user_id'] = isset($user->id) ? $user->id : null ;                  
             $dados['evento_portal'] = "LP EMPREGO PARA TODOS";
             

@@ -501,25 +501,7 @@ class Meta_apiController extends Controller
 
     public function listar_user_pelo_dominio($dominio)
     {
-
-        //VERIFICAR SE É UM SOBDOMINIO OU DOMINIO COMPRADO
-        if($dominio!='portalje.org'){
-
-            $parts = explode('.', $dominio);
-
-            $verificar = User::where('dominio', $dominio)->first();
-            
-
-            if($verificar){
-                return $verificar;
-            }else{
-                return 'redirect';
-            }
-
-        }else{
-            return false;
-        }
-        
+        return app(\App\Services\AffiliateDomainResolver::class)->resolve((string) $dominio) ?? false;
     }
 
     private function uploadImage() // RETORNA imageHash

@@ -343,19 +343,7 @@ class Home_e_cursosController extends Controller
 
     private function normalizarHost(string $dominio): string
     {
-        $dominio = strtolower(trim($dominio));
-        if ($dominio === '') {
-            return '';
-        }
-
-        if (!str_contains($dominio, '://')) {
-            $dominio = 'https://' . $dominio;
-        }
-
-        $host = (string) (parse_url($dominio, PHP_URL_HOST) ?? '');
-        $host = preg_replace('/^www\./', '', strtolower(trim($host)));
-
-        return $host ?? '';
+        return app(\App\Services\AffiliateDomainResolver::class)->normalize($dominio);
     }
 
     //DADOS DO USUARIO - AFILIADO OU PRODUTOR
@@ -379,7 +367,7 @@ class Home_e_cursosController extends Controller
             $dominio!='dns.jovemempreendedor.org'
         ){
 
-            $verificar = User::where('dominio', $dominio)->orWhere('dominio_externo', $dominio)->first();
+            $verificar = app(\App\Services\AffiliateDomainResolver::class)->resolve($dominio);
             if($verificar){
                 $whatsappSelecionado = $this->selecionarWhatsappAtendimento($verificar);
                 $whatsappAtendimento = $whatsappSelecionado['whatsapp'] ?? $verificar->whatsapp_atendimento;
@@ -745,7 +733,7 @@ class Home_e_cursosController extends Controller
             if($afiliadoID){
                 $verificar = User::find($afiliadoID);
             }else{
-                $verificar = User::where('dominio', $dominio)->orWhere('dominio_externo', $dominio)->first();
+                $verificar = app(\App\Services\AffiliateDomainResolver::class)->resolve($dominio);
             }
             
             if($verificar){
@@ -853,7 +841,7 @@ class Home_e_cursosController extends Controller
         $dados_afiliado = $this->listar_user_pelo_dominio($request->getHost());
         if($dados_afiliado=='redirect')
         { //SE DADOS DO AFILIADO VIER VAZIO
-            return redirect()->away(route('home_curso'));
+            return redirect()->away('https://portalje.org/');
         }elseif($dados_afiliado)
         {
             if($dados_afiliado->meta_pixel_id AND $dados_afiliado->meta_pixel_api AND $dados_afiliado->meta_pixel_eventcode){ //CASO TENHA OS DADOS DA API, ENVIAR EVENTO DE VISUALIZAÇÃO DE PÁGINA
@@ -1548,7 +1536,7 @@ class Home_e_cursosController extends Controller
                 return view('home_e_cursos.curso_individual', compact('curso', 'pagina'));
             }
         }else{
-            return redirect()->away(route('home_curso'));
+            return redirect()->away('https://portalje.org/');
         }
 
         
@@ -1560,9 +1548,7 @@ class Home_e_cursosController extends Controller
         //VERIFICAR SE É UM SOBDOMINIO OU DOMINIO COMPRADO
         if($dominio!='portalje.org' AND $dominio!='dns.portalje.org' AND $dominio!='jemp.me' AND $dominio!='jovemempreendedor.org' AND $dominio!='dns.jovemempreendedor.org'){            
 
-            $verificar = User::where('dominio', $dominio)
-                                ->orWhere('dominio_externo', $dominio)
-                                ->first();
+            $verificar = app(\App\Services\AffiliateDomainResolver::class)->resolve($dominio);
             
 
             if($verificar){
@@ -1831,9 +1817,7 @@ class Home_e_cursosController extends Controller
 
         $dominio = $this->normalizarHost((string) $request->getHost());
         if (!$this->isRootPortalHost($dominio) && $dominio !== 'dns.portalje.org' && $dominio !== 'dns.jovemempreendedor.org') {
-            return User::where('dominio', $dominio)
-                ->orWhere('dominio_externo', $dominio)
-                ->first();
+            return app(\App\Services\AffiliateDomainResolver::class)->resolve($dominio);
         }
 
         return null;

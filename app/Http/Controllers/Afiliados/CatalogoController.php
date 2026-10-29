@@ -156,10 +156,7 @@ class CatalogoController extends Controller
             return null;
         }
 
-        return User::query()
-            ->where('dominio', $host)
-            ->orWhere('dominio_externo', $host)
-            ->first();
+        return app(\App\Services\AffiliateDomainResolver::class)->resolve($host);
     }
 
     private function resolverBaseUrl(Request $request, ?User $user, string $fallbackBaseUrl): string

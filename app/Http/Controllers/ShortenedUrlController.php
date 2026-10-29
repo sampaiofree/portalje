@@ -15,19 +15,7 @@ class ShortenedUrlController extends Controller
 
     private function normalizeDomain(?string $domain): ?string
     {
-        $domain = strtolower(trim((string) $domain));
-        if ($domain === '') {
-            return null;
-        }
-
-        if (!str_contains($domain, '://')) {
-            $domain = 'https://' . $domain;
-        }
-
-        $host = parse_url($domain, PHP_URL_HOST) ?: '';
-        $host = preg_replace('/^www\./', '', strtolower(trim($host)));
-
-        return $host !== '' ? $host : null;
+        return app(\App\Services\AffiliateDomainResolver::class)->normalize($domain) ?: null;
     }
 
     private function domainCandidates(string $host): array

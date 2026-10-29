@@ -49,9 +49,7 @@ class UserController extends Controller
 
     public function pixel_user(Request $request){
         $dominio = $request->getHost(); // ex: meudominio.com
-        $user = User::where('dominio', $dominio)
-                                ->orWhere('dominio_externo', $dominio)
-                                ->first();
+        $user = app(\App\Services\AffiliateDomainResolver::class)->resolve($dominio);
         if ($user && $user->meta_pixel_id) {
             return response()->json(['pixel_id' => $user->meta_pixel_id]);
         }
@@ -346,19 +344,7 @@ class UserController extends Controller
 
     private function normalizeDomain(?string $domain): ?string
     {
-        $domain = strtolower(trim((string) $domain));
-        if ($domain === '') {
-            return null;
-        }
-
-        if (!str_contains($domain, '://')) {
-            $domain = 'https://' . $domain;
-        }
-
-        $host = parse_url($domain, PHP_URL_HOST) ?: '';
-        $host = preg_replace('/^www\./', '', strtolower(trim($host)));
-
-        return $host !== '' ? $host : null;
+        return app(\App\Services\AffiliateDomainResolver::class)->normalize($domain) ?: null;
     }
 
     public function afiliado_configurar_site(Request $request, PhoneVerificationService $phoneVerificationService)

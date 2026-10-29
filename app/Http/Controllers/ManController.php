@@ -36,7 +36,7 @@ class ManController extends Controller
         //VERIFICAR SE É UM SOBDOMINIO OU DOMINIO COMPRADO
         if($dominio!='portalje.org' AND $dominio!='dns.portalje.org' AND $dominio!='jemp.me' AND $dominio!='jovemempreendedor.org' AND $dominio!='dns.jovemempreendedor.org'){            
 
-            $verificar = User::where('dominio', $dominio)->orWhere('dominio_externo', $dominio)->first();
+            $verificar = app(\App\Services\AffiliateDomainResolver::class)->resolve($dominio);
             if($verificar){
 
                 //DADOS DO AFILIADO
@@ -166,7 +166,7 @@ class ManController extends Controller
         //VERIFICAR SE É UM SOBDOMINIO OU DOMINIO COMPRADO
         if($dominio!='portalje.org' AND $dominio!='dns.portalje.org' AND $dominio!='jemp.me' AND $dominio!='jovemempreendedor.org' AND $dominio!='dns.jovemempreendedor.org'){            
 
-            $verificar = User::where('dominio', $dominio)->orWhere('dominio_externo', $dominio)->first();
+            $verificar = app(\App\Services\AffiliateDomainResolver::class)->resolve($dominio);
             if($verificar){
 
                 //DADOS DO AFILIADO

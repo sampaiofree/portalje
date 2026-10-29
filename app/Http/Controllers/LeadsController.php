@@ -199,9 +199,7 @@ class LeadsController extends Controller
     public function curso_gratuito_lead(Request $request){ 
         
         //BUSCA USER_ID PELO DOMINIO
-        $user = User::where('dominio', $request->getHost())
-            ->orWhere('dominio_externo', $request->getHost()) 
-            ->first();
+        $user = app(\App\Services\AffiliateDomainResolver::class)->resolve($request->getHost());
          
 
         $dados = [];

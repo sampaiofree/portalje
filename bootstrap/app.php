@@ -19,6 +19,8 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        $middleware->web(prepend: [\App\Http\Middleware\ResolveAffiliateDomain::class]);
+
         $middleware->alias([
             'minha_jornada' => MinhaJornada::class,
             'check.admin' => CheckAdmin::class,
