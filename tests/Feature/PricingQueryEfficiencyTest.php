@@ -58,6 +58,49 @@ class PricingQueryEfficiencyTest extends TestCase
         $this->assertCount(0, $queries);
     }
 
+    public function test_compact_affiliate_previews_have_the_same_cash_values_as_full_previews(): void
+    {
+        $coupons = collect([
+            Cupom::create(['codigo' => 'TEN', 'desconto' => 10]),
+            Cupom::create(['codigo' => 'HALF', 'desconto' => 50]),
+        ]);
+        $service = app(RootDomainCoursePublicStateService::class);
+        foreach (['R$200,00', null] as $price) {
+            $course = $this->course();
+            $course->preco_cheio_completo = $price;
+            $full = $service->buildAffiliateCoursePricingPreviewVariants($course, $coupons);
+            $compact = $service->buildAffiliateCoursePricingPreviewVariants($course, $coupons, true);
+            foreach ($full as $key => $offer) {
+                $this->assertSame($offer['cash_value'], $compact[$key]['cash_value']);
+            }
+        }
+    }
+
+    public function test_required_offers_preserve_current_prices_and_countdown_destination(): void
+    {
+        $principal = Cupom::create(['codigo' => 'MAIN', 'desconto' => 10]);
+        $secondary = Cupom::create(['codigo' => 'BASIC', 'desconto' => 50]);
+        $destination = Cupom::create(['codigo' => 'LATER', 'desconto' => 25]);
+        $service = app(RootDomainCoursePublicStateService::class);
+        $base = $this->course();
+        $base->parcelamento = 10;
+        $current = clone $base;
+        $data = ['modo_precos' => 'dois_precos', 'cupom_principal_id' => $principal->id,
+            'cupom_secundario_id' => $secondary->id, 'usar_contador' => true,
+            'contador_minutos' => 1, 'contador_acao' => 'alterar_preco',
+            'contador_destino_oferta' => 'completo_cupom:' . $destination->id];
+        $service->applyPricingConfigurationByCoupon($current, $data, false);
+        $full = $service->buildPublicCoursePricingConfig($base, $current, $data, false);
+        $compact = $service->buildPublicCoursePricingConfig($base, $current, $data, false, true);
+
+        $this->assertSame($full['initial_state'], $compact['initial_state']);
+        $this->assertSame($full['countdown'], $compact['countdown']);
+        foreach ([$compact['current_complete_offer_key'], $compact['current_basic_offer_key'], $data['contador_destino_oferta']] as $key) {
+            $this->assertSame($full['offer_variants'][$key], $compact['offer_variants'][$key]);
+        }
+        $this->assertCount(4, $compact['offer_variants']);
+    }
+
     private function course(): Curso
     {
         return new Curso([

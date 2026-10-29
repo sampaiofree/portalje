@@ -232,7 +232,7 @@ class RootDomainCoursePublicStateService
         $curso->origem = 'checkout_completo';
     }
 
-    public function resolveEffectivePublicStateForCourse(Curso $curso, bool $descontoBannerAtivo = false, ?RootDomainCourseConfig $config = null, bool $configResolved = false, ?array $portalData = null): array
+    public function resolveEffectivePublicStateForCourse(Curso $curso, bool $descontoBannerAtivo = false, ?RootDomainCourseConfig $config = null, bool $configResolved = false, ?array $portalData = null, bool $requiredOffersOnly = false): array
     {
         $portalData = $portalData ?? $this->portalData();
         $config = $configResolved ? $config : $this->configForCourse($curso);
@@ -251,7 +251,8 @@ class RootDomainCoursePublicStateService
                 $courseBasePricing,
                 $effectiveCourse,
                 $dados,
-                $descontoBannerAtivo
+                $descontoBannerAtivo,
+                $requiredOffersOnly
             ),
             'visible' => $this->isVisibleForCourse($curso, $config, true),
             'portal_data' => $portalData,
@@ -262,17 +263,14 @@ class RootDomainCoursePublicStateService
         Curso $cursoBasePricing,
         Curso $cursoAtual,
         array $dados,
-        bool $descontoBannerAtivo
+        bool $descontoBannerAtivo,
+        bool $requiredOffersOnly = false
     ): array {
         $modoPrecosAtual = in_array(($cursoAtual->modo_precos ?? 'padrao'), ['padrao', 'um_preco', 'dois_precos'], true)
             ? $cursoAtual->modo_precos
             : 'padrao';
 
-        $mostrarPlanoSecundario = ($cursoAtual->origem ?? 'checkout_completo') !== 'whatsapp'
-            && !$descontoBannerAtivo
-            && in_array($modoPrecosAtual, ['padrao', 'dois_precos'], true);
-
-        $offerVariants = $this->buildPublicCourseOfferVariants($cursoBasePricing, $modoPrecosAtual);
+        $mostrarPlanoSecundario = $this->showsSecondaryPlan($cursoAtual, $descontoBannerAtivo);
 
         $currentCompleteOfferKey = !empty($cursoAtual->cupom_principal_id)
             ? 'completo_cupom:' . (int) $cursoAtual->cupom_principal_id
@@ -284,6 +282,11 @@ class RootDomainCoursePublicStateService
                 ? 'basico_cupom:' . (int) $cursoAtual->cupom_secundario_id
                 : 'basico_padrao';
         }
+
+        $requiredKeys = $requiredOffersOnly
+            ? array_filter([$currentCompleteOfferKey, $currentBasicOfferKey, $dados['contador_destino_oferta'] ?? null])
+            : null;
+        $offerVariants = $this->buildPublicCourseOfferVariants($cursoBasePricing, $modoPrecosAtual, $requiredKeys);
 
         $countdown = $this->normalizePublicCountdownConfig(
             $dados,
@@ -327,7 +330,7 @@ class RootDomainCoursePublicStateService
         ];
     }
 
-    public function buildAffiliateCoursePricingPreviewVariants(Curso $curso, Collection|array|null $cupons = null): array
+    public function buildAffiliateCoursePricingPreviewVariants(Curso $curso, Collection|array|null $cupons = null, bool $cashOnly = false): array
     {
         $precoCompletoOriginal = $this->extractMonetaryValue($curso->preco_cheio_completo ?? null);
         $precoParceladoOriginal = $this->extractMonetaryValue($curso->preco_parcelado_completo ?? null);
@@ -365,6 +368,13 @@ class RootDomainCoursePublicStateService
         }
 
         foreach ($cuponsCollection as $cupom) {
+            if ($cashOnly) {
+                $cash = $this->extractMonetaryValue($cursoBasePricing->preco_cheio_completo);
+                $value = $cash === null ? null : $this->formatMonetaryValue($this->applyPercentDiscount($cash, (float) $cupom->desconto));
+                $variants['completo_cupom:' . $cupom->id] = ['cash_value' => $value ?? 'consulte'];
+                $variants['basico_cupom:' . $cupom->id] = ['cash_value' => $value ?? 'consulte'];
+                continue;
+            }
             $variants['completo_cupom:' . $cupom->id] = $this->buildOfferPayloadFromCourse(
                 $this->applyOfferCouponOnClonedCourse($cursoBasePricing, 'completo', $cupom),
                 'completo'
@@ -477,6 +487,21 @@ class RootDomainCoursePublicStateService
         }
     }
 
+    public function buildCurrentCoursePricingState(Curso $cursoAtual, bool $descontoBannerAtivo): array
+    {
+        return $this->buildPublicCourseInitialState($cursoAtual, $this->showsSecondaryPlan($cursoAtual, $descontoBannerAtivo));
+    }
+
+    private function showsSecondaryPlan(Curso $cursoAtual, bool $descontoBannerAtivo): bool
+    {
+        $mode = in_array(($cursoAtual->modo_precos ?? 'padrao'), ['padrao', 'um_preco', 'dois_precos'], true)
+            ? $cursoAtual->modo_precos : 'padrao';
+
+        return ($cursoAtual->origem ?? 'checkout_completo') !== 'whatsapp'
+            && !$descontoBannerAtivo
+            && in_array($mode, ['padrao', 'dois_precos'], true);
+    }
+
     private function buildPublicCourseInitialState(Curso $cursoAtual, bool $mostrarPlanoSecundario): array
     {
         $completeOffer = $this->buildOfferPayloadFromCourse($cursoAtual, 'completo');
@@ -508,7 +533,7 @@ class RootDomainCoursePublicStateService
         ];
     }
 
-    private function buildPublicCourseOfferVariants(Curso $cursoBasePricing, string $modoPrecos): array
+    private function buildPublicCourseOfferVariants(Curso $cursoBasePricing, string $modoPrecos, ?array $requiredKeys = null): array
     {
         $variants = [
             'completo_padrao' => $this->buildOfferPayloadFromCourse($cursoBasePricing, 'completo'),
@@ -523,8 +548,21 @@ class RootDomainCoursePublicStateService
             return $variants;
         }
 
-        $cupons = Cupom::query()->orderBy('id')->get();
+        $query = Cupom::query()->orderBy('id');
+        if ($requiredKeys !== null) {
+            $ids = [];
+            foreach ($requiredKeys as $key) {
+                if (preg_match('/^(?:completo|basico)_cupom:(\d+)$/', (string) $key, $matches)) {
+                    $ids[] = (int) $matches[1];
+                }
+            }
+            $query->whereIn('id', array_unique($ids));
+        }
+        $cupons = $query->get();
         foreach ($cupons as $cupom) {
+            if ($requiredKeys !== null && !in_array('completo_cupom:' . $cupom->id, $requiredKeys, true)) {
+                continue;
+            }
             $variants['completo_cupom:' . $cupom->id] = $this->buildOfferPayloadFromCourse(
                 $this->applyOfferCouponOnClonedCourse($cursoBasePricing, 'completo', $cupom),
                 'completo'
@@ -533,6 +571,9 @@ class RootDomainCoursePublicStateService
 
         if ($modoPrecos === 'dois_precos') {
             foreach ($cupons as $cupom) {
+                if ($requiredKeys !== null && !in_array('basico_cupom:' . $cupom->id, $requiredKeys, true)) {
+                    continue;
+                }
                 $variants['basico_cupom:' . $cupom->id] = $this->buildOfferPayloadFromCourse(
                     $this->applyOfferCouponOnClonedCourse($cursoBasePricing, 'basico', $cupom),
                     'basico'

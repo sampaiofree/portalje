@@ -145,7 +145,7 @@ class ConsultarController extends Controller
 
     private function buildCursoMarkdown(Curso $curso, ?RootDomainCourseConfig $config = null, bool $configResolved = false, ?array $portalData = null): string
     {
-        $state = $this->rootDomainCoursePublicStateService->resolveEffectivePublicStateForCourse($curso, false, $config, $configResolved, $portalData);
+        $state = $this->rootDomainCoursePublicStateService->resolveEffectivePublicStateForCourse($curso, false, $config, $configResolved, $portalData, true);
         /** @var \App\Models\Curso $effectiveCourse */
         $effectiveCourse = $state['course'];
         $pricing = $state['pricing'];

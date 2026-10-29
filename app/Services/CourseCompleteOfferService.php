@@ -36,17 +36,8 @@ class CourseCompleteOfferService
         $cursoAtual = $this->pricingStateService->prepareCoursePricingBase($curso);
         $this->pricingStateService->hydrateCourseForPublicState($cursoAtual, $dados);
 
-        $cursoBasePricing = clone $cursoAtual;
         $this->pricingStateService->applyPricingConfigurationByCoupon($cursoAtual, $dados, false);
-
-        $pricingConfig = $this->pricingStateService->buildPublicCoursePricingConfig(
-            $cursoBasePricing,
-            $cursoAtual,
-            $dados,
-            false
-        );
-
-        $cards = $pricingConfig['initial_state']['cards'] ?? [];
+        $cards = $this->pricingStateService->buildCurrentCoursePricingState($cursoAtual, false)['cards'] ?? [];
         $offers = [];
 
         if (is_array($cards['completo'] ?? null) && !empty($cards['completo'])) {
