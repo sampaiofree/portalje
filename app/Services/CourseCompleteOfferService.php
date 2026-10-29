@@ -12,9 +12,9 @@ class CourseCompleteOfferService
     ) {
     }
 
-    public function completeOffer(Curso $curso, ?Codigo_ref $ref): array
+    public function completeOffer(Curso $curso, ?Codigo_ref $ref, ?array $offers = null): array
     {
-        foreach ($this->offersForCatalog($curso, $ref) as $offer) {
+        foreach ($offers ?? $this->offersForCatalog($curso, $ref) as $offer) {
             if (($offer['label'] ?? '') === 'Plano completo') {
                 return $offer;
             }

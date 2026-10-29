@@ -62,6 +62,7 @@ class CatalogoController extends Controller
     private function mapearItemCatalogo(Curso $curso, string $baseUrl, ?Codigo_ref $ref, Collection $cuponsPorId): array
     {
         $link = rtrim($baseUrl, '/') . '/' . ltrim((string) $curso->url, '/');
+        $offers = $this->completeOfferService->offersForCatalog($curso, $ref);
 
         return [
             'id' => 'curso_' . $curso->id,
@@ -71,8 +72,8 @@ class CatalogoController extends Controller
             'condition' => 'new',
             'price' => $this->precoMetaPorConfiguracao($curso, $ref, $cuponsPorId),
             'link' => $link,
-            'checkout_link' => $this->completeOfferService->completeOffer($curso, $ref)['checkout_url'] ?? '',
-            'offers' => $this->completeOfferService->offersForCatalog($curso, $ref),
+            'checkout_link' => $this->completeOfferService->completeOffer($curso, $ref, $offers)['checkout_url'] ?? '',
+            'offers' => $offers,
             'workload' => $this->cargaHorariaCurso($curso),
             'teacher_name' => $this->nomeProfessorCurso($curso),
             'image_link' => $curso->capa_quadrada ? asset('storage/' . $curso->capa_quadrada) : '',

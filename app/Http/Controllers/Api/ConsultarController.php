@@ -30,8 +30,6 @@ class ConsultarController extends Controller
         if ($nomeCampo == "email") $nomeCampo = "buyer_email";
         if ($nomeCampo == "telefone") $nomeCampo = "buyer_checkout_phone";
 
-        $alunos = PurchaseEvent::where($nomeCampo, 'like', '%' . $conteudoCampo . '%')->get();
-
         $alunos = PurchaseEvent::where($nomeCampo, $conteudoCampo)->get();
 
         // 🔹 Retornar os resultados formatados em Markdown
@@ -72,12 +70,16 @@ class ConsultarController extends Controller
 
         $cursos = $query->get();
 
+        $configsByCourseId = null;
+        $portalData = null;
         if (!$id) {
-            $configsByCourseId = $this->rootDomainCoursePublicStateService->configsByCourseId();
+            $configsByCourseId = $this->rootDomainCoursePublicStateService->configsByCourseId($cursos->modelKeys());
+            $portalData = $this->rootDomainCoursePublicStateService->portalData();
             $cursos = $cursos
                 ->filter(fn (Curso $curso) => $this->rootDomainCoursePublicStateService->isVisibleForCourse(
                     $curso,
-                    $configsByCourseId->get($curso->id)
+                    $configsByCourseId->get($curso->id),
+                    true
                 ))
                 ->values();
         }
@@ -89,7 +91,7 @@ class ConsultarController extends Controller
         $markdown = "## 🎓 Lista de Cursos\n\n";
 
         foreach ($cursos as $curso) {
-            $markdown .= $this->buildCursoMarkdown($curso);
+            $markdown .= $this->buildCursoMarkdown($curso, $configsByCourseId?->get($curso->id), $configsByCourseId !== null, $portalData);
             $markdown .= "---\n\n";
         }
 
@@ -141,9 +143,9 @@ class ConsultarController extends Controller
 
    }
 
-    private function buildCursoMarkdown(Curso $curso): string
+    private function buildCursoMarkdown(Curso $curso, ?RootDomainCourseConfig $config = null, bool $configResolved = false, ?array $portalData = null): string
     {
-        $state = $this->rootDomainCoursePublicStateService->resolveEffectivePublicStateForCourse($curso);
+        $state = $this->rootDomainCoursePublicStateService->resolveEffectivePublicStateForCourse($curso, false, $config, $configResolved, $portalData);
         /** @var \App\Models\Curso $effectiveCourse */
         $effectiveCourse = $state['course'];
         $pricing = $state['pricing'];

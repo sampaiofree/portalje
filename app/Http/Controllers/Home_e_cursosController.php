@@ -53,9 +53,9 @@ class Home_e_cursosController extends Controller
         return $this->rootDomainCoursePublicStateService->isRootPortalHost($dominio);
     }
 
-    private function rootDomainConfigsByCourseId()
+    private function rootDomainConfigsByCourseId(?array $courseIds = null)
     {
-        return $this->rootDomainCoursePublicStateService->configsByCourseId();
+        return $this->rootDomainCoursePublicStateService->configsByCourseId($courseIds);
     }
 
     private function rootDomainConfigForCourse(?Curso $curso): ?RootDomainCourseConfig
@@ -65,7 +65,7 @@ class Home_e_cursosController extends Controller
 
     private function applyRootDomainPublicConfigOnCourse(Curso $curso, ?RootDomainCourseConfig $config): void
     {
-        $this->rootDomainCoursePublicStateService->applyConfigOnCourse($curso, $config, $this->dados_portal);
+        $this->rootDomainCoursePublicStateService->applyConfigOnCourse($curso, $config, $this->dados_portal, true);
     }
 
     private function buildRootDomainCourseData(Curso $curso, ?RootDomainCourseConfig $config): array
@@ -1195,13 +1195,13 @@ class Home_e_cursosController extends Controller
         }
 
         $isRootPortalHost = !$user && $this->isRootPortalHost((string) $request->getHost());
-        $rootDomainConfigsByCourseId = $isRootPortalHost
-            ? $this->rootDomainConfigsByCourseId()
-            : collect();
-        
         $datacursos = Curso::orderBy('ordem')
             ->orderBy('id')
             ->get();
+
+        $rootDomainConfigsByCourseId = $isRootPortalHost
+            ? $this->rootDomainConfigsByCourseId($datacursos->modelKeys())
+            : collect();
 
         $cursos = [];
         $vagas = $this->vagas();

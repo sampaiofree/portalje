@@ -60,13 +60,18 @@ class RootDomainCoursePublicStateService
         return in_array($dominio, $this->rootPortalHosts(), true);
     }
 
-    public function configsByCourseId(): Collection
+    public function configsByCourseId(?array $courseIds = null): Collection
     {
         if (!Schema::hasTable('root_domain_course_configs')) {
             return collect();
         }
 
-        return RootDomainCourseConfig::query()->get()->keyBy('curso_id');
+        $query = RootDomainCourseConfig::query();
+        if ($courseIds !== null) {
+            $query->whereIn('curso_id', $courseIds);
+        }
+
+        return $query->get()->keyBy('curso_id');
     }
 
     public function configForCourse(?Curso $curso): ?RootDomainCourseConfig
@@ -80,19 +85,19 @@ class RootDomainCoursePublicStateService
             ->first();
     }
 
-    public function isVisibleForCourse(Curso $curso, ?RootDomainCourseConfig $config = null): bool
+    public function isVisibleForCourse(Curso $curso, ?RootDomainCourseConfig $config = null, bool $configResolved = false): bool
     {
-        $config = $config ?: $this->configForCourse($curso);
+        $config = $configResolved ? $config : ($config ?: $this->configForCourse($curso));
 
         return $config
             ? (bool) $config->mostrar_curso
             : (bool) ($curso->mostrar_na_pagina ?? false);
     }
 
-    public function applyConfigOnCourse(Curso $curso, ?RootDomainCourseConfig $config = null, ?array $portalData = null): void
+    public function applyConfigOnCourse(Curso $curso, ?RootDomainCourseConfig $config = null, ?array $portalData = null, bool $configResolved = false): void
     {
         $portalData = $portalData ?: $this->portalData();
-        $config = $config ?: $this->configForCourse($curso);
+        $config = $configResolved ? $config : ($config ?: $this->configForCourse($curso));
 
         $curso->root_domain_course_config_id = $config->id ?? null;
         $curso->mostrar_curso = $config
@@ -125,10 +130,11 @@ class RootDomainCoursePublicStateService
         Curso $curso,
         ?RootDomainCourseConfig $config = null,
         array $overrides = [],
-        ?array $portalData = null
+        ?array $portalData = null,
+        bool $configResolved = false
     ): array {
         $portalData = $portalData ?: $this->portalData();
-        $config = $config ?: $this->configForCourse($curso);
+        $config = $configResolved ? $config : ($config ?: $this->configForCourse($curso));
 
         $dados = [
             'whatsapp_atendimento' => $portalData['telefone_suporte_alunos'],
@@ -226,12 +232,12 @@ class RootDomainCoursePublicStateService
         $curso->origem = 'checkout_completo';
     }
 
-    public function resolveEffectivePublicStateForCourse(Curso $curso, bool $descontoBannerAtivo = false): array
+    public function resolveEffectivePublicStateForCourse(Curso $curso, bool $descontoBannerAtivo = false, ?RootDomainCourseConfig $config = null, bool $configResolved = false, ?array $portalData = null): array
     {
-        $portalData = $this->portalData();
-        $config = $this->configForCourse($curso);
+        $portalData = $portalData ?? $this->portalData();
+        $config = $configResolved ? $config : $this->configForCourse($curso);
         $effectiveCourse = $this->prepareCoursePricingBase($curso);
-        $dados = $this->buildRootDomainCourseData($effectiveCourse, $config, [], $portalData);
+        $dados = $this->buildRootDomainCourseData($effectiveCourse, $config, [], $portalData, true);
 
         $this->hydrateCourseForPublicState($effectiveCourse, $dados);
         $courseBasePricing = clone $effectiveCourse;
@@ -247,7 +253,7 @@ class RootDomainCoursePublicStateService
                 $dados,
                 $descontoBannerAtivo
             ),
-            'visible' => $this->isVisibleForCourse($curso, $config),
+            'visible' => $this->isVisibleForCourse($curso, $config, true),
             'portal_data' => $portalData,
         ];
     }
@@ -388,8 +394,16 @@ class RootDomainCoursePublicStateService
             return;
         }
 
-        $cupons = Cupom::query()->get()->keyBy('id');
-        if ($cupons->isEmpty()) {
+        if ($modoPrecos === 'padrao') {
+            $this->forceDefaultPricingConfiguration($curso);
+            return;
+        }
+
+        $ids = array_values(array_filter([$cupomPrincipalId, $cupomSecundarioId]));
+        $cupons = $ids ? Cupom::query()->whereIn('id', $ids)->get()->keyBy('id') : collect();
+        // With no principal coupon, the legacy one-price mode depends on whether
+        // any coupon exists, even if the configured secondary ID is missing.
+        if ($modoPrecos === 'um_preco' && !$cupomPrincipalId && $cupons->isEmpty() && !Cupom::query()->exists()) {
             $this->forceDefaultPricingConfiguration($curso);
             return;
         }
