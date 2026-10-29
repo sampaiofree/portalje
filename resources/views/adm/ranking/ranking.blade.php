@@ -11,7 +11,11 @@
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012-2m-6 0h6"></path>
                 </svg>
-                <span>Atualizado em tempo real</span>
+                @if (($activeTab ?? 'xp') === 'xp')
+                    <span>Atualização diária às 03h (Brasília)</span>
+                @else
+                    <span>Atualizado em tempo real</span>
+                @endif
             </div>
         </div>
     </x-slot>
@@ -35,6 +39,7 @@
                     'max' => 100,
                     'max_visible' => count($xpRows),
                     'load_more_url' => route('ranking.xp.load_more'),
+                    'generated_at' => null,
                 ], $xpMeta ?? []);
             @endphp
 
@@ -386,8 +391,13 @@
                                                         <svg class="w-16 h-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"></path>
                                                         </svg>
-                                                        <h3 class="text-lg font-medium text-gray-900 mb-2">Nenhum afiliado com XP</h3>
-                                                        <p class="text-gray-500">Ainda não há afiliados com XP acumulado para exibir no ranking.</p>
+                                                        @if ($xpMeta['generated_at'])
+                                                            <h3 class="text-lg font-medium text-gray-900 mb-2">Nenhum afiliado com XP</h3>
+                                                            <p class="text-gray-500">Ainda não há afiliados com XP acumulado para exibir no ranking.</p>
+                                                        @else
+                                                            <h3 class="text-lg font-medium text-gray-900 mb-2">Ranking aguardando primeira apuração</h3>
+                                                            <p class="text-gray-500">O ranking é atualizado diariamente às 03h (Brasília).</p>
+                                                        @endif
                                                     </div>
                                                 </td>
                                             </tr>
@@ -456,7 +466,16 @@
                         <div class="bg-gray-50 px-6 py-3 border-t border-gray-200">
                             <div class="flex items-center justify-between text-sm text-gray-500">
                                 <span x-text="`Exibindo ${formatNumber(rows.length)} de ${formatNumber(maxVisible)} afiliados`"></span>
-                                <span>Última atualização: {{ now()->format('d/m/Y H:i') }}</span>
+                                <span>
+                                    @if ($xpMeta['generated_at'])
+                                        Última apuração: {{ \Carbon\Carbon::parse($xpMeta['generated_at'])->timezone('America/Sao_Paulo')->format('d/m/Y H:i') }} (Brasília)
+                                        @if (\Carbon\Carbon::parse($xpMeta['generated_at'])->lt(now()->subHours(26)))
+                                            · Atualização em atraso
+                                        @endif
+                                    @else
+                                        Aguardando primeira apuração
+                                    @endif
+                                </span>
                             </div>
                         </div>
                     </div>

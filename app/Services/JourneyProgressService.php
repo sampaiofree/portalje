@@ -12,6 +12,8 @@ use Illuminate\Support\Facades\Schema;
 
 class JourneyProgressService
 {
+    public function __construct(private JourneyStepEvaluator $stepEvaluator) {}
+
     public function buildForUser(User $user): array
     {
         if (!$this->journeyTablesAvailable()) {
@@ -194,7 +196,7 @@ class JourneyProgressService
                 ->all();
 
             $goalValue = $step->goal_value !== null ? (float) $step->goal_value : null;
-            $concluido = $this->resolveStepCompletion($step, $completionMetrics);
+            $concluido = $this->stepEvaluator->isComplete($step, $completionMetrics);
 
             $dashboardJourney[] = [
                 'id' => $step->id,
@@ -240,31 +242,6 @@ class JourneyProgressService
         unset($dashboardStep);
 
         return $dashboardJourney;
-    }
-
-    private function resolveStepCompletion(JourneyStep $step, array $completionMetrics): bool
-    {
-        $rule = (string) $step->completion_rule;
-
-        if ($rule === JourneyStep::COMPLETION_RULE_SALES_COUNT_AT_LEAST) {
-            $goalValue = (float) ($step->goal_value ?? 0);
-            if ($goalValue <= 0) {
-                return false;
-            }
-
-            return (int) ($completionMetrics[$rule] ?? 0) >= $goalValue;
-        }
-
-        if ($rule === JourneyStep::COMPLETION_RULE_SALES_TOTAL_AT_LEAST) {
-            $goalValue = (float) ($step->goal_value ?? 0);
-            if ($goalValue <= 0) {
-                return false;
-            }
-
-            return (float) ($completionMetrics[$rule] ?? 0) >= $goalValue;
-        }
-
-        return (bool) ($completionMetrics[$rule] ?? false);
     }
 
     private function goalLabel(string $rule, ?float $goalValue): ?string

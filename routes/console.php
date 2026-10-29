@@ -9,3 +9,6 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote')->hourly();
 
 Schedule::command('auth:clear-resets')->everyFifteenMinutes();
+
+// The command owns the shared Redis lock, including for manual executions.
+Schedule::command('ranking:xp:rebuild')->dailyAt('03:00')->timezone('America/Sao_Paulo')->runInBackground();
