@@ -58,6 +58,42 @@ class PricingQueryEfficiencyTest extends TestCase
         $this->assertCount(0, $queries);
     }
 
+    public function test_invalid_coupon_configurations_fall_back_to_default(): void
+    {
+        $coupon = Cupom::create(['codigo' => 'SAME', 'desconto' => 10]);
+        $service = app(RootDomainCoursePublicStateService::class);
+
+        foreach ([
+            ['modo_precos' => 'um_preco', 'cupom_principal_id' => 9999],
+            ['modo_precos' => 'dois_precos', 'cupom_principal_id' => $coupon->id, 'cupom_secundario_id' => $coupon->id],
+            ['modo_precos' => 'dois_precos', 'cupom_secundario_id' => 9999],
+        ] as $data) {
+            $course = $this->course();
+            $service->applyPricingConfigurationByCoupon($course, $data, false);
+            $this->assertSame('padrao', $course->modo_precos);
+            $this->assertNull($course->cupom_principal_id);
+            $this->assertNull($course->cupom_secundario_id);
+            $this->assertSame('https://go.hotmart.com/REF?ap=abc', $course->link_checkout_completo);
+        }
+    }
+
+    public function test_known_missing_config_uses_course_defaults_without_another_query(): void
+    {
+        $course = $this->course();
+        $course->mostrar_na_pagina = true;
+        $service = app(RootDomainCoursePublicStateService::class);
+        DB::enableQueryLog();
+        $this->assertTrue($service->isVisibleForCourse($course, null, true));
+        $service->applyConfigOnCourse($course, null, ['formulario_pre_checkout' => true], true);
+        $queries = collect(DB::getQueryLog())->filter(fn ($query) => str_contains(strtolower($query['query']), 'root_domain_course_configs'));
+        DB::disableQueryLog();
+
+        $this->assertCount(0, $queries);
+        $this->assertTrue($course->mostrar_curso);
+        $this->assertSame('padrao', $course->modo_precos);
+        $this->assertTrue($course->formulario_pre_checkout);
+    }
+
     public function test_compact_affiliate_previews_have_the_same_cash_values_as_full_previews(): void
     {
         $coupons = collect([
