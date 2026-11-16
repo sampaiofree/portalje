@@ -91,7 +91,7 @@
 </style></head>
 <body>
 <header class="site-header"><div class="wrap header-content">
-<a href="#inicio" class="brand" aria-label="Portal Jovem Empreendedor, voltar ao início"><img src="{{ asset('img/home_page/logoPortal2.webp') }}" alt="Portal Jovem Empreendedor"><span class="brand-note">Portal dos<br>Afiliados</span></a>
+<a href="#inicio" class="brand" aria-label="Portal Jovem Empreendedor, voltar ao início"><img src="{{ asset('img/home_page/logojecolor.webp') }}" width="501" height="130" alt="Portal Jovem Empreendedor"><span class="brand-note">Portal dos<br>Afiliados</span></a>
 <nav class="top-nav" aria-label="Navegação principal"><a href="#como-funciona">Como funciona</a><a href="#materiais">Cursos e materiais</a><a href="#comissoes">Comissões</a><a href="#duvidas">Dúvidas</a><a class="btn btn-dark" href="https://portalje.org/register">Criar conta ↗</a></nav>
 </div></header>
 <main id="inicio">

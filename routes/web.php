@@ -344,7 +344,7 @@ Route::domain('afiliados.jovemempreendedor.org')->group(function () {
 
 //REDIRECIONAR DOMINIO/PARCEIROS
 Route::get('/parceiros', function () {
-    return view('parceiros'); // Redireciona para a URL externa
+    return redirect()->route('afiliados.index', [], 301);
 });
 
 //REDIRECIONAMENTO DE LINKS COM COOKIE PARA AFILIADOS
