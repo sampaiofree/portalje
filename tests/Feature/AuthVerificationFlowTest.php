@@ -124,6 +124,34 @@ class AuthVerificationFlowTest extends TestCase
         $responseOk->assertOk();
     }
 
+    public function test_phone_verification_screen_redirects_to_dashboard_without_confirming_pending_phone(): void
+    {
+        $user = User::factory()->unverifiedPhone()->create([
+            'email_verified_at' => now(),
+        ]);
+        $user->issuePhoneVerificationCode('5562999998888');
+
+        $this->actingAs($user)->get(route('phone.verification.notice'))
+            ->assertRedirect(route('dashboard'));
+
+        $user->refresh();
+        $this->assertNull($user->telefone_pessoal_1_verified_at);
+        $this->assertSame('5562999998888', $user->telefone_pessoal_1_pending);
+    }
+
+    public function test_phone_verification_screen_requires_login(): void
+    {
+        $this->get(route('phone.verification.notice'))->assertRedirect(route('login'));
+    }
+
+    public function test_phone_verification_screen_requires_verified_email(): void
+    {
+        $user = User::factory()->unverified()->unverifiedPhone()->create();
+
+        $this->actingAs($user)->get(route('phone.verification.notice'))
+            ->assertRedirect(route('verification.notice'));
+    }
+
     public function test_phone_verification_send_dispatches_botconversa_webhook_and_stores_pending_phone(): void
     {
         config([

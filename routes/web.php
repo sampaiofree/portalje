@@ -121,7 +121,7 @@ Route::view('/afiliados/politica', 'termos_e_politica.politica')->name('afiliado
  
 /*ROTAS DOS USUARIOS |EXIGE EMAIL EMAIL AUTENTICADO */
 Route::middleware(['auth', 'verified'])->prefix('user')->group(function () {
-    Route::get('/verificar-whatsapp', [PhoneVerificationController::class, 'show'])->name('phone.verification.notice');
+    Route::get('/verificar-whatsapp', fn () => redirect()->route('dashboard'))->name('phone.verification.notice');
     Route::post('/verificar-whatsapp/enviar', [PhoneVerificationController::class, 'send'])
         ->middleware('throttle:6,1')
         ->name('phone.verification.send');
