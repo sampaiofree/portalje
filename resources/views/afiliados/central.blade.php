@@ -4,6 +4,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="Conheça o programa de afiliados do Portal Jovem Empreendedor e os materiais para divulgar nossos cursos.">
 <title>Seja afiliado | Portal Jovem Empreendedor</title>
+<link rel="icon" href="{{ asset('icons/je512.png') }}" type="image/png" sizes="512x512">
 <style>
     :root{--navy:#123d59;--deep:#082f47;--mint:#137b67;--mint-dark:#0e6454;--teal-light:#e6f5ef;--orange:#f0a446;--ink:#182c3a;--muted:#5c6a76;--line:#e4eaf0;--bg:#f7fafc;--white:#fff;--radius:18px;--shadow:0 18px 48px rgba(15,54,78,.08)}
     *,*::before,*::after{box-sizing:border-box}
