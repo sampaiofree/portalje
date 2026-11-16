@@ -33,6 +33,7 @@
         <x-slot name="content">
             <x-dropdown-link :href="route('encurtar_link_lista')">Encurtador de links</x-dropdown-link>
             <x-dropdown-link :href="$catalogoUrl">Catálogo Meta Ads</x-dropdown-link>
+            <x-dropdown-link :href="route('afiliados.index')" target="_blank" rel="noopener noreferrer">Cursos e materiais ↗<span class="sr-only"> (abre em nova aba)</span></x-dropdown-link>
         </x-slot>
     </x-dropdown>
 </div>

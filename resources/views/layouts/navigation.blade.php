@@ -84,6 +84,7 @@
                 <div class="mt-2 space-y-1">
                     <x-responsive-nav-link :href="route('encurtar_link_lista')">Encurtador de links</x-responsive-nav-link>
                     <x-responsive-nav-link :href="$catalogoUrl">Catálogo Meta Ads</x-responsive-nav-link>
+                    <x-responsive-nav-link :href="route('afiliados.index')" target="_blank" rel="noopener noreferrer">Cursos e materiais ↗<span class="sr-only"> (abre em nova aba)</span></x-responsive-nav-link>
                 </div>
             </div>
 

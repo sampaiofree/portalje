@@ -516,6 +516,17 @@
                 <div class="bg-white bg-gray-800 p-6 rounded-lg shadow-sm">
                     <h3 class="text-xl font-semibold mb-4 flex items-center text-gray-900 text-gray-100"><span class="bg-blue-500 text-white rounded-full h-8 w-8 flex items-center justify-center mr-3 text-sm">4</span>Materiais e Leads</h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div class="flex flex-col items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4">
+                            <i class="ri-folder-open-line text-2xl text-blue-600" aria-hidden="true"></i>
+                            <div>
+                                <h4 class="font-semibold text-gray-900">Cursos e materiais de divulgação</h4>
+                                <p class="mt-2 text-sm text-gray-600">Encontre materiais para divulgar os cursos e links para se afiliar na Hotmart.</p>
+                            </div>
+                            <a href="{{ route('afiliados.index') }}" target="_blank" rel="noopener noreferrer" class="mt-auto inline-flex items-center gap-2 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                                Acessar cursos e materiais <span aria-hidden="true">↗</span>
+                                <span class="sr-only">(abre em nova aba)</span>
+                            </a>
+                        </div>
                         <a href="https://drive.google.com/drive/folders/1H1Obc3ozkNDUkcimhDwHD1olZYvHBL2f?usp=sharing" target="_blank" class="flex items-center gap-3 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 px-4 py-3 bg-gray-100 focus:bg-white transition"><i class="ri-folder-zip-line text-2xl text-blue-500"></i> <span class="font-medium text-gray-700 text-gray-300">Materiais de Apoio</span></a>
                         <a href="https://drive.google.com/drive/folders/1GjFHzFfwI_yEjtMwliMU5F34y581xmKN?usp=sharing" target="_blank" rel="noopener noreferrer" class="flex items-center gap-3 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 px-4 py-3 bg-gray-100 focus:bg-white transition"><i class="ri-file-list-3-line text-2xl text-blue-500"></i> <span class="font-medium text-gray-700 text-gray-300">Script de atendimento</span></a>
                         <a href="{{ route('hotmart_leads', ['version' => null]) }}" class="flex items-center gap-3 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 px-4 py-3 bg-gray-100 focus:bg-white transition"><i class="ri-user-search-line text-2xl text-blue-500"></i> <span class="font-medium text-gray-700 text-gray-300">Meus Leads</span></a>
