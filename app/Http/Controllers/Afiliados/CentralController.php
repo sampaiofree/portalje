@@ -14,7 +14,7 @@ class CentralController extends Controller
             ->where('permitir_afiliacao', true)
             ->orderBy('ordem')
             ->orderBy('id')
-            ->get(['id', 'titulo', 'descricao_curta', 'headline', 'capa_horizontal', 'capa_quadrada', 'link_materiais', 'link_afiliacao']);
+            ->get(['id', 'titulo', 'capa_horizontal', 'capa_quadrada', 'link_materiais', 'link_afiliacao']);
 
         return view('afiliados.central', compact('cursos'));
     }

@@ -106,11 +106,10 @@
 @forelse ($cursos as $curso)
 @php
     $capa = $curso->capa_horizontal ?: $curso->capa_quadrada;
-    $descricao = trim(strip_tags((string) ($curso->descricao_curta ?: $curso->headline)));
     $materiais = trim((string) $curso->link_materiais);
     $afiliacao = trim((string) $curso->link_afiliacao);
 @endphp
-<article class="course-card" data-course-title="{{ $curso->titulo }}"><div class="course-cover {{ $capa ? '' : 'course-cover-placeholder' }}">@if ($capa)<img src="{{ asset('storage/' . $capa) }}" alt="" loading="lazy">@else<span>{{ $curso->titulo }}</span>@endif</div><div class="course-body"><h3>{{ $curso->titulo }}</h3>@if ($descricao)<p>{{ $descricao }}</p>@endif<div class="course-divider course-actions">@if ($materiais && preg_match('~^https?://~i', $materiais))<a class="btn btn-dark" href="{{ $materiais }}" target="_blank" rel="noopener noreferrer">Materiais de divulgação ↗</a>@else<span class="unavailable">Materiais em breve</span>@endif @if ($afiliacao && preg_match('~^https?://~i', $afiliacao))<a class="btn btn-outline" href="{{ $afiliacao }}" target="_blank" rel="noopener noreferrer">Afiliar-se na Hotmart ↗</a>@endif</div></div></article>
+<article class="course-card" data-course-title="{{ $curso->titulo }}"><div class="course-cover {{ $capa ? '' : 'course-cover-placeholder' }}">@if ($capa)<img src="{{ asset('storage/' . $capa) }}" alt="" loading="lazy">@else<span>{{ $curso->titulo }}</span>@endif</div><div class="course-body"><h3>{{ $curso->titulo }}</h3><div class="course-divider course-actions">@if ($materiais && preg_match('~^https?://~i', $materiais))<a class="btn btn-dark" href="{{ $materiais }}" target="_blank" rel="noopener noreferrer">Materiais de divulgação ↗</a>@else<span class="unavailable">Materiais em breve</span>@endif @if ($afiliacao && preg_match('~^https?://~i', $afiliacao))<a class="btn btn-outline" href="{{ $afiliacao }}" target="_blank" rel="noopener noreferrer">Afiliar-se na Hotmart ↗</a>@endif</div></div></article>
 @empty
 <p class="empty-message">Nenhum curso disponível no momento.</p>
 @endforelse
