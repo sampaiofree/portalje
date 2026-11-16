@@ -33,6 +33,7 @@ use App\Http\Controllers\LandingPageController;
 use App\Http\Controllers\FacebookConversionsController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Afiliados\CatalogoController;
+use App\Http\Controllers\Afiliados\CentralController;
 use App\Http\Controllers\Auth\EmailVerificationCodeController;
 use App\Http\Controllers\Auth\EmailVerificationNotificationController;
 use App\Http\Controllers\Auth\EmailVerificationPromptController;
@@ -63,6 +64,7 @@ Route::view('/workshop', 'landign_pages.vendedor_online');
 Route::view('/bio', 'bio');
 
 //CATALOGO PUBLICO DE AFILIADOS (META ADS)
+Route::get('/afiliados', [CentralController::class, 'index'])->name('afiliados.index');
 Route::get('/afiliado/catalogo', [CatalogoController::class, 'index'])->name('afiliado.catalogo');
 Route::get('/afiliado/catalogo2', [CatalogoController::class, 'markdown'])->name('afiliado.catalogo2');
 
@@ -359,7 +361,7 @@ Route::prefix('email')->group(function () {
     Route::get('/verify/{id}/{hash}', function (EmailVerificationRequest $request) {
         $request->fulfill(); // Marca o e-mail como verificado
         $request->user()->clearEmailVerificationCode();
-        return redirect()->route('phone.verification.notice')->with('status', 'email-verified');
+        return redirect()->route('dashboard')->with('status', 'email-verified');
     })->middleware(['auth', 'signed'])->name('verification.verify');
     
 

@@ -15,7 +15,7 @@ class EmailVerificationPromptController extends Controller
     public function __invoke(Request $request): RedirectResponse|View
     {
         if ($request->user()->hasVerifiedEmail()) {
-            return redirect()->route('phone.verification.notice');
+            return redirect()->route('dashboard');
         }
 
         return view('auth.verify-email');

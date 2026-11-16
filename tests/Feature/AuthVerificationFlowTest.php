@@ -40,7 +40,7 @@ class AuthVerificationFlowTest extends TestCase
         });
     }
 
-    public function test_email_code_can_confirm_email_and_redirect_to_whatsapp_verification(): void
+    public function test_email_code_can_confirm_email_and_redirect_to_dashboard(): void
     {
         $user = User::factory()->unverified()->unverifiedPhone()->create();
         $code = $user->issueEmailVerificationCode();
@@ -49,13 +49,34 @@ class AuthVerificationFlowTest extends TestCase
             'code' => $code,
         ]);
 
-        $response->assertRedirect(route('phone.verification.notice'));
+        $response->assertRedirect(route('dashboard'));
 
         $user->refresh();
 
         $this->assertNotNull($user->email_verified_at);
         $this->assertNull($user->email_verification_code_hash);
         $this->assertNull($user->email_verification_code_expires_at);
+    }
+
+    public function test_signed_email_verification_redirects_to_dashboard(): void
+    {
+        $user = User::factory()->unverified()->unverifiedPhone()->create();
+        $url = \Illuminate\Support\Facades\URL::temporarySignedRoute('verification.verify', now()->addMinutes(10), [
+            'id' => $user->getKey(),
+            'hash' => sha1($user->getEmailForVerification()),
+        ]);
+
+        $this->actingAs($user)->get($url)->assertRedirect(route('dashboard'));
+        $this->assertNotNull($user->fresh()->email_verified_at);
+    }
+
+    public function test_verified_user_is_redirected_to_dashboard_from_email_verification(): void
+    {
+        $user = User::factory()->unverifiedPhone()->create(['email_verified_at' => now()]);
+
+        $this->actingAs($user)->get(route('verification.notice'))->assertRedirect(route('dashboard'));
+        $this->actingAs($user)->post(route('verification.send'))->assertRedirect(route('dashboard'));
+        $this->actingAs($user)->post(route('verification.code'), ['code' => '123456'])->assertRedirect(route('dashboard'));
     }
 
     public function test_resending_email_code_invalidates_previous_code(): void
@@ -76,7 +97,7 @@ class AuthVerificationFlowTest extends TestCase
         Notification::assertSentTo($user, EmailVerificationCodeNotification::class);
     }
 
-    public function test_user_dashboard_redirects_to_correct_step_based_on_email_and_phone_verification(): void
+    public function test_user_dashboard_requires_verified_email_but_not_verified_phone(): void
     {
         $this->withoutMiddleware(MinhaJornada::class);
 
@@ -90,7 +111,7 @@ class AuthVerificationFlowTest extends TestCase
             'email_verified_at' => now(),
         ]);
         $responsePhone = $this->actingAs($telefoneNaoVerificado)->get(route('dashboard'));
-        $responsePhone->assertRedirect(route('phone.verification.notice'));
+        $responsePhone->assertOk();
 
         auth()->logout();
 

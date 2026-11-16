@@ -22,7 +22,7 @@ class EmailVerificationCodeController extends Controller
         }
 
         if ($user->hasVerifiedEmail()) {
-            return redirect()->route('phone.verification.notice');
+            return redirect()->route('dashboard');
         }
 
         if (!$user->matchesEmailVerificationCode((string) $request->input('code'))) {
@@ -36,6 +36,6 @@ class EmailVerificationCodeController extends Controller
 
         event(new Verified($user));
 
-        return redirect()->route('phone.verification.notice')->with('status', 'email-verified');
+        return redirect()->route('dashboard')->with('status', 'email-verified');
     }
 }

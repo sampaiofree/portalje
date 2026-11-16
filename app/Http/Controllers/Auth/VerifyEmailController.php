@@ -15,7 +15,7 @@ class VerifyEmailController extends Controller
     public function __invoke(EmailVerificationRequest $request): RedirectResponse
     {
         if ($request->user()->hasVerifiedEmail()) {
-            return redirect()->route('phone.verification.notice');
+            return redirect()->route('dashboard');
         }
 
         if ($request->user()->markEmailAsVerified()) {
@@ -24,6 +24,6 @@ class VerifyEmailController extends Controller
 
         $request->user()->clearEmailVerificationCode();
 
-        return redirect()->route('phone.verification.notice')->with('status', 'email-verified');
+        return redirect()->route('dashboard')->with('status', 'email-verified');
     }
 }
